@@ -3,46 +3,274 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>보행 분석</title>
+    <title>Talktail Gait</title>
     <!-- Pretendard (KR/EN UI). Falls back to system-ui offline; self-host the woff2 for a fully offline clinical build. -->
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@600;700&display=swap" rel="stylesheet" />
     <style>
       /* Design System: 보행 분석 — "The Clinic Companion". Light, line-delineated
          instrument. One coral voice; scientific data colors stay untouched. */
       :root {
-        --bg: #f8f9fb;          /* Paper Field — app + panel field */
+        --bg: #FFFBF8;          /* Warm ivory canvas */
         --surface: #ffffff;     /* Card White — inputs, raised controls */
-        --panel: #f8f9fb;       /* console shares the field, separated by line */
-        --border: #d8dce2;      /* Hairline — the confident border */
-        --border-strong: #c6cbd2; /* Hairline Strong — hovered control edge */
-        --divider: #e6e9ed;     /* Whisper Divider — internal row lines */
-        --surface-hover: #f0f1f4; /* Field Hover — secondary button hover fill */
+        --panel: #FFFDFA;       /* console shares the field, separated by line */
+        --border: #F3EFEC;      /* Hairline — the confident border */
+        --border-strong: #E9E5E3; /* Hairline Strong — hovered control edge */
+        --divider: #F6F2EF;     /* Whisper Divider — internal row lines */
+        --surface-hover: #FEF4F0; /* Field Hover — secondary button hover fill */
         --fg: #1f2329;          /* Ink — primary text + metrics */
-        --muted: #737a86;       /* Slate — secondary text */
+        --muted: #7C7977;       /* Warm slate — secondary text */
         --primary: #f0663f;         /* Signal Coral */
         --primary-hover: #f2764d;
         --primary-pressed: #d9502b;
         --primary-light: #fdebe4;   /* Coral Wash — focus ring */
+        --brand-text: #D14E27;
         --success: #1a7f37;
         --warning: #9a6700;
         --danger: #cf222e;
         --mat-frame: #05070a;   /* dark well behind the luminous heatmap */
         --font-ui: 'Pretendard', 'Pretendard Variable', system-ui, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+        --font-brand: 'Quicksand', 'Pretendard', sans-serif;
       }
       * { box-sizing: border-box; }
       body {
         margin: 0; background: var(--bg); color: var(--fg);
-        font: 14px/1.4 var(--font-ui); display: flex; height: 100vh;
-        -webkit-font-smoothing: antialiased;
+        font: 14px/1.4 var(--font-ui); display: flex; flex-direction: column; height: 100vh;
+        -webkit-font-smoothing: antialiased; position: relative;
       }
-      #stage {
-        flex: 1; display: flex; flex-direction: column; align-items: stretch;
-        justify-content: stretch; padding: 12px; gap: 10px; min-width: 0; overflow: hidden;
+
+      /* —— App header: single bar — logo | wordmark | nav —— */
+      #appHeader {
+        flex-shrink: 0; background: var(--surface); border-bottom: 1px solid var(--border);
+        z-index: 50;
+      }
+      .ah-bar {
+        display: grid; grid-template-columns: 1fr auto 1fr;
+        align-items: center; gap: 16px; padding: 10px 20px; min-height: 60px;
+      }
+      .ah-logo {
+        justify-self: start; display: flex; align-items: center; text-decoration: none;
+        line-height: 0; border-radius: 8px;
+      }
+      .ah-logo img {
+        display: block; height: 36px; width: auto; max-width: 148px;
+        object-fit: contain; object-position: center;
+      }
+      .ah-wordmark {
+        justify-self: center; text-align: center; line-height: 1;
+        font-family: var(--font-brand); font-weight: 700;
+        letter-spacing: -0.03em; user-select: none; pointer-events: none;
+      }
+      .ah-wordmark-talk {
+        font-size: clamp(22px, 2.6vw, 30px); color: var(--primary);
+      }
+      .ah-wordmark-gait {
+        font-size: clamp(22px, 2.6vw, 30px); color: var(--brand-text);
+        margin-left: 0.28em; font-weight: 600;
+      }
+      .ah-nav {
+        justify-self: end; display: flex; align-items: center; gap: 6px;
+      }
+      .ah-nav button {
+        min-width: 72px; padding: 9px 16px; border-radius: 10px;
+        background: transparent; border: 1px solid transparent; color: var(--muted);
+        font-size: 13px; font-weight: 700; letter-spacing: -0.01em;
+      }
+      .ah-nav button:hover { background: var(--surface-hover); color: var(--fg); }
+      .ah-nav button.active {
+        background: var(--primary-light); color: var(--primary-pressed);
+        border-color: transparent;
+      }
+      .ah-nav button.active:hover {
+        background: var(--primary-light); color: var(--primary-pressed);
+      }
+      @media (max-width: 640px) {
+        .ah-bar { grid-template-columns: auto 1fr auto; gap: 10px; padding: 8px 12px; }
+        .ah-logo img { height: 30px; max-width: 112px; }
+        .ah-wordmark-talk, .ah-wordmark-gait { font-size: 18px; }
+        .ah-nav button { min-width: 0; padding: 8px 12px; font-size: 12px; }
+      }
+
+      #appBody {
+        flex: 1; min-height: 0; display: flex; position: relative;
+      }
+      body[data-module="report"] #appBody,
+      body[data-module="report"] #btnSideToggle { display: none !important; }
+
+      /* —— Report page —— */
+      #reportPage {
+        flex: 1; min-height: 0; display: none; flex-direction: column;
+        background: var(--bg); overflow: hidden;
+      }
+      body[data-module="report"] #reportPage { display: flex; }
+      .rp-toolbar {
+        flex-shrink: 0; display: flex; align-items: flex-start; justify-content: space-between;
+        gap: 12px; padding: 16px 24px 12px; border-bottom: 1px solid var(--divider);
+        background: var(--surface);
+      }
+      .rp-toolbar-text { min-width: 0; }
+      #rpCrumbs { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+      #rpTitle { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+      #rpSub { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+      .rp-toolbar-actions { display: flex; gap: 8px; flex-shrink: 0; }
+      .rp-scroll {
+        flex: 1; min-height: 0; overflow: auto; padding: 20px 24px 32px;
+      }
+      .rp-grid {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 12px;
+      }
+      .rp-card {
+        text-align: left; padding: 16px 18px; border-radius: 12px;
+        background: var(--surface); border: 1px solid var(--border);
+        display: flex; flex-direction: column; gap: 6px; cursor: pointer;
+      }
+      .rp-card:hover { border-color: var(--primary); background: var(--brand-selected-bg, var(--primary-light)); }
+      .rp-card-title { font-size: 16px; font-weight: 700; color: var(--fg); }
+      .rp-card-meta { font-size: 12px; color: var(--muted); font-feature-settings: 'tnum' 1; }
+      #rpEmpty, #rpLoading { font-size: 14px; color: var(--muted); padding: 32px 8px; text-align: center; }
+      #rpDetail {
+        display: grid; grid-template-columns: minmax(280px, 42%) 1fr; gap: 20px; align-items: start;
+      }
+      @media (max-width: 900px) {
+        #rpDetail { grid-template-columns: 1fr; }
+      }
+      #rpDetail.hidden, #rpList.hidden, #rpEmpty.hidden, #rpLoading.hidden, #rpBack.hidden { display: none !important; }
+      #rpDetailVideo.video-panel {
+        background: var(--mat-frame); border: 1px solid var(--border); border-radius: 12px;
+        overflow: hidden; display: flex; flex-direction: column; min-height: 280px; position: sticky; top: 0;
+      }
+      #rpDetailLoading { text-align: center; color: var(--muted); padding: 24px; }
+      #rpDetailBody { min-width: 0; }
+      .rp-detail-main { min-width: 0; }
+
+      /* —— Right control rail (collapsible) —— */
+      #side {
+        order: 2; width: 320px; flex: 0 0 320px; background: var(--panel);
+        border-left: 1px solid var(--border);
+        padding: 18px; display: flex; flex-direction: column; gap: 14px;
+        overflow-x: hidden; overflow-y: auto;
+        transition: flex-basis .22s ease, width .22s ease, padding .22s ease, opacity .18s ease;
+      }
+      body.side-collapsed #side {
+        flex-basis: 0; width: 0; padding-left: 0; padding-right: 0;
+        opacity: 0; pointer-events: none; border-left-width: 0;
+      }
+      #btnSideToggle {
+        position: absolute; top: 12px; z-index: 40;
+        width: 28px; height: 56px; padding: 0;
+        border-radius: 8px 0 0 8px; border: 1px solid var(--border); border-right: none;
+        background: var(--surface); color: var(--muted); font-size: 16px; line-height: 1;
+        box-shadow: -1px 2px 8px rgba(31, 35, 41, 0.06);
+      }
+      body:not(.side-collapsed) #btnSideToggle { right: 320px; left: auto; }
+      body.side-collapsed #btnSideToggle {
+        right: 0; left: auto;
+        border-right: 1px solid var(--border); border-radius: 8px 0 0 8px;
+      }
+
+      /* —— Workspace: pad | 16:9 capture stack | remaining analysis ——
+         Col2 width ≈ two stacked 16:9 (1920×1080) panes: W = (H − labels/gaps) × 8/9.
+         Leftover width goes mainly to col3. */
+      #stage.workspace {
+        order: 1; flex: 1; min-width: 0; overflow: hidden; position: relative;
+        display: grid;
+        container-type: size;
+        grid-template-columns:
+          minmax(120px, 1fr)
+          minmax(0, calc((100cqh - 52px) * 8 / 9))
+          minmax(0, 1.6fr);
+        gap: 10px; padding: 12px;
+      }
+      .ws-pane, .ws-cell {
+        min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 6px;
+      }
+      .ws-pane-2, .ws-pane-3 {
+        display: grid; grid-template-rows: 1fr 1fr; gap: 10px;
+      }
+      .ws-pane-2 .ws-body {
+        aspect-ratio: 16 / 9;
+      }
+      .ws-label {
+        flex-shrink: 0; font-size: 11px; font-weight: 600; letter-spacing: .05em;
+        text-transform: uppercase; color: var(--muted);
+      }
+      .ws-body {
+        flex: 1; min-height: 0; position: relative; overflow: hidden;
+        background: #05070a; border: 1px solid var(--border); border-radius: 8px;
+        display: flex; align-items: center; justify-content: center;
+      }
+      .ws-body > img, .ws-body > video {
+        width: 100%; height: 100%; object-fit: contain; display: none; background: #05070a;
+      }
+      .ws-body.has-media > img, .ws-body.has-media > video { display: block; }
+      .ws-body.is-empty::after {
+        content: attr(data-slot);
+        color: rgba(255,255,255,.18); font-size: 12px; font-weight: 600;
+        letter-spacing: .06em; text-transform: uppercase;
+      }
+      .ws-body.has-media.is-empty::after { display: none; }
+      .ws-media-controls {
+        flex-shrink: 0; display: flex; align-items: center; gap: 8px;
+        padding: 4px 2px 0;
+      }
+      .ws-media-controls .ws-play {
+        width: 34px; padding: 6px 0; font-size: 13px; line-height: 1;
+      }
+      .ws-media-controls .ws-speed {
+        flex: 1; min-width: 0; background: var(--surface); color: var(--fg);
+        border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font: inherit;
+        cursor: pointer;
+      }
+      .ws-media-controls .ws-speed:focus {
+        outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light);
+      }
+      .ws-media-controls .ws-play:disabled,
+      .ws-media-controls .ws-speed:disabled {
+        opacity: .4; cursor: not-allowed;
+      }
+
+      /* Session status overlay (recording / analyzing) — no live A/V stream */
+      #sessionOverlay {
+        position: absolute; inset: 12px; z-index: 30;
+        display: none; align-items: center; justify-content: center;
+        background: rgba(5, 7, 10, 0.92); border: 1px solid var(--border); border-radius: 10px;
+        pointer-events: none;
+      }
+      #sessionOverlay.show { display: flex; }
+      .session-overlay-card { text-align: center; color: #fff; padding: 24px; max-width: 420px; }
+      .session-overlay-card .so-title {
+        font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 8px;
+      }
+      .session-overlay-card .so-sub { font-size: 13px; color: rgba(255,255,255,.65); line-height: 1.45; margin: 0; }
+      .session-overlay-card .so-pulse {
+        width: 10px; height: 10px; border-radius: 50%; background: var(--primary);
+        margin: 0 auto 14px; animation: soPulse 1.1s ease-in-out infinite;
+      }
+      @keyframes soPulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: .35; transform: scale(1.35); }
+      }
+      body.session-recording #sessionOverlay .so-pulse { background: #cf222e; }
+      body.session-analyzing #sessionOverlay .so-pulse { background: var(--primary); }
+
+      #btnSession {
+        grid-column: span 2; font-weight: 700; font-size: 15px; padding: 12px 10px;
+      }
+      #btnSession.is-stop {
+        background: var(--danger); border-color: var(--danger); color: #fff;
+      }
+      #btnSession.is-stop:hover { filter: brightness(1.05); }
+
+      /* Legacy hosts kept for existing JS (heatmap / sync player) — not the review layout */
+      #legacyHosts {
+        position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+        overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
       }
       #cameraSection {
-        width: 100%; align-self: stretch;
-        display: flex; flex-direction: column; gap: 6px;
-        flex: 1 1 0; min-height: 0;
+        width: 100%; display: flex; flex-direction: column; gap: 6px; min-height: 0;
       }
       .sync-pane-label {
         font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
@@ -50,9 +278,9 @@
       }
       #cameraPanel.video-panel {
         background: var(--mat-frame); border: 1px solid var(--border); border-radius: 8px;
-        overflow: hidden; display: flex; flex-direction: column; flex: 1; min-height: 0;
+        overflow: hidden; display: flex; flex-direction: column; flex: 1; min-height: 120px;
       }
-      #cameraPanel .video-viewport { flex: 1; min-height: 0; }
+      #cameraPanel .video-viewport { flex: 1; min-height: 80px; }
       #cameraPanel .video-controls {
         background: var(--surface); border-top: 1px solid var(--divider); flex-shrink: 0;
       }
@@ -60,18 +288,14 @@
         background: var(--surface); color: var(--fg); border-color: var(--border);
       }
       #cameraPanel .video-time { color: var(--muted); }
-      #btnSyncBackLive { align-self: flex-end; flex-shrink: 0; }
+      #btnSyncBackLive { flex-shrink: 0; }
       #btnSyncBackLive.hidden { display: none; }
       #syncMatLabel { display: none; width: 100%; }
       #stage.sync-active #syncMatLabel { display: block; }
       #stage.sync-active #cameraPanelLabel { display: none; }
-      /* Mat on top half — portrait canvas rotated -90° for landscape display;
-         slot takes flex space so transform does not break the column layout. */
       #matSlot {
-        flex: 1 1 0; min-height: 0; width: 100%;
-        position: relative; overflow: hidden;
-        container-type: size;
-        background: var(--mat-frame); border: 1px solid var(--border); border-radius: 8px;
+        position: relative; overflow: hidden; width: 240px; height: 480px;
+        container-type: size; background: var(--mat-frame);
       }
       #matWrap {
         position: absolute; top: 50%; left: 50%;
@@ -81,12 +305,7 @@
         transform: translate(-50%, -50%) rotate(-90deg);
       }
       #heatmap { width: 100%; height: 100%; display: block; image-rendering: auto; }
-      /* Paw-label overlay sits directly on top of the heatmap, same box. */
       #overlay { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
-      #side {
-        width: 320px; background: var(--panel); border-left: 1px solid var(--border);
-        padding: 18px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto;
-      }
       h1 { font-size: 15px; font-weight: 600; line-height: 1.3; margin: 0 0 4px; }
       .row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--divider); }
       .row b { font-weight: 600; font-feature-settings: 'tnum' 1; }
@@ -111,6 +330,53 @@
         border-radius: 6px; padding: 7px 8px; font: inherit; font-feature-settings: 'tnum' 1;
       }
       .field input[type=number]:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+      .dog-info { display: flex; flex-direction: column; gap: 8px; }
+      .dog-info.is-collapsed { display: none; }
+      .dog-info-head {
+        display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      }
+      .dog-info-head .section { margin-top: 0; }
+      .dog-info-head #btnDogInfoToggle {
+        flex-shrink: 0; padding: 4px 10px; font-size: 12px; color: var(--muted);
+      }
+      .dog-info .field-col {
+        display: flex; flex-direction: column; align-items: stretch; gap: 4px;
+      }
+      .dog-info .field-col label { font-size: 12px; color: var(--muted); }
+      .dog-info .field-col input {
+        width: 100%; box-sizing: border-box; background: var(--surface); color: var(--fg);
+        border: 1px solid var(--border); border-radius: 6px; padding: 7px 8px; font: inherit;
+        font-feature-settings: 'tnum' 1;
+      }
+      .dog-info .field-col input:disabled {
+        opacity: .55; cursor: not-allowed; background: var(--divider, #f0f0f0);
+      }
+      /* Pad connection panel — top of side rail */
+      #padConnectPanel {
+        display: flex; flex-direction: column; gap: 10px;
+        padding: 12px; border: 1px solid var(--border); border-radius: 10px;
+        background: var(--surface);
+      }
+      #padConnectPanel.is-connected {
+        border-color: color-mix(in srgb, var(--success) 35%, var(--border));
+        background: color-mix(in srgb, var(--success) 6%, var(--surface));
+      }
+      #padConnectPanel.is-waiting {
+        border-color: color-mix(in srgb, var(--warning) 35%, var(--border));
+        background: color-mix(in srgb, var(--warning) 6%, var(--surface));
+      }
+      #padConnectPanel .pad-status-row {
+        display: flex; flex-direction: column; gap: 6px;
+      }
+      #padConnectPanel .pad-status-row .row {
+        padding: 2px 0; border-bottom: none;
+      }
+      #padConnectPanel .pad-hint {
+        font-size: 12px; color: var(--muted); line-height: 1.45; margin: 0;
+      }
+      #padConnectPanel .controls { margin: 0; }
+      #padConnectPanel #btnConnect.primary { grid-column: span 2; }
+      #padConnectPanel #btnCalibrate { grid-column: span 2; }
       button.primary { background: var(--primary); border-color: var(--primary); color: #fff; grid-column: span 2; }
       button.primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
       button.primary:active { background: var(--primary-pressed); border-color: var(--primary-pressed); }
@@ -316,44 +582,43 @@
     
     </style>
   </head>
-  <body>
-    <div id="stage">
-      <div class="sync-pane-label" id="syncMatLabel" data-i18n="sync_mat_label">Recorded mat</div>
-      <div id="matSlot">
-        <div id="matWrap"><canvas id="heatmap"></canvas><canvas id="overlay"></canvas></div>
+  <body class="side-collapsed" data-module="measure">
+    <header id="appHeader">
+      <div class="ah-bar">
+        <a class="ah-logo" href="#measure" data-nav="measure" aria-label="Talktail">
+          <img src="./brand/talktail_logo.png" alt="Talktail" width="148" height="36" />
+        </a>
+        <div class="ah-wordmark" aria-label="Talktail Gait">
+          <span class="ah-wordmark-talk">Talktail</span><span class="ah-wordmark-gait">Gait</span>
+        </div>
+        <nav class="ah-nav" aria-label="Modules">
+          <button type="button" class="active" data-module="measure" aria-current="page" data-i18n="nav_measure">측정</button>
+          <button type="button" data-module="report" data-i18n="nav_report">리포트</button>
+        </nav>
       </div>
-      <div id="cameraSection">
-        <div class="sync-pane-label" id="cameraPanelLabel" data-i18n="camera_panel_label">Phone camera</div>
-        <div id="cameraPanel" class="video-panel">
-          <div class="video-viewport">
-            <div class="video-media-wrap">
-              <canvas class="camera-preview-canvas"></canvas>
-              <img class="camera-preview" alt="" hidden />
-              <video class="ai-video" playsinline></video>
-              <div class="camera-placeholder" data-i18n="camera_placeholder">Waiting for phone camera…</div>
-              <div class="camera-loading"><span data-i18n="sync_analyzing">Analyzing…</span></div>
-            </div>
+    </header>
+
+    <div id="appBody">
+    <!-- side is order:2 (right); stage is order:1 -->
+    <aside id="side">
+      <div class="section" data-i18n="section_pad_connect">패드 연결</div>
+      <div id="padConnectPanel">
+        <div class="pad-status-row">
+          <div class="row">
+            <span data-i18n="stat_connection">연결</span>
+            <b id="status" class="off">○ 대기</b>
           </div>
-          <div class="video-controls">
-            <button type="button" class="btn-video-play" title="Play">▶</button>
-            <input type="range" class="video-scrub" min="0" max="1000" value="0" />
-            <span class="video-time">0:00 / 0:00</span>
-            <select class="video-speed" aria-label="Speed">
-              <option value="0.2">0.2×</option>
-              <option value="0.25">0.25×</option>
-              <option value="0.5">0.5×</option>
-              <option value="1" selected>1×</option>
-              <option value="1.5">1.5×</option>
-              <option value="2">2×</option>
-            </select>
-            <input type="range" class="video-zoom" min="100" max="300" value="100" title="Zoom" />
+          <div class="row">
+            <span data-i18n="stat_calibration">보정</span>
+            <b id="statCal" class="warn">미보정</b>
           </div>
         </div>
-        <button type="button" id="btnSyncBackLive" class="hidden" data-i18n="btn_back_live">Back to live</button>
+        <div class="controls">
+          <button type="button" id="btnConnect" class="primary" data-i18n="btn_connect_pad">패드 연결</button>
+          <button type="button" id="btnCalibrate" data-i18n="btn_calibrate" disabled>보정</button>
+        </div>
+        <p class="pad-hint" data-i18n="pad_connect_hint">USB로 압력 패드를 연결한 뒤 버튼을 누르세요. 연결 후 보정을 권장합니다.</p>
       </div>
-    </div>
-    <aside id="side">
-      <h1 data-i18n="h1_title">Pressure Mat Viewer</h1>
 
       <div class="lang-row">
         <label for="langSelect" class="muted" data-i18n="lang_label">Language</label>
@@ -363,16 +628,45 @@
         </select>
       </div>
 
+      <!-- 기타 컨트롤: 파일 재생 / 라벨 / 격자 / 선명도 (임시 비표시)
       <div class="controls">
-        <button id="btnConnect" data-i18n="btn_connect">Connect</button>
-        <button id="btnCalibrate" data-i18n="btn_calibrate">Calibrate</button>
         <label class="btn" for="file" data-i18n="btn_replay_file">Replay file</label>
         <button id="btnLabels" data-i18n="btn_labels_on">🐾 Labels: On</button>
         <button id="btnGrid" data-i18n="btn_grid">Grid</button>
         <button id="btnSharp" data-i18n="btn_sharp_soft">Sharpness: Soft</button>
       </div>
       <input id="file" type="file" accept=".txt,.csv,.log" />
+      -->
 
+      <div class="dog-info-head">
+        <div class="section" data-i18n="section_dog_info">반려견</div>
+        <button type="button" id="btnDogInfoToggle" data-i18n="btn_dog_info_expand">펼치기</button>
+      </div>
+      <div class="dog-info is-collapsed" id="dogInfoForm">
+        <div class="field-col">
+          <label for="dogName" data-i18n="dog_name">이름</label>
+          <input id="dogName" type="text" disabled placeholder="–" autocomplete="off" />
+        </div>
+        <div class="field-col">
+          <label for="dogHeight" data-i18n="dog_height">신장</label>
+          <input id="dogHeight" type="number" disabled placeholder="cm" min="0" step="0.1" />
+        </div>
+        <div class="field-col">
+          <label for="dogWeightInfo" data-i18n="dog_weight">몸무게</label>
+          <input id="dogWeightInfo" type="number" disabled placeholder="kg" min="0" step="0.1" />
+        </div>
+        <div class="field-col">
+          <label for="dogBreed" data-i18n="dog_breed">견종</label>
+          <input id="dogBreed" type="text" disabled placeholder="–" autocomplete="off" />
+        </div>
+      </div>
+
+      <div class="section" data-i18n="section_session">세션</div>
+      <div class="controls">
+        <button type="button" id="btnSession" class="primary" data-i18n="btn_session_start">시작</button>
+      </div>
+
+      <!-- 녹화 섹션 (임시 비표시)
       <div class="section" data-i18n="section_recording">Recording</div>
       <div class="controls">
         <button id="btnRecord" data-i18n="btn_record">● Record</button>
@@ -382,19 +676,17 @@
         <button id="btnGif" disabled data-i18n="btn_gif">GIF</button>
         <button id="btnPng" disabled data-i18n="btn_png">Heatmap PNG</button>
       </div>
+      -->
 
+      <!-- 보행 분석 버튼 (임시 비표시)
       <div class="section" data-i18n="section_gait">Gait analysis</div>
-      <div class="field">
-        <label for="dogWeight" data-i18n="dog_weight">Dog weight</label>
-        <input id="dogWeight" type="number" min="0.4" max="80" step="0.1" value="3.5" />
-        <span class="muted" data-i18n="kg">kg</span>
-      </div>
       <div class="controls">
         <button id="btnGait" class="primary" disabled data-i18n="btn_analyze_gait">🐾 Analyze gait</button>
         <button id="btnGaitCsv" disabled data-i18n="btn_report_csv">Report CSV</button>
         <button id="btnGaitPdf" disabled data-i18n="btn_report_pdf">Report PDF</button>
         <button id="btnGaitJson" disabled>Report JSON</button>
       </div>
+      -->
 
       <div id="gaitResult">
         <div class="row">
@@ -431,8 +723,6 @@
       </div>
 
       <div>
-        <div class="row"><span data-i18n="stat_connection">Connection</span><b id="status" class="off">○ idle</b></div>
-        <div class="row"><span data-i18n="stat_calibration">Calibration</span><b id="statCal" class="warn">uncalibrated</b></div>
         <div class="row"><span data-i18n="stat_max">Max pressure</span><b id="statMax">–</b></div>
         <div class="row"><span data-i18n="stat_avg">Avg pressure</span><b id="statAvg">–</b></div>
         <div class="row"><span data-i18n="stat_contact">Contact area</span><b id="statContact">–</b></div>
@@ -449,6 +739,7 @@
         <div class="row"><span data-i18n="stat_recording">Recording</span><b id="statRec" class="off">–</b></div>
       </div>
 
+      <!-- 색 스펙트럼 · 발 라벨 · 카메라 동기화 · AI 결과 (임시 비표시)
       <div id="legend"><span>10</span><div id="bar"></div><span>80</span></div>
       <div class="section" data-i18n="section_paw_labels">Paw labels</div>
       <div id="pawLegend">
@@ -476,7 +767,179 @@
         <div id="resultsEmpty" data-i18n="results_empty">No results</div>
         <ul id="resultsList"></ul>
       </div>
+      -->
     </aside>
+
+    <button type="button" id="btnSideToggle" aria-expanded="false" aria-controls="side" title="패널 열기/접기">‹</button>
+
+    <main id="stage" class="workspace">
+      <div id="sessionOverlay" aria-live="polite">
+        <div class="session-overlay-card">
+          <div class="so-pulse" aria-hidden="true"></div>
+          <p class="so-title" id="sessionOverlayTitle">–</p>
+          <p class="so-sub" id="sessionOverlaySub">–</p>
+        </div>
+      </div>
+
+      <!-- 1 · pressure GIF (USB raw → gif) -->
+      <section class="ws-pane ws-pane-1" id="wsPane1" aria-label="Section 1">
+        <div class="ws-label" data-i18n="ws_label_1">1 · 압력패드</div>
+        <div class="ws-body is-empty" data-slot="pressure" id="wsBody1">
+          <img id="wsPressureGif" alt="" />
+        </div>
+      </section>
+
+      <!-- 2 · capture (top) + skeleton analysis (bottom) -->
+      <section class="ws-pane ws-pane-2" id="wsPane2" aria-label="Section 2">
+        <div class="ws-cell" id="wsPane21">
+          <div class="ws-label" data-i18n="ws_label_21">2-1 · 촬영 영상</div>
+          <div class="ws-body is-empty" data-slot="origin" id="wsBody21">
+            <video id="wsOriginVideo" muted loop playsinline></video>
+          </div>
+          <div class="ws-media-controls" data-video="wsOriginVideo">
+            <button type="button" class="ws-play" title="재생" disabled>▶</button>
+            <select class="ws-speed" aria-label="배속" disabled>
+              <option value="0.25">0.25×</option>
+              <option value="0.5">0.5×</option>
+              <option value="1" selected>1×</option>
+              <option value="1.5">1.5×</option>
+              <option value="2">2×</option>
+            </select>
+          </div>
+        </div>
+        <div class="ws-cell" id="wsPane22">
+          <div class="ws-label" data-i18n="ws_label_22">2-2 · 스켈레톤 분석</div>
+          <div class="ws-body is-empty" data-slot="analysis" id="wsBody22">
+            <video id="wsAnalysisVideo" muted loop playsinline></video>
+          </div>
+          <div class="ws-media-controls" data-video="wsAnalysisVideo">
+            <button type="button" class="ws-play" title="재생" disabled>▶</button>
+            <select class="ws-speed" aria-label="배속" disabled>
+              <option value="0.25">0.25×</option>
+              <option value="0.5">0.5×</option>
+              <option value="1" selected>1×</option>
+              <option value="1.5">1.5×</option>
+              <option value="2">2×</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3 · angle / stride (ai-server artifacts) -->
+      <section class="ws-pane ws-pane-3" id="wsPane3" aria-label="Section 3">
+        <div class="ws-cell" id="wsPane31">
+          <div class="ws-label" data-i18n="ws_label_31">3-1 · 각도 분석</div>
+          <div class="ws-body is-empty" data-slot="max-min" id="wsBody31">
+            <video id="wsMaxMinVideo" muted loop playsinline></video>
+          </div>
+          <div class="ws-media-controls" data-video="wsMaxMinVideo">
+            <button type="button" class="ws-play" title="재생" disabled>▶</button>
+            <select class="ws-speed" aria-label="배속" disabled>
+              <option value="0.25">0.25×</option>
+              <option value="0.5">0.5×</option>
+              <option value="1" selected>1×</option>
+              <option value="1.5">1.5×</option>
+              <option value="2">2×</option>
+            </select>
+          </div>
+        </div>
+        <div class="ws-cell" id="wsPane32">
+          <div class="ws-label" data-i18n="ws_label_32">3-2 · 보폭분석</div>
+          <div class="ws-body is-empty" data-slot="shadow" id="wsBody32">
+            <img id="wsShadowImg" alt="" />
+          </div>
+        </div>
+      </section>
+
+      <!-- Existing pipeline hosts (IDs required by main.ts / SyncPlaybackDock) -->
+      <div id="legacyHosts">
+        <div class="sync-pane-label" id="syncMatLabel" data-i18n="sync_mat_label">Recorded mat</div>
+        <div id="matSlot">
+          <div id="matWrap"><canvas id="heatmap"></canvas><canvas id="overlay"></canvas></div>
+        </div>
+        <div id="cameraSection">
+          <div class="sync-pane-label" id="cameraPanelLabel" data-i18n="camera_panel_label">Phone camera</div>
+          <div id="cameraPanel" class="video-panel">
+            <div class="video-viewport">
+              <div class="video-media-wrap">
+                <canvas class="camera-preview-canvas"></canvas>
+                <img class="camera-preview" alt="" hidden />
+                <video class="ai-video" playsinline></video>
+                <div class="camera-placeholder" data-i18n="camera_placeholder">Waiting for phone camera…</div>
+                <div class="camera-loading"><span data-i18n="sync_analyzing">Analyzing…</span></div>
+              </div>
+            </div>
+            <div class="video-controls">
+              <button type="button" class="btn-video-play" title="Play">▶</button>
+              <input type="range" class="video-scrub" min="0" max="1000" value="0" />
+              <span class="video-time">0:00 / 0:00</span>
+              <select class="video-speed" aria-label="Speed">
+                <option value="0.2">0.2×</option>
+                <option value="0.25">0.25×</option>
+                <option value="0.5">0.5×</option>
+                <option value="1" selected>1×</option>
+                <option value="1.5">1.5×</option>
+                <option value="2">2×</option>
+              </select>
+              <input type="range" class="video-zoom" min="100" max="300" value="100" title="Zoom" />
+            </div>
+          </div>
+          <button type="button" id="btnSyncBackLive" class="hidden" data-i18n="btn_back_live">Back to live</button>
+        </div>
+      </div>
+    </main>
+    </div><!-- #appBody -->
+
+    <section id="reportPage" hidden aria-label="Reports">
+      <div class="rp-toolbar">
+        <div class="rp-toolbar-text">
+          <div id="rpCrumbs" data-i18n="results_list">결과</div>
+          <h1 id="rpTitle" data-i18n="report_page_title">분석 목록</h1>
+          <p id="rpSub" data-i18n="results_dates_hint">날짜를 선택하세요</p>
+        </div>
+        <div class="rp-toolbar-actions">
+          <button type="button" id="rpBack" class="hidden" data-i18n="btn_results_back">뒤로</button>
+          <button type="button" id="rpRefresh" data-i18n="btn_results_refresh">새로고침</button>
+        </div>
+      </div>
+      <div class="rp-scroll">
+        <div id="rpLoading" class="hidden">…</div>
+        <div id="rpEmpty" class="hidden" data-i18n="results_empty">저장된 분석 결과가 없습니다</div>
+        <div id="rpList" class="rp-grid"></div>
+        <div id="rpDetail" class="hidden">
+          <div id="rpDetailVideo" class="video-panel">
+            <div class="video-viewport">
+              <div class="video-media-wrap">
+                <canvas class="camera-preview-canvas"></canvas>
+                <img class="camera-preview" alt="" hidden />
+                <video class="ai-video" playsinline></video>
+                <div class="camera-placeholder" data-i18n="video_placeholder">AI 분석 영상</div>
+                <div class="camera-loading"><span>…</span></div>
+              </div>
+            </div>
+            <div class="video-controls">
+              <button type="button" class="btn-video-play" title="Play">▶</button>
+              <input type="range" class="video-scrub" min="0" max="1000" value="0" />
+              <span class="video-time">0:00 / 0:00</span>
+              <select class="video-speed" aria-label="Speed">
+                <option value="0.2">0.2×</option>
+                <option value="0.25">0.25×</option>
+                <option value="0.5">0.5×</option>
+                <option value="1" selected>1×</option>
+                <option value="1.5">1.5×</option>
+                <option value="2">2×</option>
+              </select>
+              <input type="range" class="video-zoom" min="100" max="300" value="100" title="Zoom" />
+              <button type="button" class="btn-video-rotate hidden"></button>
+            </div>
+          </div>
+          <div class="rp-detail-main">
+            <div id="rpDetailLoading" class="hidden">…</div>
+            <div id="rpDetailBody"></div>
+          </div>
+        </div>
+      </div>
+    </section>
 
     <div id="portModal" role="dialog" aria-modal="true" aria-labelledby="portModalTitle">
       <div class="dialog">

@@ -24,6 +24,12 @@ export type SyncMessage =
       jobId: string;
       resultUrl: string;
       resultFilename?: string | null;
+      originalUrl?: string | null;
+      artifacts?: Record<string, { kind?: string; filename?: string; url?: string | null; available?: boolean }> | null;
+      date?: string | null;
+      time?: string | null;
+      stem?: string | null;
+      sessionPath?: string | null;
       sessionId: string | null;
       serverNow: number;
     }
@@ -164,6 +170,12 @@ type JobPoll = {
   id: string;
   status: "processing" | "completed" | "failed";
   resultUrl: string | null;
+  originalUrl?: string | null;
+  artifacts?: Record<string, { kind?: string; filename?: string; url?: string | null; available?: boolean }> | null;
+  date?: string | null;
+  time?: string | null;
+  stem?: string | null;
+  sessionPath?: string | null;
   error: string | null;
 };
 

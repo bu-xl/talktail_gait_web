@@ -64,7 +64,36 @@ import {
   type SyncPeers,
 } from "../transport/gaitSocket.js";
 import { ResultsPanel } from "../ui/resultsPanel.js";
+import { ReportPage } from "../ui/reportPage.js";
+import {
+  clearReviewPanes,
+  setAnalysisVideo,
+  setMaxMinVideo,
+  setOriginVideo,
+  setPressureGif,
+  setShadowImage,
+} from "../ui/reviewPanes.js";
 import { SyncPlaybackDock } from "../ui/syncPlaybackDock.js";
+import { wireWorkspaceVideoControls } from "../ui/workspaceVideoControls.js";
+
+export type SessionArtifacts = Record<
+  string,
+  { kind?: string; filename?: string; url?: string | null; available?: boolean }
+>;
+
+/** Last clinic-session report payload (cyclogram + derived) for the Report tab later. */
+let lastReportBundle: {
+  originalUrl: string | null;
+  artifacts: SessionArtifacts | null;
+  date: string | null;
+  time: string | null;
+  stem: string | null;
+  sessionPath: string | null;
+} | null = null;
+
+export function getLastReportBundle() {
+  return lastReportBundle;
+}
 
 /** Live overlay canvas backing resolution — portrait 1 : 2.3014 (height derived
  *  from the true mat aspect), higher-res than the heatmap canvas so burned-in
@@ -97,9 +126,94 @@ function $(id: string): HTMLElement {
   return el;
 }
 
+function $opt(id: string): HTMLElement | null {
+  return document.getElementById(id);
+}
+
+function onClick(id: string, handler: (ev: MouseEvent) => void): void {
+  $opt(id)?.addEventListener("click", handler as EventListener);
+}
+
+function setSyncStatus(text: string, className?: string): void {
+  const el = $opt("syncStatus");
+  if (!el) return;
+  el.textContent = text;
+  if (className !== undefined) el.className = className;
+}
+
+/** Local UI simulation when ai-server is unavailable. `.env`: VITE_SIMULATE_AI=1 */
+function isSimulateAi(): boolean {
+  const v = String(import.meta.env.VITE_SIMULATE_AI ?? "").toLowerCase();
+  return v === "1" || v === "true" || v === "yes" || v === "on";
+}
+
+function placeholderUrl(file: string): string {
+  return `${window.location.origin}/placeholders/${file}`;
+}
+
+function wireSideToggle(): void {
+  const btn = $("btnSideToggle") as HTMLButtonElement;
+  const sync = (): void => {
+    const collapsed = document.body.classList.contains("side-collapsed");
+    btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    /* Rail is on the right: collapsed → open with ‹, open → close with › */
+    btn.textContent = collapsed ? "‹" : "›";
+    btn.title = collapsed ? "컨트롤 패널 열기" : "컨트롤 패널 접기";
+  };
+  btn.addEventListener("click", () => {
+    document.body.classList.toggle("side-collapsed");
+    sync();
+  });
+  sync();
+}
+
+function wireDogInfoToggle(): void {
+  const form = $opt("dogInfoForm");
+  const btn = $opt("btnDogInfoToggle") as HTMLButtonElement | null;
+  if (!form || !btn) return;
+  const sync = (): void => {
+    const collapsed = form.classList.contains("is-collapsed");
+    btn.textContent = collapsed ? t("btn_dog_info_expand") : t("btn_dog_info_collapse");
+    btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+  };
+  btn.addEventListener("click", () => {
+    form.classList.toggle("is-collapsed");
+    sync();
+  });
+  sync();
+}
+
+type AppModule = "measure" | "report";
+
+function wireAppHeader(opts: { onModuleChange: (mod: AppModule) => void }): void {
+  const setActive = (mod: AppModule): void => {
+    document.body.dataset.module = mod;
+    document.querySelectorAll<HTMLButtonElement>("#appHeader .ah-nav button[data-module]").forEach((btn) => {
+      const active = btn.dataset.module === mod;
+      btn.classList.toggle("active", active);
+      if (active) btn.setAttribute("aria-current", "page");
+      else btn.removeAttribute("aria-current");
+    });
+    opts.onModuleChange(mod);
+  };
+
+  document.querySelectorAll<HTMLElement>("#appHeader [data-module], #appHeader [data-nav]").forEach((el) => {
+    el.addEventListener("click", (ev) => {
+      const target = ev.currentTarget as HTMLElement;
+      const mod = (target.dataset.module || target.dataset.nav) as AppModule | undefined;
+      if (mod !== "measure" && mod !== "report") return;
+      if (target.tagName === "A") ev.preventDefault();
+      setActive(mod);
+    });
+  });
+}
+
 async function boot(): Promise<void> {
   const userSettings = loadUserSettings();
   initI18n(userSettings.lang);
+  wireSideToggle();
+  wireDogInfoToggle();
+  wireWorkspaceVideoControls();
 
   const config = await fetchConfig();
   configureSync(config.sync);
@@ -112,7 +226,8 @@ async function boot(): Promise<void> {
   canvas.height = config.render.upsample_height;
 
   config.render.show_grid = userSettings.showGrid;
-  ($("dogWeight") as HTMLInputElement).value = String(userSettings.dogWeight);
+  /** 체중 UI 제거 — 저장된 설정값(또는 기본값)만 사용 */
+  const dogWeightKg = userSettings.dogWeight;
 
   const pipeline = new ProcessingPipeline(config);
   const renderer = new HeatmapRenderer(canvas, config);
@@ -126,26 +241,223 @@ async function boot(): Promise<void> {
   let syncPlaybackActive = false;
   let lastAiVideoUrl: string | null = null;
   let pendingAnalyzeJob: string | null = null;
+  /** Clinic session driven from the right-rail Start/Stop (web-led). */
+  type SessionPhase = "idle" | "recording" | "analyzing" | "review";
+  let sessionPhase: SessionPhase = "idle";
+  let pressureGifObjectUrl: string | null = null;
+  let clinicSessionActive = false;
+  let simulateTimer: number | null = null;
 
-  const resultsPanel = new ResultsPanel($("resultsPanel"));
-  resultsPanel.setApiBase(apiBase);
+  const clearSimulateTimer = (): void => {
+    if (simulateTimer != null) {
+      window.clearTimeout(simulateTimer);
+      simulateTimer = null;
+    }
+  };
+
+  const scheduleSimulateReview = (): void => {
+    if (!isSimulateAi()) return;
+    clearSimulateTimer();
+    setSyncStatus("시뮬레이션 결과 준비 중…", "wait");
+    simulateTimer = window.setTimeout(() => {
+      simulateTimer = null;
+      if (sessionPhase !== "analyzing") return;
+      const analysis = placeholderUrl("analysis.mp4");
+      const origin = placeholderUrl("origin.mp4");
+      const angle = placeholderUrl("max-min.mp4");
+      const stride = placeholderUrl("shadow.png");
+      enterReview({
+        analysisUrl: analysis,
+        originalUrl: origin,
+        artifacts: {
+          video: { kind: "video", available: true, url: analysis, filename: "analysis.mp4" },
+          angle_pawy: { kind: "angle_pawy", available: true, url: angle, filename: "max-min.mp4" },
+          stride: { kind: "stride", available: true, url: stride, filename: "shadow.png" },
+          cyclogram: { kind: "cyclogram", available: true, url: analysis, filename: "analysis.mp4" },
+          derived: { kind: "derived", available: false, url: null },
+        },
+        date: "sim",
+        time: "000000",
+        stem: "simulated-session",
+        sessionPath: "sim/000000",
+      });
+      // 패드 프레임이 없으면 1번도 placeholder GIF
+      if (!$opt("wsBody1")?.classList.contains("has-media")) {
+        setPressureGif(placeholderUrl("foot.gif"));
+      }
+      setSyncStatus("시뮬레이션 완료 (VITE_SIMULATE_AI)", "ok");
+    }, 2500);
+  };
+
+  const resultsPanelEl = $opt("resultsPanel");
+  const resultsPanel = resultsPanelEl ? new ResultsPanel(resultsPanelEl) : null;
+  resultsPanel?.setApiBase(apiBase);
+  const reportPageEl = $opt("reportPage");
+  const reportPage = reportPageEl ? new ReportPage(reportPageEl) : null;
+  reportPage?.setApiBase(apiBase);
+  clearReviewPanes();
+
+  wireAppHeader({
+    onModuleChange: (mod) => {
+      if (mod === "report") reportPage?.show();
+      else reportPage?.hide();
+    },
+  });
+
+  const sessionBtn = $("btnSession") as HTMLButtonElement;
+  const sessionOverlay = $("sessionOverlay");
+
+  const revokePressureGif = (): void => {
+    if (pressureGifObjectUrl) {
+      URL.revokeObjectURL(pressureGifObjectUrl);
+      pressureGifObjectUrl = null;
+    }
+  };
+
+  const setSessionPhase = (phase: SessionPhase): void => {
+    sessionPhase = phase;
+    document.body.classList.toggle("session-recording", phase === "recording");
+    document.body.classList.toggle("session-analyzing", phase === "analyzing");
+    const showOverlay = phase === "recording" || phase === "analyzing";
+    sessionOverlay.classList.toggle("show", showOverlay);
+
+    if (phase === "recording") {
+      $("sessionOverlayTitle").textContent = t("session_recording_title");
+      $("sessionOverlaySub").textContent = t("session_recording_sub");
+      sessionBtn.textContent = t("btn_session_stop");
+      sessionBtn.classList.add("is-stop");
+      sessionBtn.classList.remove("primary");
+      sessionBtn.disabled = false;
+    } else if (phase === "analyzing") {
+      $("sessionOverlayTitle").textContent = t("session_analyzing_title");
+      $("sessionOverlaySub").textContent = t("session_analyzing_sub");
+      sessionBtn.textContent = t("btn_session_stop");
+      sessionBtn.classList.add("is-stop");
+      sessionBtn.disabled = true;
+    } else {
+      sessionBtn.textContent = t("btn_session_start");
+      sessionBtn.classList.remove("is-stop");
+      sessionBtn.classList.add("primary");
+      sessionBtn.disabled = false;
+    }
+  };
+
+  const buildPressureGifUrl = (): string | null => {
+    if (recorder.frameCount < 2) return null;
+    try {
+      const track = getRecordingTrack();
+      const po = config.paw_overlay;
+      const delayMs = track.fps > 1 ? 1000 / track.fps : 33;
+      const bytes = encodeAnnotatedGif({
+        displayFields: track.displayFields,
+        overlayFrames: track.overlayFrames,
+        rows: GRID_ROWS,
+        cols: GRID_COLS,
+        width: po.gif_width,
+        height: aspectHeight(po.gif_width),
+        direction: track.direction,
+        delayMs,
+        config,
+        unit: liveUnit(),
+        timestampsSec: track.timestampsSec,
+        maxFrames: po.gif_max_frames,
+        makeCtx: makeExportCtx,
+      });
+      revokePressureGif();
+      const copy = Uint8Array.from(bytes);
+      pressureGifObjectUrl = URL.createObjectURL(new Blob([copy], { type: "image/gif" }));
+      return pressureGifObjectUrl;
+    } catch (err) {
+      console.warn("[session] pressure gif failed", err);
+      return null;
+    }
+  };
+
+  const enterReview = (opts: {
+    analysisUrl: string;
+    originalUrl?: string | null;
+    artifacts?: SessionArtifacts | null;
+    date?: string | null;
+    time?: string | null;
+    stem?: string | null;
+    sessionPath?: string | null;
+  }): void => {
+    const { analysisUrl, originalUrl, artifacts } = opts;
+    clearSimulateTimer();
+    lastAiVideoUrl = analysisUrl;
+    clinicSessionActive = false;
+    setSessionPhase("review");
+    sessionOverlay.classList.remove("show");
+
+    // 2-1 원본 (back/uploads), 2-2 스켈레톤 영상
+    if (originalUrl) {
+      const abs =
+        originalUrl.startsWith("http://") || originalUrl.startsWith("https://")
+          ? originalUrl
+          : absolutizeResultUrl(apiBase, originalUrl);
+      setOriginVideo(abs);
+    }
+    setAnalysisVideo(analysisUrl);
+
+    // 3-1 angle_pawy 영상, 3-2 stride png
+    const angle = artifacts?.angle_pawy;
+    if (angle?.available && angle.url) {
+      const abs =
+        angle.url.startsWith("http://") || angle.url.startsWith("https://")
+          ? angle.url
+          : absolutizeResultUrl(apiBase, angle.url);
+      setMaxMinVideo(abs);
+    }
+    const stride = artifacts?.stride;
+    if (stride?.available && stride.url) {
+      const abs =
+        stride.url.startsWith("http://") || stride.url.startsWith("https://")
+          ? stride.url
+          : absolutizeResultUrl(apiBase, stride.url);
+      setShadowImage(abs);
+    }
+
+    // 1번 압력 GIF (패드 세션) — 없으면 simulate 일 때 foot.gif
+    const gifUrl = buildPressureGifUrl() ?? (isSimulateAi() ? placeholderUrl("foot.gif") : null);
+    if (gifUrl) setPressureGif(gifUrl);
+
+    lastReportBundle = {
+      originalUrl: originalUrl ?? null,
+      artifacts: artifacts ?? null,
+      date: opts.date ?? null,
+      time: opts.time ?? null,
+      stem: opts.stem ?? null,
+      sessionPath: opts.sessionPath ?? null,
+    };
+
+    setSyncStatus(t("sync_analyze_done"), "ok");
+    void resultsPanel?.refresh();
+  };
 
   const updateSyncUi = (peers?: SyncPeers, hubConnected?: boolean): void => {
-    const mobileEl = $("syncStatus");
-    const hubEl = $("syncHub");
+    const mobileEl = $opt("syncStatus");
+    const hubEl = $opt("syncHub");
     if (hubConnected === false) {
-      hubEl.textContent = t("sync_hub_disconnected");
-      hubEl.className = "off";
-      mobileEl.textContent = "–";
-      mobileEl.className = "off";
+      if (hubEl) {
+        hubEl.textContent = t("sync_hub_disconnected");
+        hubEl.className = "off";
+      }
+      if (mobileEl) {
+        mobileEl.textContent = "–";
+        mobileEl.className = "off";
+      }
       if (!syncPlaybackActive) cameraPlayer.clearPreview();
       return;
     }
-    hubEl.textContent = t("sync_hub_connected");
-    hubEl.className = "ok";
+    if (hubEl) {
+      hubEl.textContent = t("sync_hub_connected");
+      hubEl.className = "ok";
+    }
     const mobile = peers?.mobile ?? false;
-    mobileEl.textContent = mobile ? t("sync_mobile_connected") : t("sync_mobile_waiting");
-    mobileEl.className = mobile ? "ok" : "wait";
+    if (mobileEl) {
+      mobileEl.textContent = mobile ? t("sync_mobile_connected") : t("sync_mobile_waiting");
+      mobileEl.className = mobile ? "ok" : "wait";
+    }
     if (mobile && !syncPlaybackActive && cameraPlayer.getMode() === "idle") {
       cameraPlayer.showIdle(t("camera_preview_receiving"));
     }
@@ -166,15 +478,13 @@ async function boot(): Promise<void> {
     displayMode = "live";
     peakHold = null;
     clearOverlay();
-    $("syncStatus").textContent = t("sync_analyze_done");
-    $("syncStatus").className = "ok";
+    setSyncStatus(t("sync_analyze_done"), "ok");
     try {
       await syncDock.play(frames, videoUrl, (raw) => renderSyncedMatFrame(raw));
     } catch (err) {
       syncPlaybackActive = false;
       syncDock.hide();
-      $("syncStatus").textContent = err instanceof Error ? err.message : String(err);
-      $("syncStatus").className = "bad";
+      setSyncStatus(err instanceof Error ? err.message : String(err), "bad");
     }
   };
 
@@ -189,8 +499,7 @@ async function boot(): Promise<void> {
   const clearOverlay = (): void =>
     overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
 
-  const weightOf = (): number =>
-    Number(($("dogWeight") as HTMLInputElement).value) || config.gait.default_weight_kg;
+  const weightOf = (): number => dogWeightKg || config.gait.default_weight_kg;
 
   const liveTracker = new LivePawTracker(config, weightOf());
   let overlayEnabled = userSettings.overlayEnabled;
@@ -244,7 +553,8 @@ async function boot(): Promise<void> {
     config.render.gaussian_sigma_min = m.sigmaMin;
     config.render.gaussian_sigma_max = m.sigmaMax;
     renderer.setConfig(config);
-    ($("btnSharp") as HTMLButtonElement).textContent = t(m.labelKey);
+    const sharpBtn = $opt("btnSharp");
+    if (sharpBtn) sharpBtn.textContent = t(m.labelKey);
   };
   applySharpMode(sharpIdx);
 
@@ -281,7 +591,25 @@ async function boot(): Promise<void> {
     lastStatus = { connected, detail };
     const text = localizeStatusDetail(detail) ?? (connected ? t("status_connected") : t("status_idle"));
     $("status").textContent = connected ? `● ${text}` : `○ ${text}`;
-    $("status").className = connected ? "ok" : "off";
+    const waiting =
+      !connected &&
+      !!detail &&
+      detail !== "idle" &&
+      detail !== "disconnected";
+    $("status").className = connected ? "ok" : waiting ? "warn" : "off";
+
+    const panel = $opt("padConnectPanel");
+    panel?.classList.toggle("is-connected", connected);
+    panel?.classList.toggle("is-waiting", waiting);
+
+    const connectBtn = $opt("btnConnect") as HTMLButtonElement | null;
+    if (connectBtn) {
+      connectBtn.textContent = connected ? t("btn_reconnect") : t("btn_connect_pad");
+      connectBtn.classList.toggle("primary", !connected);
+    }
+
+    const calBtn = $opt("btnCalibrate") as HTMLButtonElement | null;
+    if (calBtn) calBtn.disabled = !connected;
   };
 
   const attach = (src: FrameSource): void => {
@@ -342,7 +670,8 @@ async function boot(): Promise<void> {
   // --- Recording + export -------------------------------------------------
   const setExportsEnabled = (on: boolean): void => {
     for (const id of ["btnCsv", "btnTrackCsv", "btnGif", "btnPng", "btnReplay", "btnGait"]) {
-      ($(id) as HTMLButtonElement).disabled = !on;
+      const btn = $opt(id) as HTMLButtonElement | null;
+      if (btn) btn.disabled = !on;
     }
   };
 
@@ -366,14 +695,16 @@ async function boot(): Promise<void> {
   // --- Gait analysis ------------------------------------------------------
   let lastGait: GaitSummary | null = null;
   const setGaitReportsEnabled = (on: boolean): void => {
-    ($("btnGaitCsv") as HTMLButtonElement).disabled = !on;
-    ($("btnGaitPdf") as HTMLButtonElement).disabled = !on;
-    ($("btnGaitJson") as HTMLButtonElement).disabled = !on;
+    for (const id of ["btnGaitCsv", "btnGaitPdf", "btnGaitJson"]) {
+      const btn = $opt(id) as HTMLButtonElement | null;
+      if (btn) btn.disabled = !on;
+    }
   };
 
-  $("btnGait").addEventListener("click", () => {
-    const btn = $("btnGait") as HTMLButtonElement;
-    const weight = Number(($("dogWeight") as HTMLInputElement).value) || config.gait.default_weight_kg;
+  onClick("btnGait", () => {
+    const btn = $opt("btnGait") as HTMLButtonElement | null;
+    if (!btn) return;
+    const weight = weightOf();
     btn.disabled = true;
     const prev = btn.textContent;
     btn.textContent = t("analyzing");
@@ -398,14 +729,15 @@ async function boot(): Promise<void> {
     }, 0);
   });
 
-  $("btnGaitCsv").addEventListener("click", () => {
+  onClick("btnGaitCsv", () => {
     if (!lastGait) return;
     downloadText(`gait-report-${fileStamp()}.csv`, gaitSummaryToCsv(lastGait));
   });
 
-  $("btnGaitPdf").addEventListener("click", async () => {
+  onClick("btnGaitPdf", async () => {
     if (!lastGait) return;
-    const btn = $("btnGaitPdf") as HTMLButtonElement;
+    const btn = $opt("btnGaitPdf") as HTMLButtonElement | null;
+    if (!btn) return;
     btn.disabled = true;
     btn.textContent = t("pdf_generating");
     try {
@@ -417,7 +749,7 @@ async function boot(): Promise<void> {
     }
   });
 
-  $("btnGaitJson").addEventListener("click", () => {
+  onClick("btnGaitJson", () => {
     if (!lastGait) return;
     downloadText(`gait-report-${fileStamp()}.json`, gaitSummaryToJson(lastGait), "application/json");
   });
@@ -430,9 +762,10 @@ async function boot(): Promise<void> {
         ? t("rec_frames", { n, d, hz: recorder.fps.toFixed(0) })
         : "–";
     $("statRec").className = recorder.isRecording ? "warn" : "ok";
-    ($("btnRecord") as HTMLButtonElement).textContent = recorder.isRecording
-      ? t("btn_stop")
-      : t("btn_record");
+    const recBtn = $opt("btnRecord");
+    if (recBtn) {
+      recBtn.textContent = recorder.isRecording ? t("btn_stop") : t("btn_record");
+    }
   };
 
   const startLocalRecording = (wallAnchorMs?: number): void => {
@@ -486,7 +819,10 @@ async function boot(): Promise<void> {
       syncSessionId = msg.sessionId;
       syncDock.hide();
       syncPlaybackActive = false;
-      $("syncStatus").textContent = t("sync_pending");
+      clearReviewPanes();
+      revokePressureGif();
+      setSessionPhase("recording");
+      setSyncStatus(t("sync_pending"));
       void waitUntilRecordAt(msg.recordAt).then(() => {
         if (!recorder.isRecording) startLocalRecording(msg.recordAt);
       });
@@ -495,46 +831,82 @@ async function boot(): Promise<void> {
       syncRecordPending = false;
       if (recorder.isRecording) stopLocalRecording();
       syncSessionId = null;
+      if (clinicSessionActive || sessionPhase === "recording") {
+        setSessionPhase("analyzing");
+        scheduleSimulateReview();
+      }
     }
     if (msg.type === "upload_started") {
       pendingAnalyzeJob = msg.jobId;
-      $("syncStatus").textContent = t("sync_uploading");
-      $("syncStatus").className = "wait";
+      setSyncStatus(t("sync_uploading"), "wait");
+      setSessionPhase("analyzing");
+      scheduleSimulateReview();
       cameraPlayer.setLoading(true, t("sync_uploading"));
       void pollJobUntilDone(apiBase, msg.jobId)
         .then((job) => {
           if (pendingAnalyzeJob !== msg.jobId) return;
           pendingAnalyzeJob = null;
           if (job.status === "completed" && job.resultUrl) {
-            void beginSyncedPlayback(absolutizeResultUrl(apiBase, job.resultUrl));
-            void resultsPanel.refresh();
+            enterReview({
+              analysisUrl: absolutizeResultUrl(apiBase, job.resultUrl),
+              originalUrl: job.originalUrl ?? null,
+              artifacts: job.artifacts ?? null,
+              date: job.date ?? null,
+              time: job.time ?? null,
+              stem: job.stem ?? null,
+              sessionPath: job.sessionPath ?? null,
+            });
+            cameraPlayer.setLoading(false);
           } else {
             cameraPlayer.setLoading(false);
-            $("syncStatus").textContent = `${t("sync_analyze_failed")}: ${job.error ?? "unknown"}`;
-            $("syncStatus").className = "bad";
+            if (isSimulateAi()) {
+              setSessionPhase("analyzing");
+              scheduleSimulateReview();
+            } else {
+              setSessionPhase("idle");
+              setSyncStatus(`${t("sync_analyze_failed")}: ${job.error ?? "unknown"}`, "bad");
+            }
           }
         })
         .catch((err) => {
           pendingAnalyzeJob = null;
           cameraPlayer.setLoading(false);
-          $("syncStatus").textContent = err instanceof Error ? err.message : String(err);
-          $("syncStatus").className = "bad";
+          if (isSimulateAi()) {
+            setSessionPhase("analyzing");
+            scheduleSimulateReview();
+          } else {
+            setSessionPhase("idle");
+            setSyncStatus(err instanceof Error ? err.message : String(err), "bad");
+          }
         });
     }
     if (msg.type === "analyze_done") {
       pendingAnalyzeJob = null;
-      void beginSyncedPlayback(absolutizeResultUrl(apiBase, msg.resultUrl));
-      void resultsPanel.refresh();
+      cameraPlayer.setLoading(false);
+      enterReview({
+        analysisUrl: absolutizeResultUrl(apiBase, msg.resultUrl),
+        originalUrl: msg.originalUrl ?? null,
+        artifacts: msg.artifacts ?? null,
+        date: msg.date ?? null,
+        time: msg.time ?? null,
+        stem: msg.stem ?? null,
+        sessionPath: msg.sessionPath ?? null,
+      });
     }
     if (msg.type === "analyze_failed") {
       cameraPlayer.setLoading(false);
-      $("syncStatus").textContent = `${t("sync_analyze_failed")}: ${msg.error}`;
-      $("syncStatus").className = "bad";
+      if (isSimulateAi()) {
+        setSessionPhase("analyzing");
+        scheduleSimulateReview();
+      } else {
+        clinicSessionActive = false;
+        setSessionPhase("idle");
+        setSyncStatus(`${t("sync_analyze_failed")}: ${msg.error}`, "bad");
+      }
     }
     if (msg.type === "error") {
       syncRecordPending = false;
-      $("syncStatus").textContent = msg.message;
-      $("syncStatus").className = "bad";
+      setSyncStatus(msg.message, "bad");
     }
   });
   if (isSyncEnabled()) {
@@ -550,15 +922,74 @@ async function boot(): Promise<void> {
     clearOverlay();
     if (gaitSync.peers.mobile) cameraPlayer.showIdle(t("camera_preview_receiving"));
   });
-  void resultsPanel.refresh();
+  void resultsPanel?.refresh();
+  setSessionPhase("idle");
 
-  $("btnRecord").addEventListener("click", () => {
+  const startClinicSession = (): void => {
+    if (sessionPhase === "recording" || sessionPhase === "analyzing") return;
+    // Simulate mode: web-only Start/Stop to verify review panes without app/AI.
+    if (isSimulateAi()) {
+      clinicSessionActive = true;
+      revokePressureGif();
+      clearReviewPanes();
+      syncRecordPending = false;
+      setSyncStatus("시뮬레이션 녹화 중…", "wait");
+      setSessionPhase("recording");
+      if (gaitSync.connected && gaitSync.peers.mobile) {
+        syncRecordPending = true;
+        gaitSync.requestRecord();
+      }
+      return;
+    }
+    if (!gaitSync.connected) {
+      setSyncStatus(t("session_need_hub"), "bad");
+      return;
+    }
+    if (!gaitSync.peers.mobile) {
+      setSyncStatus(t("session_need_mobile"), "warn");
+      return;
+    }
+    clinicSessionActive = true;
+    revokePressureGif();
+    clearReviewPanes();
+    syncRecordPending = true;
+    setSyncStatus(t("sync_pending"), "wait");
+    setSessionPhase("recording");
+    gaitSync.requestRecord();
+  };
+
+  const stopClinicSession = (): void => {
+    if (sessionPhase !== "recording" && !recorder.isRecording) return;
+    if (recorder.isRecording) stopLocalRecording();
+    if (gaitSync.connected && gaitSync.peers.mobile) {
+      gaitSync.stopRecord(syncSessionId);
+    }
+    syncSessionId = null;
+    syncRecordPending = false;
+    setSessionPhase("analyzing");
+    setSyncStatus(t("sync_analyzing"), "wait");
+    updateSyncUi(gaitSync.peers, gaitSync.connected);
+    scheduleSimulateReview();
+  };
+
+  sessionBtn.addEventListener("click", () => {
+    if (sessionPhase === "recording") {
+      stopClinicSession();
+      return;
+    }
+    if (sessionPhase === "analyzing") return;
+    startClinicSession();
+  });
+
+  onClick("btnRecord", () => {
+    /* Pad-only / legacy control — clinic flow prefers #btnSession (Start/Stop). */
     if (recorder.isRecording) {
       stopLocalRecording();
       if (gaitSync.connected && gaitSync.peers.mobile) {
         gaitSync.stopRecord(syncSessionId);
-        $("syncStatus").textContent = t("sync_analyzing");
-        $("syncStatus").className = "wait";
+        setSyncStatus(t("sync_analyzing"), "wait");
+        setSessionPhase("analyzing");
+        scheduleSimulateReview();
       }
       syncSessionId = null;
       syncRecordPending = false;
@@ -567,29 +998,33 @@ async function boot(): Promise<void> {
     }
 
     if (gaitSync.connected && gaitSync.peers.mobile) {
+      clinicSessionActive = true;
+      clearReviewPanes();
+      revokePressureGif();
       syncRecordPending = true;
-      $("syncStatus").textContent = t("sync_pending");
+      setSyncStatus(t("sync_pending"));
+      setSessionPhase("recording");
       gaitSync.requestRecord();
       return;
     }
 
     if (gaitSync.connected) {
-      $("syncStatus").textContent = t("sync_need_mobile");
-      $("syncStatus").className = "warn";
+      setSyncStatus(t("sync_need_mobile"), "warn");
       return;
     }
 
     startLocalRecording();
   });
 
-  $("btnCsv").addEventListener("click", () => {
+  onClick("btnCsv", () => {
     const csv = framesToCanineGaitCsv(recorder.getFrames(), GRID_ROWS, GRID_COLS);
     downloadText(`gait-${fileStamp()}.csv`, csv);
   });
 
   // Paw-tracking CSV: per-frame, per-paw label + position + pressure.
-  $("btnTrackCsv").addEventListener("click", () => {
-    const btn = $("btnTrackCsv") as HTMLButtonElement;
+  onClick("btnTrackCsv", () => {
+    const btn = $opt("btnTrackCsv") as HTMLButtonElement | null;
+    if (!btn) return;
     btn.disabled = true;
     const prev = btn.textContent;
     btn.textContent = t("csv_generating");
@@ -603,8 +1038,9 @@ async function boot(): Promise<void> {
     }
   });
 
-  $("btnGif").addEventListener("click", async () => {
-    const btn = $("btnGif") as HTMLButtonElement;
+  onClick("btnGif", async () => {
+    const btn = $opt("btnGif") as HTMLButtonElement | null;
+    if (!btn) return;
     btn.disabled = true;
     btn.textContent = t("gif_generating");
     try {
@@ -633,8 +1069,9 @@ async function boot(): Promise<void> {
     }
   });
 
-  $("btnPng").addEventListener("click", async () => {
-    const btn = $("btnPng") as HTMLButtonElement;
+  onClick("btnPng", async () => {
+    const btn = $opt("btnPng") as HTMLButtonElement | null;
+    if (!btn) return;
     btn.disabled = true;
     const prev = btn.textContent;
     btn.textContent = t("png_generating");
@@ -663,7 +1100,7 @@ async function boot(): Promise<void> {
     }
   });
 
-  $("btnReplay").addEventListener("click", () => {
+  onClick("btnReplay", () => {
     if (lastAiVideoUrl && recorder.frameCount > 0) {
       void beginSyncedPlayback(lastAiVideoUrl);
       return;
@@ -681,7 +1118,7 @@ async function boot(): Promise<void> {
   });
   setExportsEnabled(false);
 
-  $("btnCalibrate").addEventListener("click", () => {
+  onClick("btnCalibrate", () => {
     // Size the baseline window from the MEASURED input rate so the requested
     // collect_seconds holds regardless of the mat's actual Hz (fallback 40).
     const hz = measuredHz > 1 ? measuredHz : 40;
@@ -695,19 +1132,13 @@ async function boot(): Promise<void> {
     persistSettings();
   });
 
-  ($("dogWeight") as HTMLInputElement).addEventListener("change", () => {
-    liveTracker.setWeight(weightOf());
-    cachedTrack = null;
-    persistSettings();
-  });
-  ($("dogWeight") as HTMLInputElement).addEventListener("input", () => persistSettings());
-
-  const btnLabels = $("btnLabels") as HTMLButtonElement;
+  const btnLabels = $opt("btnLabels") as HTMLButtonElement | null;
   const refreshLabelsBtn = (): void => {
+    if (!btnLabels) return;
     btnLabels.textContent = overlayEnabled ? t("btn_labels_on") : t("btn_labels_off");
     btnLabels.classList.toggle("active", overlayEnabled);
   };
-  btnLabels.addEventListener("click", () => {
+  btnLabels?.addEventListener("click", () => {
     overlayEnabled = !overlayEnabled;
     if (!overlayEnabled) {
       latestOverlay = null;
@@ -717,16 +1148,16 @@ async function boot(): Promise<void> {
     persistSettings();
   });
   refreshLabelsBtn();
-  $("btnGrid").addEventListener("click", () => {
+  onClick("btnGrid", () => {
     config.render.show_grid = !config.render.show_grid;
     renderer.setConfig(config);
     persistSettings();
   });
-  $("btnSharp").addEventListener("click", () => {
+  onClick("btnSharp", () => {
     applySharpMode(sharpIdx + 1);
     persistSettings();
   });
-  ($("file") as HTMLInputElement).addEventListener("change", async (e) => {
+  ($opt("file") as HTMLInputElement | null)?.addEventListener("change", async (e) => {
     const file = (e.target as HTMLInputElement).files?.[0];
     if (!file) return;
     attach(new ReplaySource(await file.text(), config.render.target_fps));
@@ -831,6 +1262,12 @@ async function boot(): Promise<void> {
     applyDocumentI18n();
     refreshLabelsBtn();
     applySharpMode(sharpIdx);
+    const dogForm = $opt("dogInfoForm");
+    const dogBtn = $opt("btnDogInfoToggle") as HTMLButtonElement | null;
+    if (dogForm && dogBtn) {
+      const collapsed = dogForm.classList.contains("is-collapsed");
+      dogBtn.textContent = collapsed ? t("btn_dog_info_expand") : t("btn_dog_info_collapse");
+    }
     const { connected, detail } = lastStatus;
     setStatus(connected, detail);
     updateRecordingStatus();
@@ -930,7 +1367,7 @@ async function boot(): Promise<void> {
       void renderPorts();
     };
 
-    $("btnConnect").addEventListener("click", () => openPortModal());
+    onClick("btnConnect", () => openPortModal());
     $("portCancel").addEventListener("click", () => closePortModal());
     $("portRefresh").addEventListener("click", () => void renderPorts());
     modal.addEventListener("click", (ev) => {
@@ -947,7 +1384,7 @@ async function boot(): Promise<void> {
       if (ev.key === "Escape" && modal.classList.contains("open")) closePortModal();
     });
   } else {
-    $("btnConnect").addEventListener("click", () => attach(new WebSerialSource()));
+    onClick("btnConnect", () => attach(new WebSerialSource()));
     setStatus(false);
   }
 
