@@ -1,0 +1,79 @@
+{
+  "formula": "relative",
+  "x_ranges": [[0, 300], [300, 800], [800, 1600], [1600, 4095]],
+  "coefficients": [[0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]],
+  "scale": 0.05,
+  "pressure_range": [0, 80],
+  "colorbar_range": [10, 80],
+  "pressure_thresholds": {
+    "visible_min_mmhg": 10,
+    "medium_min_mmhg": 30,
+    "high_min_mmhg": 50
+  },
+  "orientation": {
+    "rotate90": false,
+    "flipHorizontal": false,
+    "flipVertical": false
+  },
+  "baseline": {
+    "collect_seconds": 2,
+    "fallback_raw": 4095
+  },
+  "noise": {
+    "deadband_raw": 20,
+    "spatial_median": false,
+    "min_active_neighbors": 1
+  },
+  "smoothing": {
+    "ema_alpha": 0.45,
+    "ema_alpha_rising": 0.6,
+    "fade_out_ms": 300
+  },
+  "render": {
+    "upsample_width": 260,
+    "upsample_height": 598,
+    "gaussian_sigma_min": 0.4,
+    "gaussian_sigma_max": 1.6,
+    "interpolation": "bilinear",
+    "target_fps": 60,
+    "show_grid": false
+  },
+  "gait": {
+    "rows": 40,
+    "cols": 40,
+    "min_paw_area": 2,
+    "max_track_distance": 7,
+    "morphology_kernel": 3,
+    "min_cycles_before_classify": 2,
+    "normalize_target_peak": 200,
+    "normalize_percentile": 98,
+    "pressure_scale": null,
+    "default_weight_kg": 3.5
+  },
+  "paw_overlay": {
+    "enabled": true,
+    "show_unknown": true,
+    "gif_width": 240,
+    "gif_height": 552,
+    "gif_max_frames": 160,
+    "png_width": 360,
+    "png_height": 828,
+    "live_scale_decay": 0.985,
+    "live_min_peak": 120,
+    "live_unload_peak_ratio": 0.22,
+    "live_unload_sum_ratio": 0.35,
+    "live_min_track_frames": 5,
+    "live_require_tracking_for_unknown": true,
+    "require_contact": true,
+    "min_contact_area": 3,
+    "min_contact_peak_frac": 0.3,
+    "min_track_frames": 3,
+    "min_contact_sec": 0.08
+  },
+  "sync": {
+    "enabled": true,
+    "apiBaseUrl": "http://210.91.154.131:20443/deployment2/41e3dafa47605ab5",
+    "wsUrl": "",
+    "roomId": "gait-default"
+  }
+}

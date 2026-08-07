@@ -1,0 +1,28 @@
+GaitPressureMat — Windows 설치 / 실행 안내
+
+[SmartScreen / 보안 경고가 뜰 때]
+서명 인증서가 없는 앱은 Windows가 처음 실행 시 경고를 표시할 수 있습니다.
+완전히 없애려면 코드 서명 인증서(유료)가 필요합니다. 아래 방법으로 실행하세요.
+
+1) 설치 프로그램(GaitPressureMat-Setup-…-Win64.exe)
+   - 경고 창에서 「추가 정보」또는 「More info」 클릭
+   - 「실행」또는 「Run anyway」 선택
+
+2) 다운로드한 exe가 막힐 때 (파일 속성)
+   - exe 우클릭 → 속성 → 일반 탭
+   - 하단 「차단 해제」또는 「Unblock」 체크 → 적용
+
+3) 권장 실행 방법 (가장 안정적)
+   - GaitPressureMat-0.1.0-Win64-win.zip 압축 해제
+   - 폴더 안 GaitPressureMat.exe 실행 (포터블 단일 exe보다 안정적)
+
+[포터블 exe vs 설치본 vs ZIP]
+- ZIP / 설치본(NSIS): 권장
+- 포터블 단일 exe: 백신·SmartScreen에 더 자주 걸릴 수 있음
+
+[USB 연결]
+- STM USB(VID 0483) 매트 연결 시 자동 연결됩니다.
+- 연결 버튼: 수동 재스캔
+
+[문제 발생 시 로그]
+%APPDATA%\gait-pressure-viewer\startup.log

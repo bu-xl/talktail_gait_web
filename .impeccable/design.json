@@ -1,0 +1,153 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-04T00:00:00.000Z",
+  "title": "Design System: 보행 분석 (GaitPressureMat)",
+  "extensions": {
+    "colorMeta": {
+      "primary": { "role": "primary", "displayName": "Signal Coral", "canonical": "#F0663F", "tonalRamp": ["#4A1608", "#7A2611", "#A8371B", "#D9502B", "#F0663F", "#F58A67", "#FAB39B", "#FDEBE4"] },
+      "primary-pressed": { "role": "primary", "displayName": "Deep Coral / Pressed", "canonical": "#D9502B" },
+      "primary-hover": { "role": "primary", "displayName": "Coral Hover", "canonical": "#F2764D" },
+      "primary-light": { "role": "primary", "displayName": "Coral Wash", "canonical": "#FDEBE4" },
+      "bg": { "role": "neutral", "displayName": "Paper Field", "canonical": "#F8F9FB", "tonalRamp": ["#1F2329", "#3A3F47", "#5A616B", "#737A86", "#A5AAB2", "#D8DCE2", "#E6E9ED", "#F8F9FB"] },
+      "surface": { "role": "neutral", "displayName": "Card White", "canonical": "#FFFFFF" },
+      "surface-hover": { "role": "neutral", "displayName": "Field Hover", "canonical": "#F0F1F4" },
+      "border": { "role": "neutral", "displayName": "Hairline", "canonical": "#D8DCE2" },
+      "border-strong": { "role": "neutral", "displayName": "Hairline Strong", "canonical": "#C6CBD2" },
+      "divider": { "role": "neutral", "displayName": "Whisper Divider", "canonical": "#E6E9ED" },
+      "text": { "role": "neutral", "displayName": "Ink", "canonical": "#1F2329" },
+      "text-secondary": { "role": "neutral", "displayName": "Slate", "canonical": "#737A86" },
+      "success": { "role": "tertiary", "displayName": "Valid Green", "canonical": "#1A7F37" },
+      "warning": { "role": "tertiary", "displayName": "Caution Amber", "canonical": "#9A6700" },
+      "danger": { "role": "tertiary", "displayName": "Alert Red", "canonical": "#CF222E" },
+      "paw-lf": { "role": "data", "displayName": "Paw LF", "canonical": "#3C82F6" },
+      "paw-rf": { "role": "data", "displayName": "Paw RF", "canonical": "#EB463C" },
+      "paw-lh": { "role": "data", "displayName": "Paw LH", "canonical": "#28C8DC" },
+      "paw-rh": { "role": "data", "displayName": "Paw RH", "canonical": "#FF9628" },
+      "paw-unknown": { "role": "data", "displayName": "Paw Unknown", "canonical": "#A5AAB2" },
+      "mat-frame": { "role": "data", "displayName": "Mat Frame", "canonical": "#05070A" }
+    },
+    "typographyMeta": {
+      "title": { "displayName": "Title", "purpose": "App title and strongest headings; the largest type in the product." },
+      "metric": { "displayName": "Metric", "purpose": "Bold, tabular values in stat rows and the gait table; aligns live-updating numbers." },
+      "body": { "displayName": "Body", "purpose": "Default UI text, button and row labels." },
+      "label": { "displayName": "Label", "purpose": "Uppercase, tracked section headers in Slate." },
+      "caption": { "displayName": "Caption", "purpose": "Table cells, legends, muted secondary notes." }
+    },
+    "shadows": [],
+    "motion": [
+      { "name": "state-transition", "value": "background 0.15s ease, border-color 0.15s ease, color 0.15s ease", "purpose": "Default easing for button/input hover and focus state changes. Chrome is flat; motion is limited to color/state, never elevation." }
+    ],
+    "breakpoints": [
+      { "name": "console", "value": "280px", "purpose": "Fixed right console width; the stage takes the remainder. This is a desktop/Electron instrument, not a responsive fluid layout." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single coral action; spans both console columns (e.g. Analyze gait).",
+      "html": "<button class=\"ds-btn-primary\">🐾 보행 분석</button>",
+      "css": ".ds-btn-primary { background: #F0663F; color: #FFFFFF; border: 1px solid #F0663F; border-radius: 6px; padding: 8px 10px; font: 600 14px/1.4 Pretendard, system-ui, sans-serif; cursor: pointer; transition: background 0.15s ease, border-color 0.15s ease; } .ds-btn-primary:hover { background: #F2764D; border-color: #F2764D; } .ds-btn-primary:active { background: #D9502B; border-color: #D9502B; } .ds-btn-primary:focus-visible { outline: 3px solid #FDEBE4; outline-offset: 1px; } .ds-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "The workhorse control (Connect, Calibrate, exports); neutral surface with a confident hairline.",
+      "html": "<button class=\"ds-btn-secondary\">Calibrate</button>",
+      "css": ".ds-btn-secondary { background: #FFFFFF; color: #1F2329; border: 1px solid #D8DCE2; border-radius: 6px; padding: 8px 10px; font: 400 14px/1.4 Pretendard, system-ui, sans-serif; cursor: pointer; transition: background 0.15s ease, border-color 0.15s ease; } .ds-btn-secondary:hover { background: #F0F1F4; border-color: #C6CBD2; } .ds-btn-secondary:focus-visible { outline: 3px solid #FDEBE4; outline-offset: 1px; border-color: #F0663F; } .ds-btn-secondary:disabled { opacity: 0.4; cursor: not-allowed; }"
+    },
+    {
+      "name": "Toggle Button (active)",
+      "kind": "button",
+      "refersTo": "button-primary-active",
+      "description": "An engaged toggle (Labels: On); coral fill signals the state is on.",
+      "html": "<button class=\"ds-btn-toggle is-active\">🐾 Labels: On</button>",
+      "css": ".ds-btn-toggle { background: #FFFFFF; color: #1F2329; border: 1px solid #D8DCE2; border-radius: 6px; padding: 8px 10px; font: 400 14px/1.4 Pretendard, system-ui, sans-serif; cursor: pointer; transition: background 0.15s ease; } .ds-btn-toggle.is-active { background: #F0663F; border-color: #F0663F; color: #FFFFFF; } .ds-btn-toggle.is-active:hover { background: #F2764D; }"
+    },
+    {
+      "name": "Number Input",
+      "kind": "input",
+      "refersTo": "input-number",
+      "description": "Dog-weight field; card-white surface, coral focus ring.",
+      "html": "<div class=\"ds-field\"><label class=\"ds-field-label\">Dog weight</label><input class=\"ds-input\" type=\"number\" value=\"3.5\" /><span class=\"ds-field-unit\">kg</span></div>",
+      "css": ".ds-field { display: flex; align-items: center; gap: 8px; font: 400 14px/1.4 Pretendard, system-ui, sans-serif; } .ds-field-label { color: #737A86; font-size: 13px; } .ds-field-unit { color: #737A86; font-size: 12px; } .ds-input { width: 72px; background: #FFFFFF; color: #1F2329; border: 1px solid #D8DCE2; border-radius: 6px; padding: 7px 8px; font: inherit; } .ds-input:focus { outline: none; border-color: #F0663F; box-shadow: 0 0 0 3px #FDEBE4; }"
+    },
+    {
+      "name": "Stat Row",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Label-left / value-right readout row; value is bold tabular Ink, separated by a whisper divider.",
+      "html": "<div class=\"ds-row\"><span class=\"ds-row-label\">Max pressure</span><b class=\"ds-row-value\">42.8</b></div><div class=\"ds-row\"><span class=\"ds-row-label\">Calibration</span><b class=\"ds-row-value ds-warn\">uncalibrated</b></div>",
+      "css": ".ds-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #E6E9ED; font: 400 14px/1.4 Pretendard, system-ui, sans-serif; } .ds-row-label { color: #737A86; } .ds-row-value { color: #1F2329; font-weight: 600; font-feature-settings: 'tnum' 1; } .ds-warn { color: #9A6700; }"
+    },
+    {
+      "name": "Validity Badge",
+      "kind": "chip",
+      "refersTo": "badge-valid",
+      "description": "Trial-validity pill; solid semantic fill, white text.",
+      "html": "<span class=\"ds-badge ds-badge-valid\">VALID</span> <span class=\"ds-badge ds-badge-partial\">PARTIAL</span> <span class=\"ds-badge ds-badge-invalid\">INVALID</span>",
+      "css": ".ds-badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font: 600 12px/1.4 Pretendard, system-ui, sans-serif; color: #FFFFFF; } .ds-badge-valid { background: #1A7F37; } .ds-badge-partial { background: #9A6700; } .ds-badge-invalid { background: #CF222E; }"
+    },
+    {
+      "name": "Section Header",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Uppercase tracked group label in Slate.",
+      "html": "<div class=\"ds-section\">Gait analysis</div>",
+      "css": ".ds-section { font: 600 12px/1.4 Pretendard, system-ui, sans-serif; color: #737A86; text-transform: uppercase; letter-spacing: 0.04em; margin-top: 4px; }"
+    },
+    {
+      "name": "Heatmap Colorbar",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "The fixed scientific spectrum legend between its 10–80 bounds; never re-themed.",
+      "html": "<div class=\"ds-legend\"><span>10</span><div class=\"ds-bar\"></div><span>80</span></div>",
+      "css": ".ds-legend { display: flex; align-items: center; gap: 8px; font: 400 12px/1.5 Pretendard, system-ui, sans-serif; color: #737A86; } .ds-bar { height: 12px; flex: 1; border-radius: 6px; background: linear-gradient(90deg, #283CC8, #00AADC, #28C85A, #F0DC28, #F5961E, #DC1E1E); }"
+    },
+    {
+      "name": "Paw Legend",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Permanent paw-color key; data-viz colors, caption type.",
+      "html": "<div class=\"ds-paw-legend\"><span><i style=\"background:#3C82F6\"></i>LF</span><span><i style=\"background:#EB463C\"></i>RF</span><span><i style=\"background:#28C8DC\"></i>LH</span><span><i style=\"background:#FF9628\"></i>RH</span><span><i style=\"background:#A5AAB2\"></i>?</span></div>",
+      "css": ".ds-paw-legend { display: flex; flex-wrap: wrap; gap: 10px; font: 400 12px/1.5 Pretendard, system-ui, sans-serif; color: #737A86; } .ds-paw-legend span { display: inline-flex; align-items: center; gap: 5px; } .ds-paw-legend i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Clinic Companion",
+    "overview": "This is a warm clinical instrument, not a developer console. It sits on a vet's bench beside the animal and turns a short walk into numbers a clinician trusts — so it must feel calm, legible, and certain. The world is light: a soft off-white field with panels delineated by line, not by heavy fills, and a single confident coral that carries every primary action. The one place the light world yields is the measurement itself: the pressure mat sits in a near-black frame so the scientific heatmap and paw-label colors read at full saturation. Honesty is a visual value — the UI never dresses up an uncalibrated reading, never re-tints scientific data, and states confidence plainly.",
+    "keyCharacteristics": [
+      "Light, line-delineated instrument surface — panels separated by borders, not fills",
+      "One coral voice for all primary intent; neutrals do the rest",
+      "A dark measurement stage where scientific color lives untouched",
+      "Dense but calm: bilingual (한국어 / English), point-of-care legible",
+      "Tactile, confident controls; no ornament, no drama"
+    ],
+    "rules": [
+      { "name": "The One Coral Rule", "body": "Signal Coral is the only brand accent, and it appears on the primary action and active state — nowhere else. If more than a couple of coral elements share a screen, one of them is not really the primary action.", "section": "colors" },
+      { "name": "The Untouched-Data Rule", "body": "Heatmap and paw-label colors are scientific truth. Never recolor them to match the brand, never autoscale them per frame, never apply coral to a reading. The measurement owns its own palette.", "section": "colors" },
+      { "name": "The Line-Not-Fill Rule", "body": "Depth on the chrome comes from hairlines and dividers, not from stacked gray fills or shadows. When you need to separate two regions, reach for a border first.", "section": "colors" },
+      { "name": "The Tabular Metric Rule", "body": "Every number that updates live or sits in a column uses tabular figures. A clinician's eye should never chase a digit that shifted because a 1 is narrower than an 8.", "section": "typography" },
+      { "name": "The No-Shadow Rule", "body": "Chrome surfaces cast no shadow at rest or on hover. If something needs to feel raised, change its surface to Card White and give it a Hairline border — do not add a shadow.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep one coral voice — Signal Coral (#F0663F) marks the primary action and the active state, and little else.",
+      "Do separate chrome regions with #D8DCE2 hairlines and #E6E9ED dividers rather than shadows or stacked fills.",
+      "Do set every live/columnar number in tabular figures so digits never jitter.",
+      "Do keep the pressure mat in its dark #05070A well; the reading is the hero and needs the dark backdrop.",
+      "Do hold the mat at 1 : 2.3014 (73 × 168) — derive height from width. Never square.",
+      "Do render Korean and English at equal quality (Pretendard); the language toggle is permanent.",
+      "Do make disabled states unmistakable — the Calibrate → Record → Weight → Analyze flow gates on them."
+    ],
+    "donts": [
+      "Don't recolor, re-tint, or per-frame autoscale the heatmap or paw-label colors — they are scientific truth.",
+      "Don't add drop shadows to chrome surfaces; depth is drawn with line and surface, not light.",
+      "Don't introduce a second accent color to compete with coral.",
+      "Don't apply coral to a data reading or use it to imply a measurement value.",
+      "Don't carry the legacy GitHub-dark chrome (#0e1117 / #161b22 / #1f6feb) forward — it is the anti-reference this world replaces.",
+      "Don't use pure black (#000) or pure-saturated grays; stay in the Ink / Slate / Paper family."
+    ]
+  }
+}

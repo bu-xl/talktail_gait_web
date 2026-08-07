@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+dist-electron/
+release/
+*.asar
+
+# Electron / packaging artifacts
+*.dmg
+*.exe
+*.zip
+*.blockmap
+*.AppImage
+*.snap
+*.deb
+*.rpm
+
+# Vite / tooling
+.vite/
+vite.config.ts.timestamp-*.mjs
+
+# Env & local
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
+*.tsbuildinfo
+.idea/
+.vscode/

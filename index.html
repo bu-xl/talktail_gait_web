@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>보행 분석</title>
+    <!-- Pretendard (KR/EN UI). Falls back to system-ui offline; self-host the woff2 for a fully offline clinical build. -->
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+    <style>
+      /* Design System: 보행 분석 — "The Clinic Companion". Light, line-delineated
+         instrument. One coral voice; scientific data colors stay untouched. */
+      :root {
+        --bg: #f8f9fb;          /* Paper Field — app + panel field */
+        --surface: #ffffff;     /* Card White — inputs, raised controls */
+        --panel: #f8f9fb;       /* console shares the field, separated by line */
+        --border: #d8dce2;      /* Hairline — the confident border */
+        --border-strong: #c6cbd2; /* Hairline Strong — hovered control edge */
+        --divider: #e6e9ed;     /* Whisper Divider — internal row lines */
+        --surface-hover: #f0f1f4; /* Field Hover — secondary button hover fill */
+        --fg: #1f2329;          /* Ink — primary text + metrics */
+        --muted: #737a86;       /* Slate — secondary text */
+        --primary: #f0663f;         /* Signal Coral */
+        --primary-hover: #f2764d;
+        --primary-pressed: #d9502b;
+        --primary-light: #fdebe4;   /* Coral Wash — focus ring */
+        --success: #1a7f37;
+        --warning: #9a6700;
+        --danger: #cf222e;
+        --mat-frame: #05070a;   /* dark well behind the luminous heatmap */
+        --font-ui: 'Pretendard', 'Pretendard Variable', system-ui, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; background: var(--bg); color: var(--fg);
+        font: 14px/1.4 var(--font-ui); display: flex; height: 100vh;
+        -webkit-font-smoothing: antialiased;
+      }
+      #stage {
+        flex: 1; display: flex; flex-direction: column; align-items: stretch;
+        justify-content: flex-start; padding: 16px; gap: 12px; min-width: 0; overflow-y: auto;
+      }
+      #stage.sync-active { justify-content: flex-start; }
+      #stage.sync-active #matWrap {
+        height: min(38vh, calc(50vw - 180px));
+        flex-shrink: 0;
+      }
+      #cameraSection {
+        width: 100%; max-width: min(920px, calc(100vw - 320px));
+        align-self: center;
+        display: flex; flex-direction: column; gap: 8px;
+        flex: 1 1 280px; min-height: 280px;
+      }
+      .sync-pane-label {
+        font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+        color: var(--muted);
+      }
+      #cameraPanel.video-panel {
+        background: var(--mat-frame); border: 1px solid var(--border); border-radius: 8px;
+        overflow: hidden; display: flex; flex-direction: column; flex: 1; min-height: 280px;
+      }
+      #cameraPanel .video-viewport { flex: 1; min-height: 220px; }
+      #cameraPanel .video-controls {
+        background: var(--surface); border-top: 1px solid var(--divider);
+      }
+      #cameraPanel .btn-video-play {
+        background: var(--surface); color: var(--fg); border-color: var(--border);
+      }
+      #cameraPanel .video-time { color: var(--muted); }
+      #btnSyncBackLive { align-self: flex-end; }
+      #btnSyncBackLive.hidden { display: none; }
+      #syncMatLabel { display: none; align-self: center; width: 100%; max-width: min(920px, calc(100vw - 320px)); }
+      #stage.sync-active #syncMatLabel { display: block; }
+      #stage.sync-active #cameraPanelLabel { display: none; }
+      /* The mat is 73×168cm (cells 1.825×4.2) -> width:height = 1:2.3014. Never square.
+         Displayed rotated 90° to the left (counter-clockwise): the canvases render
+         portrait, the wrapper is turned to landscape purely for display. Intrinsic
+         height (= post-rotation visual width) is capped so it never runs under the
+         console. Data pipeline / exports / gait geometry are untouched. */
+      #matWrap {
+        position: relative; height: min(62vh, calc(100vw - 380px)); aspect-ratio: 73 / 168;
+        background: var(--mat-frame); border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+        transform: rotate(-90deg); align-self: center; flex-shrink: 0;
+      }
+      #heatmap { width: 100%; height: 100%; display: block; image-rendering: auto; }
+      /* Paw-label overlay sits directly on top of the heatmap, same box. */
+      #overlay { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+      #side {
+        width: 320px; background: var(--panel); border-left: 1px solid var(--border);
+        padding: 18px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto;
+      }
+      h1 { font-size: 15px; font-weight: 600; line-height: 1.3; margin: 0 0 4px; }
+      .row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--divider); }
+      .row b { font-weight: 600; font-feature-settings: 'tnum' 1; }
+      .muted { color: var(--muted); }
+      button, label.btn {
+        background: var(--surface); color: var(--fg); border: 1px solid var(--border); border-radius: 6px;
+        padding: 8px 10px; cursor: pointer; text-align: center; font: inherit;
+        transition: background .15s ease, border-color .15s ease, color .15s ease;
+      }
+      button:hover, label.btn:hover { background: var(--surface-hover); border-color: var(--border-strong); }
+      button:focus-visible, label.btn:focus-visible, select:focus-visible {
+        outline: 3px solid var(--primary-light); outline-offset: 1px; border-color: var(--primary);
+      }
+      .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      .section { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-top: 4px; }
+      button:disabled { opacity: .4; cursor: not-allowed; }
+      .ok { color: var(--success); } .warn { color: var(--warning); } .off { color: var(--muted); } .bad { color: var(--danger); }
+      .field { display: flex; align-items: center; gap: 8px; }
+      .field label { color: var(--muted); }
+      .field input[type=number] {
+        width: 72px; background: var(--surface); color: var(--fg); border: 1px solid var(--border);
+        border-radius: 6px; padding: 7px 8px; font: inherit; font-feature-settings: 'tnum' 1;
+      }
+      .field input[type=number]:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+      button.primary { background: var(--primary); border-color: var(--primary); color: #fff; grid-column: span 2; }
+      button.primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+      button.primary:active { background: var(--primary-pressed); border-color: var(--primary-pressed); }
+      button.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+      button.active:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+      #pawLegend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; color: var(--muted); }
+      #pawLegend span { display: inline-flex; align-items: center; gap: 5px; }
+      #pawLegend i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+      #gaitResult { display: none; flex-direction: column; gap: 8px; border-top: 1px solid var(--divider); padding-top: 12px; }
+      #gaitResult.show { display: flex; }
+      .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-weight: 600; font-size: 12px; color: #fff; }
+      .badge.VALID { background: var(--success); } .badge.PARTIAL { background: var(--warning); } .badge.INVALID { background: var(--danger); }
+      table.paws { width: 100%; border-collapse: collapse; font-size: 12px; }
+      table.paws th, table.paws td { text-align: right; padding: 4px 4px; border-bottom: 1px solid var(--divider); }
+      table.paws td { font-feature-settings: 'tnum' 1; }
+      table.paws th:first-child, table.paws td:first-child { text-align: left; }
+      table.paws th { color: var(--muted); font-weight: 600; }
+      td.dim { color: var(--muted); }
+      .gaitSummaryText { font-size: 12px; color: var(--muted); white-space: pre-wrap; line-height: 1.5; }
+      #legend { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+      #bar { height: 12px; flex: 1; border-radius: 6px;
+        background: linear-gradient(90deg,#283cc8,#00aadc,#28c85a,#f0dc28,#f5961e,#dc1e1e); }
+      input[type=file] { display: none; }
+      .lang-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+      .lang-row select {
+        flex: 1; background: var(--surface); color: var(--fg); border: 1px solid var(--border);
+        border-radius: 6px; padding: 7px 8px; font: inherit; cursor: pointer;
+      }
+      .lang-row select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+
+      /* Serial port picker modal */
+      #portModal {
+        display: none; position: fixed; inset: 0; z-index: 1000;
+        align-items: center; justify-content: center;
+        background: rgba(15, 18, 24, 0.45);
+      }
+      #portModal.open { display: flex; }
+      #portModal .dialog {
+        width: min(440px, calc(100vw - 32px)); max-height: min(70vh, 520px);
+        background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+        box-shadow: 0 16px 48px rgba(15, 18, 24, 0.18);
+        display: flex; flex-direction: column; overflow: hidden;
+      }
+      #portModal .dialog-head {
+        padding: 16px 18px 10px; border-bottom: 1px solid var(--divider);
+      }
+      #portModal .dialog-head h2 {
+        margin: 0 0 6px; font-size: 15px; font-weight: 600;
+      }
+      #portModal .dialog-head p {
+        margin: 0; font-size: 12px; color: var(--muted); line-height: 1.4;
+      }
+      #portList {
+        list-style: none; margin: 0; padding: 8px; overflow-y: auto; flex: 1;
+      }
+      #portList li { margin: 0 0 6px; }
+      #portList label.port-item {
+        display: flex; align-items: flex-start; gap: 10px;
+        padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
+        cursor: pointer; background: var(--bg); text-align: left; font: inherit;
+        transition: border-color .12s ease, background .12s ease;
+      }
+      #portList label.port-item:hover { border-color: var(--border-strong); background: var(--surface-hover); }
+      #portList label.port-item:has(input:checked) {
+        border-color: var(--primary); background: var(--primary-light);
+      }
+      #portList input { margin-top: 3px; accent-color: var(--primary); }
+      #portList .port-label { flex: 1; font-size: 13px; line-height: 1.35; word-break: break-all; }
+      #portList .badge-rec {
+        flex-shrink: 0; font-size: 11px; font-weight: 600; color: #fff;
+        background: var(--primary); border-radius: 999px; padding: 2px 8px;
+      }
+      #portEmpty { display: none; padding: 24px 18px; text-align: center; color: var(--muted); font-size: 13px; }
+      #portEmpty.show { display: block; }
+      #portModal .dialog-foot {
+        display: flex; gap: 8px; justify-content: flex-end;
+        padding: 12px 18px; border-top: 1px solid var(--divider);
+      }
+      #portModal .dialog-foot button { min-width: 72px; }
+      #portModal .dialog-foot button.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+      #portModal .dialog-foot button.primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+      #portModal .dialog-foot button.primary:disabled { opacity: .4; cursor: not-allowed; }
+
+      /* Camera sync + AI results */
+      #resultsPanel { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--divider); padding-top: 12px; }
+      #resultsPanel .results-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+      #resultsPanel .results-head .section { margin: 0; }
+      #resultsBreadcrumb { font-size: 12px; color: var(--muted); min-height: 1.2em; }
+      #resultsLoading.hidden, #resultsEmpty.hidden, #btnResultsBack.hidden { display: none !important; }
+      #resultsList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; }
+      button.results-item {
+        width: 100%; text-align: left; padding: 10px 12px; border-radius: 8px;
+        background: var(--surface); border: 1px solid var(--border);
+      }
+      button.results-item:hover { background: var(--surface-hover); border-color: var(--border-strong); }
+      #resultsEmpty, #resultsLoading { font-size: 12px; color: var(--muted); padding: 8px 0; }
+      #syncStatus.ok, #syncHub.ok { color: var(--success); }
+      #syncStatus.wait, #syncHub.wait { color: var(--warning); }
+      #syncStatus.off, #syncHub.off { color: var(--muted); }
+
+      /* Report modal — light clinic surface for video + metrics */
+      body.modal-open { overflow: hidden; }
+      #reportModal {
+        display: none; position: fixed; inset: 0; z-index: 1100;
+        background: rgba(31, 35, 41, 0.45); align-items: stretch; justify-content: center;
+      }
+      #reportModal.open { display: flex; }
+      #reportModal .rm-shell {
+        width: min(1120px, 100vw); height: min(92vh, 900px); margin: auto;
+        background: var(--surface); color: var(--fg); border-radius: 12px; overflow: hidden;
+        display: grid; grid-template-rows: auto 1fr; border: 1px solid var(--border);
+        box-shadow: 0 16px 48px rgba(31, 35, 41, 0.12);
+      }
+      #reportModal .rm-top {
+        display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+        padding: 14px 16px; border-bottom: 1px solid var(--divider);
+      }
+      #reportModalCrumbs { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+      #reportModalTitle { font-size: 18px; font-weight: 600; margin: 0; }
+      #reportModalSub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+      #reportModal .rm-top-actions { display: flex; gap: 8px; flex-shrink: 0; }
+      #reportModal .rm-top-actions button {
+        background: var(--surface); color: var(--fg); border-color: var(--border);
+      }
+      #reportModalScroll {
+        overflow: auto; padding: 16px; display: grid;
+        grid-template-columns: minmax(280px, 42%) 1fr; gap: 16px;
+        background: var(--bg);
+      }
+      @media (max-width: 860px) {
+        #reportModalScroll { grid-template-columns: 1fr; }
+      }
+      #reportModalVideo.video-panel {
+        background: var(--mat-frame); border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+        display: flex; flex-direction: column; min-height: 280px;
+      }
+      .video-viewport {
+        position: relative; flex: 1; min-height: 220px; background: #05070a;
+        display: flex; align-items: center; justify-content: center; overflow: hidden;
+      }
+      .video-media-wrap { position: relative; width: 100%; height: 100%; }
+      .camera-preview-canvas, .camera-preview, .ai-video {
+        position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain;
+        display: none;
+      }
+      .camera-preview-canvas.show, .ai-video.show { display: block; }
+      .camera-placeholder {
+        position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+        color: var(--muted); font-size: 13px; padding: 16px; text-align: center;
+      }
+      .camera-placeholder.hidden { display: none; }
+      .camera-loading {
+        position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+        background: rgba(5, 7, 10, 0.55); color: #fff; font-size: 13px;
+      }
+      .camera-loading.show { display: flex; }
+      .video-controls {
+        display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+        padding: 10px 12px; border-top: 1px solid var(--divider); background: var(--surface);
+      }
+      .btn-video-play {
+        min-width: 40px; background: var(--surface); color: var(--fg); border-color: var(--border);
+      }
+      .video-scrub { flex: 1; min-width: 120px; accent-color: var(--primary); }
+      .video-time { font-size: 12px; color: var(--muted); font-feature-settings: 'tnum' 1; min-width: 88px; }
+      .video-speed, .video-zoom { accent-color: var(--primary); }
+      #reportModalLoading {
+        grid-column: 1 / -1; text-align: center; color: var(--muted); padding: 24px;
+      }
+      #reportModalLoading.hidden { display: none; }
+      #reportModalBody { min-width: 0; }
+      .rm-section-label { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+      .rm-hero { margin-bottom: 12px; }
+      .rm-kicker { font-size: 11px; color: var(--primary); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+      .rm-title { font-size: 20px; font-weight: 600; margin-top: 4px; }
+      .rm-lead { font-size: 13px; color: var(--muted); line-height: 1.5; margin: 8px 0 0; }
+      .rm-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .rm-chip { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; min-width: 88px; }
+      .rm-chip b { display: block; font-size: 18px; font-feature-settings: 'tnum' 1; }
+      .rm-chip span { font-size: 11px; color: var(--muted); }
+      .rm-chip.ok b { color: var(--success); }
+      .rm-chip.warn b { color: var(--warning); }
+      .rm-meta { font-size: 12px; color: var(--muted); margin: 0 0 12px; }
+      .rm-advisory { background: var(--primary-light); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; font-size: 13px; }
+      .rm-advisory b { display: block; margin-bottom: 4px; color: var(--primary-pressed); }
+      .rm-section { margin-bottom: 16px; }
+      .rm-section h3 { margin: 0 0 6px; font-size: 14px; }
+      .rm-blurb { margin: 0 0 8px; font-size: 12px; color: var(--muted); line-height: 1.45; }
+      .rm-metric { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+      .rm-metric.caution { border-color: #e8c547; }
+      .rm-metric-top { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+      .rm-metric-label { font-size: 13px; font-weight: 600; }
+      .rm-metric-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+      .rm-metric-sub.muted { opacity: .65; }
+      .rm-metric-value { font-size: 18px; font-weight: 600; font-feature-settings: 'tnum' 1; text-align: right; }
+      .rm-metric-value.caution { color: var(--warning); }
+      .rm-ref { display: inline-block; margin-top: 4px; font-size: 10px; color: var(--warning); border: 1px solid #e8c547; border-radius: 999px; padding: 1px 6px; }
+      .rm-why { margin: 8px 0 0; font-size: 12px; color: var(--muted); line-height: 1.4; }
+      .rm-caveats { margin-top: 12px; }
+      .rm-link { background: none; border: none; color: var(--primary); padding: 0; cursor: pointer; font: inherit; }
+      .rm-caveat-line { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
+      .rm-empty { font-size: 13px; color: var(--muted); }
+    
+    </style>
+  </head>
+  <body>
+    <div id="stage">
+      <div class="sync-pane-label" id="syncMatLabel" data-i18n="sync_mat_label">Recorded mat</div>
+      <div id="matWrap"><canvas id="heatmap"></canvas><canvas id="overlay"></canvas></div>
+      <div id="cameraSection">
+        <div class="sync-pane-label" id="cameraPanelLabel" data-i18n="camera_panel_label">Phone camera</div>
+        <div id="cameraPanel" class="video-panel">
+          <div class="video-viewport">
+            <div class="video-media-wrap">
+              <canvas class="camera-preview-canvas"></canvas>
+              <img class="camera-preview" alt="" hidden />
+              <video class="ai-video" playsinline></video>
+              <div class="camera-placeholder" data-i18n="camera_placeholder">Waiting for phone camera…</div>
+              <div class="camera-loading"><span data-i18n="sync_analyzing">Analyzing…</span></div>
+            </div>
+          </div>
+          <div class="video-controls">
+            <button type="button" class="btn-video-play" title="Play">▶</button>
+            <input type="range" class="video-scrub" min="0" max="1000" value="0" />
+            <span class="video-time">0:00 / 0:00</span>
+            <select class="video-speed" aria-label="Speed">
+              <option value="0.2">0.2×</option>
+              <option value="0.25">0.25×</option>
+              <option value="0.5">0.5×</option>
+              <option value="1" selected>1×</option>
+              <option value="1.5">1.5×</option>
+              <option value="2">2×</option>
+            </select>
+            <input type="range" class="video-zoom" min="100" max="300" value="100" title="Zoom" />
+          </div>
+        </div>
+        <button type="button" id="btnSyncBackLive" class="hidden" data-i18n="btn_back_live">Back to live</button>
+      </div>
+    </div>
+    <aside id="side">
+      <h1 data-i18n="h1_title">Pressure Mat Viewer</h1>
+
+      <div class="lang-row">
+        <label for="langSelect" class="muted" data-i18n="lang_label">Language</label>
+        <select id="langSelect" aria-label="Language">
+          <option value="ko">한국어</option>
+          <option value="en">English</option>
+        </select>
+      </div>
+
+      <div class="controls">
+        <button id="btnConnect" data-i18n="btn_connect">Connect</button>
+        <button id="btnCalibrate" data-i18n="btn_calibrate">Calibrate</button>
+        <label class="btn" for="file" data-i18n="btn_replay_file">Replay file</label>
+        <button id="btnLabels" data-i18n="btn_labels_on">🐾 Labels: On</button>
+        <button id="btnGrid" data-i18n="btn_grid">Grid</button>
+        <button id="btnSharp" data-i18n="btn_sharp_soft">Sharpness: Soft</button>
+      </div>
+      <input id="file" type="file" accept=".txt,.csv,.log" />
+
+      <div class="section" data-i18n="section_recording">Recording</div>
+      <div class="controls">
+        <button id="btnRecord" data-i18n="btn_record">● Record</button>
+        <button id="btnReplay" disabled data-i18n="btn_replay_rec">Replay rec</button>
+        <button id="btnCsv" disabled data-i18n="btn_raw_csv">Raw CSV</button>
+        <button id="btnTrackCsv" disabled data-i18n="btn_paw_csv">Paw CSV</button>
+        <button id="btnGif" disabled data-i18n="btn_gif">GIF</button>
+        <button id="btnPng" disabled data-i18n="btn_png">Heatmap PNG</button>
+      </div>
+
+      <div class="section" data-i18n="section_gait">Gait analysis</div>
+      <div class="field">
+        <label for="dogWeight" data-i18n="dog_weight">Dog weight</label>
+        <input id="dogWeight" type="number" min="0.4" max="80" step="0.1" value="3.5" />
+        <span class="muted" data-i18n="kg">kg</span>
+      </div>
+      <div class="controls">
+        <button id="btnGait" class="primary" disabled data-i18n="btn_analyze_gait">🐾 Analyze gait</button>
+        <button id="btnGaitCsv" disabled data-i18n="btn_report_csv">Report CSV</button>
+        <button id="btnGaitPdf" disabled data-i18n="btn_report_pdf">Report PDF</button>
+        <button id="btnGaitJson" disabled>Report JSON</button>
+      </div>
+
+      <div id="gaitResult">
+        <div class="row">
+          <span data-i18n="gait_result">Result</span>
+          <b><span id="gaitBadge" class="badge INVALID">–</span></b>
+        </div>
+        <div class="row"><span data-i18n="gait_direction">Direction</span><b id="gaitDir">–</b></div>
+        <div class="row"><span data-i18n="gait_detected_paws">Detected paws</span><b id="gaitPaws">–</b></div>
+        <div class="row"><span data-i18n="gait_duration_hz">Duration · Hz</span><b id="gaitDur">–</b></div>
+        <div class="row"><span data-i18n="gait_cadence">Cadence</span><b id="gaitCadence">–</b></div>
+        <div class="row"><span data-i18n="gait_fore_hind">Fore / Hind load</span><b id="gaitFH">–</b></div>
+        <div class="row"><span data-i18n="gait_symmetry">Symmetry F/H</span><b id="gaitSym">–</b></div>
+        <div class="row"><span>Speed</span><b id="gaitSpeed">–</b></div>
+        <div class="row"><span>Stride / Step</span><b id="gaitStride">–</b></div>
+        <div class="row"><span>Step width</span><b id="gaitStepW">–</b></div>
+        <div class="row"><span>Double support</span><b id="gaitDS">–</b></div>
+        <div class="row"><span>COP path / area</span><b id="gaitCop">–</b></div>
+        <div class="row"><span>Paw sequence</span><b id="gaitSeq">–</b></div>
+        <table class="paws">
+          <thead>
+            <tr>
+              <th data-i18n="th_paw">Paw</th>
+              <th data-i18n="th_load">Load%</th>
+              <th data-i18n="th_peak">Peak</th>
+              <th data-i18n="th_impulse">Impulse</th>
+              <th data-i18n="th_area">Area</th>
+              <th data-i18n="th_steps">Steps</th>
+            </tr>
+          </thead>
+          <tbody id="gaitTbody"></tbody>
+        </table>
+        <div id="gaitFlags"></div>
+        <div id="gaitNote" class="gaitSummaryText"></div>
+      </div>
+
+      <div>
+        <div class="row"><span data-i18n="stat_connection">Connection</span><b id="status" class="off">○ idle</b></div>
+        <div class="row"><span data-i18n="stat_calibration">Calibration</span><b id="statCal" class="warn">uncalibrated</b></div>
+        <div class="row"><span data-i18n="stat_max">Max pressure</span><b id="statMax">–</b></div>
+        <div class="row"><span data-i18n="stat_avg">Avg pressure</span><b id="statAvg">–</b></div>
+        <div class="row"><span data-i18n="stat_contact">Contact area</span><b id="statContact">–</b></div>
+        <div class="row"><span data-i18n="stat_medium">30–50 area</span><b id="statMedium">–</b></div>
+        <div class="row"><span data-i18n="stat_high">&gt;50 area</span><b id="statHigh">–</b></div>
+        <div class="row">
+          <span data-i18n="stat_input_hz">Input Hz</span>
+          <b id="statHz">–</b>
+        </div>
+        <div class="row">
+          <span data-i18n="stat_render_fps">Render FPS</span>
+          <b id="statFps">–</b>
+        </div>
+        <div class="row"><span data-i18n="stat_recording">Recording</span><b id="statRec" class="off">–</b></div>
+      </div>
+
+      <div id="legend"><span>10</span><div id="bar"></div><span>80</span></div>
+      <div class="section" data-i18n="section_paw_labels">Paw labels</div>
+      <div id="pawLegend">
+        <span><i style="background:#3c82f6"></i>LF</span>
+        <span><i style="background:#eb463c"></i>RF</span>
+        <span><i style="background:#28c8dc"></i>LH</span>
+        <span><i style="background:#ff9628"></i>RH</span>
+        <span><i style="background:#a5aab2"></i>?</span>
+      </div>
+
+      <div class="section" data-i18n="section_camera_sync">Camera sync</div>
+      <div class="row"><span data-i18n="sync_mobile_waiting">Mobile</span><b id="syncStatus" class="wait">–</b></div>
+      <div class="row"><span>Hub</span><b id="syncHub" class="wait">–</b></div>
+
+      <div id="resultsPanel">
+        <div class="results-head">
+          <div class="section" data-i18n="section_ai_results">AI results</div>
+          <div style="display:flex;gap:6px;">
+            <button type="button" id="btnResultsBack" class="hidden" data-i18n="btn_results_back">Back</button>
+            <button type="button" id="btnResultsRefresh" data-i18n="btn_results_refresh">Refresh</button>
+          </div>
+        </div>
+        <div id="resultsBreadcrumb" data-i18n="results_dates_hint">Pick a date</div>
+        <div id="resultsLoading" class="hidden">…</div>
+        <div id="resultsEmpty" data-i18n="results_empty">No results</div>
+        <ul id="resultsList"></ul>
+      </div>
+    </aside>
+
+    <div id="portModal" role="dialog" aria-modal="true" aria-labelledby="portModalTitle">
+      <div class="dialog">
+        <div class="dialog-head">
+          <h2 id="portModalTitle" data-i18n="port_modal_title">Select serial port</h2>
+          <p data-i18n="port_modal_hint">Pick a device, then Connect.</p>
+        </div>
+        <ul id="portList"></ul>
+        <div id="portEmpty" data-i18n="port_modal_empty">No ports found.</div>
+        <div class="dialog-foot">
+          <button type="button" id="portRefresh" data-i18n="port_modal_refresh">Refresh</button>
+          <button type="button" id="portCancel" data-i18n="port_modal_cancel">Cancel</button>
+          <button type="button" class="primary" id="portConfirm" data-i18n="port_modal_connect" disabled>Connect</button>
+        </div>
+      </div>
+    </div>
+    <div id="reportModal" role="dialog" aria-modal="true" aria-labelledby="reportModalTitle">
+      <div class="rm-shell">
+        <div class="rm-top">
+          <div>
+            <div id="reportModalCrumbs"></div>
+            <h2 id="reportModalTitle">–</h2>
+            <div id="reportModalSub"></div>
+          </div>
+          <div class="rm-top-actions">
+            <button type="button" id="reportModalBack" data-i18n="report_modal_back">List</button>
+            <button type="button" id="reportModalClose" data-i18n="report_modal_close">Close</button>
+          </div>
+        </div>
+        <div id="reportModalScroll">
+          <div id="reportModalVideo" class="video-panel">
+            <div class="video-viewport">
+              <div class="video-media-wrap">
+                <canvas class="camera-preview-canvas"></canvas>
+                <img class="camera-preview" alt="" hidden />
+                <video class="ai-video" playsinline></video>
+                <div class="camera-placeholder" data-i18n="video_placeholder">AI analysis video</div>
+                <div class="camera-loading"><span>…</span></div>
+              </div>
+            </div>
+            <div class="video-controls">
+              <button type="button" class="btn-video-play" title="Play">▶</button>
+              <input type="range" class="video-scrub" min="0" max="1000" value="0" />
+              <span class="video-time">0:00 / 0:00</span>
+              <select class="video-speed" aria-label="Speed">
+                <option value="0.2">0.2×</option>
+                <option value="0.25">0.25×</option>
+                <option value="0.5">0.5×</option>
+                <option value="1" selected>1×</option>
+                <option value="1.5">1.5×</option>
+                <option value="2">2×</option>
+              </select>
+              <input type="range" class="video-zoom" min="100" max="300" value="100" title="Zoom" />
+              <button type="button" class="btn-video-rotate hidden"></button>
+            </div>
+          </div>
+          <div id="reportModalLoading" class="hidden">…</div>
+          <div id="reportModalBody"></div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/app/main.ts"></script>
+
+  </body>
+</html>
