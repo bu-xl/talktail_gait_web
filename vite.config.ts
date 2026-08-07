@@ -15,6 +15,10 @@ export default defineConfig({
         target: process.env.VITE_API_BASE_URL || "http://localhost:3000",
         changeOrigin: true,
       },
+      "/uploads": {
+        target: process.env.VITE_API_BASE_URL || "http://localhost:3000",
+        changeOrigin: true,
+      },
       "/ws": {
         target: process.env.VITE_API_BASE_URL || "http://localhost:3000",
         ws: true,

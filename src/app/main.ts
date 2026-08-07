@@ -76,6 +76,130 @@ import {
 import { SyncPlaybackDock } from "../ui/syncPlaybackDock.js";
 import { wireWorkspaceVideoControls } from "../ui/workspaceVideoControls.js";
 
+/** Promo filming cases from `dashboard_analysis/<time>/`. Open with `?promo=165529`. */
+type PromoDogInfo = {
+  name: { ko: string; en: string };
+  breed: { ko: string; en: string };
+  weightKg: number;
+  /** Leave blank in the UI when null. */
+  heightCm: number | null;
+};
+
+type PromoCase = {
+  date: string;
+  time: string;
+  stem: string;
+  originUpload: string;
+  dog: PromoDogInfo;
+};
+
+const PROMO_CASES: Record<string, PromoCase> = {
+  "165529": {
+    date: "260807",
+    time: "165529",
+    stem: "analyzed-1366x768-18s-29p92fps-260807-165529",
+    originUpload: "/uploads/165529_origin.mp4",
+    dog: {
+      name: { ko: "아미", en: "Ami" },
+      breed: { ko: "저먼 셰퍼드", en: "German Shepherd" },
+      weightKg: 23,
+      heightCm: null,
+    },
+  },
+  "165613": {
+    date: "260807",
+    time: "165613",
+    stem: "analyzed-1366x768-8s-29p83fps-260807-165613",
+    originUpload: "/uploads/165613_origin.mp4",
+    dog: {
+      name: { ko: "제니", en: "Jenny" },
+      breed: { ko: "래브라도 리트리버", en: "Labrador Retriever" },
+      weightKg: 19,
+      heightCm: null,
+    },
+  },
+};
+
+function readPromoCaseId(): string | null {
+  try {
+    const id = new URLSearchParams(window.location.search).get("promo");
+    return id && PROMO_CASES[id] ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Same-origin URL so Vite `/api`·`/uploads` proxy is used (avoids localhost↔IPv6 issues). */
+function promoAssetUrl(path: string): string {
+  const clean = path.startsWith("/") ? path : `/${path}`;
+  return `${window.location.origin}${clean}`;
+}
+
+function promoArtifactUrls(c: PromoCase): SessionArtifacts {
+  const base = `/api/ai-results/${c.date}/${c.time}`;
+  const videoPath = `${base}/result_video/${c.stem}.mp4`;
+  return {
+    video: {
+      kind: "video",
+      available: true,
+      url: promoAssetUrl(videoPath),
+      filename: `${c.stem}.mp4`,
+    },
+    angle_pawy: {
+      kind: "angle_pawy",
+      available: true,
+      url: promoAssetUrl(`${base}/result_angle_pawy/${c.stem}_angle_pawy.mp4`),
+      filename: `${c.stem}_angle_pawy.mp4`,
+    },
+    stride: {
+      kind: "stride",
+      available: true,
+      url: promoAssetUrl(`${base}/result_stride/${c.stem}_stride.png`),
+      filename: `${c.stem}_stride.png`,
+    },
+    cyclogram: {
+      kind: "cyclogram",
+      available: true,
+      url: promoAssetUrl(`${base}/result_cyclogram/${c.stem}_cyclogram.mp4`),
+      filename: `${c.stem}_cyclogram.mp4`,
+    },
+    derived: {
+      kind: "derived",
+      available: true,
+      url: promoAssetUrl(`${base}/result_derived/${c.stem}_derived.json`),
+      filename: `${c.stem}_derived.json`,
+    },
+    keypoints: {
+      kind: "keypoints",
+      available: true,
+      url: promoAssetUrl(`${base}/result_keypoints/${c.stem}_keypoints.json`),
+      filename: `${c.stem}_keypoints.json`,
+    },
+  };
+}
+
+function applyPromoDogInfo(dog: PromoDogInfo): void {
+  const lang = getLang() === "en" ? "en" : "ko";
+  const nameEl = $opt("dogName") as HTMLInputElement | null;
+  const heightEl = $opt("dogHeight") as HTMLInputElement | null;
+  const weightEl = $opt("dogWeightInfo") as HTMLInputElement | null;
+  const breedEl = $opt("dogBreed") as HTMLInputElement | null;
+  if (nameEl) nameEl.value = dog.name[lang];
+  if (heightEl) heightEl.value = dog.heightCm == null ? "" : String(dog.heightCm);
+  if (weightEl) weightEl.value = dog.weightKg > 0 ? String(dog.weightKg) : "";
+  if (breedEl) breedEl.value = dog.breed[lang];
+
+  const form = $opt("dogInfoForm");
+  const btn = $opt("btnDogInfoToggle") as HTMLButtonElement | null;
+  if (form) {
+    form.classList.remove("is-collapsed");
+    if (btn) {
+      btn.textContent = t("btn_dog_info_collapse");
+      btn.setAttribute("aria-expanded", "true");
+    }
+  }
+}
+
 export type SessionArtifacts = Record<
   string,
   { kind?: string; filename?: string; url?: string | null; available?: boolean }
@@ -210,6 +334,10 @@ function wireAppHeader(opts: { onModuleChange: (mod: AppModule) => void }): void
 
 async function boot(): Promise<void> {
   const userSettings = loadUserSettings();
+  const langParam = new URLSearchParams(window.location.search).get("lang");
+  if (langParam === "en" || langParam === "ko") {
+    userSettings.lang = langParam;
+  }
   initI18n(userSettings.lang);
   wireSideToggle();
   wireDogInfoToggle();
@@ -1258,6 +1386,10 @@ async function boot(): Promise<void> {
     patchUserSettings({ lang: getLang() });
   });
 
+  const promoCaseId = readPromoCaseId();
+  const promoCase = promoCaseId ? PROMO_CASES[promoCaseId] : null;
+  if (promoCase) applyPromoDogInfo(promoCase.dog);
+
   onLangChange(() => {
     applyDocumentI18n();
     refreshLabelsBtn();
@@ -1268,6 +1400,7 @@ async function boot(): Promise<void> {
       const collapsed = dogForm.classList.contains("is-collapsed");
       dogBtn.textContent = collapsed ? t("btn_dog_info_expand") : t("btn_dog_info_collapse");
     }
+    if (promoCase) applyPromoDogInfo(promoCase.dog);
     const { connected, detail } = lastStatus;
     setStatus(connected, detail);
     updateRecordingStatus();
@@ -1394,6 +1527,40 @@ async function boot(): Promise<void> {
     gaitSync.disconnect();
     void source?.stop();
   });
+
+  if (promoCase) {
+    setSyncStatus(`프로모 로딩… (${promoCaseId})`, "wait");
+    void (async () => {
+      try {
+        const artifacts = promoArtifactUrls(promoCase);
+        const analysisUrl = artifacts.video?.url;
+        if (!analysisUrl) throw new Error("promo video url missing");
+
+        enterReview({
+          analysisUrl,
+          originalUrl: promoAssetUrl(promoCase.originUpload),
+          artifacts,
+          date: promoCase.date,
+          time: promoCase.time,
+          stem: promoCase.stem,
+          sessionPath: `${promoCase.date}/${promoCase.time}`,
+        });
+        if (!$opt("wsBody1")?.classList.contains("has-media")) {
+          setPressureGif(placeholderUrl("foot.gif"));
+        }
+
+        // Warm the results sidebar list (API may use localhost; failure is non-fatal).
+        void resultsPanel?.refresh();
+        setSyncStatus(`프로모 준비됨 · ${promoCaseId}`, "ok");
+      } catch (err) {
+        console.error("[promo] load failed", err);
+        setSyncStatus(
+          `프로모 로드 실패: ${err instanceof Error ? err.message : String(err)}`,
+          "bad",
+        );
+      }
+    })();
+  }
 }
 
 function updateStats(

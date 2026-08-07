@@ -70,6 +70,21 @@ export type ResultDetail = {
       available?: boolean;
       preview?: DerivedPreview | null;
     };
+    cyclogram?: {
+      filename: string;
+      url: string | null;
+      available?: boolean;
+    };
+    stride?: {
+      filename: string;
+      url: string | null;
+      available?: boolean;
+    };
+    angle_pawy?: {
+      filename: string;
+      url: string | null;
+      available?: boolean;
+    };
   };
 };
 
@@ -114,15 +129,16 @@ export async function getResultDetail(
     ...detail.video,
     url: absolutize(apiBaseUrl, detail.video?.url),
   };
+  const absArtifact = <T extends { url?: string | null } | null | undefined>(item: T): T => {
+    if (!item || typeof item !== "object") return item;
+    return { ...item, url: absolutize(apiBaseUrl, item.url) };
+  };
   detail.report = {
-    keypoints: {
-      ...detail.report.keypoints,
-      url: absolutize(apiBaseUrl, detail.report?.keypoints?.url),
-    },
-    derived: {
-      ...detail.report.derived,
-      url: absolutize(apiBaseUrl, detail.report?.derived?.url),
-    },
+    keypoints: absArtifact(detail.report?.keypoints) as ResultDetail["report"]["keypoints"],
+    derived: absArtifact(detail.report?.derived) as ResultDetail["report"]["derived"],
+    cyclogram: absArtifact(detail.report?.cyclogram),
+    stride: absArtifact(detail.report?.stride),
+    angle_pawy: absArtifact(detail.report?.angle_pawy),
   };
   return detail;
 }
