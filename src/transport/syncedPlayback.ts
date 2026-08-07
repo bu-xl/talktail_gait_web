@@ -39,9 +39,18 @@ export class SyncedMatVideoPlayback {
 
     video.loop = this.loop;
     video.currentTime = 0;
-    void video.play().catch(() => {
-      /* autoplay may require user gesture — caller already clicked Record/Replay */
-    });
+    if (video.paused) {
+      void video.play().catch((error: unknown) => {
+        if (
+          typeof DOMException !== "undefined" &&
+          error instanceof DOMException &&
+          error.name === "AbortError"
+        ) {
+          return;
+        }
+        /* autoplay may require user gesture */
+      });
+    }
 
     const tick = (): void => {
       if (!this.running || !this.video) return;

@@ -3,6 +3,8 @@
  * 녹화 동기화 + 분석 결과만 담당 (라이브 영상 전송 없음).
  */
 
+import { joinApiUrl } from "../config/apiUrl.js";
+
 export type SyncPeers = { web: boolean; mobile: boolean };
 
 export type SyncMessage =
@@ -162,8 +164,7 @@ export function waitUntilRecordAt(recordAt: number): Promise<void> {
 
 export function absolutizeResultUrl(apiBaseUrl: string, resultUrl: string): string {
   if (resultUrl.startsWith("http://") || resultUrl.startsWith("https://")) return resultUrl;
-  const base = apiBaseUrl.replace(/\/$/, "");
-  return resultUrl.startsWith("/") ? `${base}${resultUrl}` : `${base}/${resultUrl}`;
+  return joinApiUrl(apiBaseUrl, resultUrl);
 }
 
 type JobPoll = {
@@ -186,13 +187,12 @@ export async function pollJobUntilDone(
   intervalMs = 1500,
   timeoutMs = 10 * 60 * 1000,
 ): Promise<JobPoll> {
-  const base = apiBaseUrl.replace(/\/$/, "");
   const started = Date.now();
   for (;;) {
     if (Date.now() - started > timeoutMs) {
       throw new Error("job poll timeout");
     }
-    const res = await fetch(`${base}/api/jobs/${encodeURIComponent(jobId)}`);
+    const res = await fetch(joinApiUrl(apiBaseUrl, `/api/jobs/${encodeURIComponent(jobId)}`));
     if (!res.ok) throw new Error(`job poll HTTP ${res.status}`);
     const job = (await res.json()) as JobPoll;
     if (job.status === "completed" || job.status === "failed") return job;

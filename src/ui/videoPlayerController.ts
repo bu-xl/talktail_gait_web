@@ -1,6 +1,12 @@
 /**
  * Phone JPEG preview + AI video player (scrub, speed, zoom, play/pause).
  * Preview paints to canvas via offscreen decode to avoid img flicker.
+ *
+ * Playback rules (AbortError-safe):
+ * - Never re-assign video.src for the same URL
+ * - load() only when src actually changes
+ * - play() only when paused; never stack concurrent play() promises
+ * - AbortError from play() is ignored (benign race)
  */
 
 import { onLangChange, t } from "../i18n/index.js";
@@ -33,6 +39,11 @@ export class VideoPlayerController {
   private onTimeListeners = new Set<() => void>();
   private resizeObserver: ResizeObserver | null = null;
   private resizeTimer = 0;
+  /** Last URL we intentionally assigned (absolute). */
+  private loadedUrl = "";
+  /** In-flight play() so callers do not stack concurrent requests. */
+  private playPromise: Promise<void> | null = null;
+  private loadGeneration = 0;
 
   constructor(root: HTMLElement) {
     this.viewport = q(root, ".video-viewport");
@@ -55,6 +66,7 @@ export class VideoPlayerController {
     this.preview.hidden = true;
     this.previewCanvas.classList.remove("show");
     this.decodeImg.decoding = "async";
+    this.video.playsInline = true;
     this.bindEvents();
     onLangChange(() => this.refreshLabels());
     this.refreshLabels();
@@ -67,6 +79,11 @@ export class VideoPlayerController {
 
   getMode(): VideoPlayerMode {
     return this.mode;
+  }
+
+  /** Absolute URL currently loaded, or empty. */
+  getLoadedUrl(): string {
+    return this.loadedUrl;
   }
 
   onTimeUpdate(fn: () => void): () => void {
@@ -105,37 +122,41 @@ export class VideoPlayerController {
     this.showIdle();
   }
 
+  /**
+   * Load (or keep) a video URL. Same URL → no-op (no src/load/play).
+   * Different URL → pause → src → load → wait metadata → optional play.
+   */
   loadVideo(url: string, opts?: { autoplay?: boolean; loop?: boolean; orientation?: string }): void {
-    this.mode = "video";
-    this.previewPending = null;
-    if (this.previewRaf) cancelAnimationFrame(this.previewRaf);
-    this.previewRaf = 0;
-    this.placeholder.classList.add("hidden");
-    this.previewCanvas.classList.remove("show");
-    this.preview.classList.remove("show");
-    this.video.classList.add("show");
+    const nextUrl = resolveMediaUrl(url);
+    if (!nextUrl) return;
+
+    const autoplay = opts?.autoplay !== false;
+    const loop = opts?.loop ?? false;
 
     if (opts?.orientation === "portrait") {
       this.rotationDeg = 90;
     } else if (opts?.orientation === "landscape") {
       this.rotationDeg = 0;
     }
+
+    // Identical URL: never touch src / load / play again.
+    if (this.isSameLoadedUrl(nextUrl)) {
+      this.enterVideoUi();
+      this.video.loop = loop;
+      this.video.playbackRate = Number(this.speedSelect.value) || 1;
+      this.applyTransform();
+      this.updateScrubMax();
+      this.updatePlayButton();
+      this.updateTimeLabel();
+      return;
+    }
+
+    this.enterVideoUi();
+    this.video.loop = loop;
+    this.video.playbackRate = Number(this.speedSelect.value) || 1;
     this.applyTransform();
 
-    if (this.video.src !== url) {
-      this.video.src = url;
-      this.video.load();
-    }
-    this.video.loop = opts?.loop ?? false;
-    this.video.playbackRate = Number(this.speedSelect.value) || 1;
-    this.updateScrubMax();
-    if (opts?.autoplay !== false) {
-      void this.video.play().catch(() => {
-        /* autoplay may require gesture */
-      });
-    }
-    this.updatePlayButton();
-    this.updateTimeLabel();
+    void this.replaceSourceAndMaybePlay(nextUrl, autoplay);
   }
 
   setLoading(on: boolean, label?: string): void {
@@ -147,7 +168,8 @@ export class VideoPlayerController {
   }
 
   play(): void {
-    if (this.mode === "video") void this.video.play();
+    if (this.mode !== "video") return;
+    void this.safePlay();
     this.updatePlayButton();
   }
 
@@ -158,18 +180,102 @@ export class VideoPlayerController {
 
   togglePlay(): void {
     if (this.mode !== "video") return;
-    if (this.video.paused) void this.video.play();
+    if (this.video.paused) void this.safePlay();
     else this.video.pause();
     this.updatePlayButton();
   }
 
   stopVideo(): void {
+    this.loadGeneration += 1;
+    this.playPromise = null;
     this.video.pause();
     this.video.removeAttribute("src");
     this.video.load();
+    this.loadedUrl = "";
     this.video.classList.remove("show");
     this.showIdle();
     this.updatePlayButton();
+  }
+
+  private enterVideoUi(): void {
+    this.mode = "video";
+    this.previewPending = null;
+    if (this.previewRaf) cancelAnimationFrame(this.previewRaf);
+    this.previewRaf = 0;
+    this.placeholder.classList.add("hidden");
+    this.previewCanvas.classList.remove("show");
+    this.preview.classList.remove("show");
+    this.video.classList.add("show");
+  }
+
+  private isSameLoadedUrl(nextUrl: string): boolean {
+    if (!nextUrl) return false;
+    if (this.loadedUrl && urlsLooselyEqual(this.loadedUrl, nextUrl)) return true;
+    const current = this.video.currentSrc || this.video.src || "";
+    if (current && urlsLooselyEqual(current, nextUrl)) return true;
+    const attr = this.video.getAttribute("src");
+    if (attr && urlsLooselyEqual(resolveMediaUrl(attr), nextUrl)) return true;
+    return false;
+  }
+
+  private async replaceSourceAndMaybePlay(nextUrl: string, autoplay: boolean): Promise<void> {
+    const gen = ++this.loadGeneration;
+    try {
+      this.video.pause();
+    } catch {
+      /* ignore */
+    }
+
+    // Only assign + load when the element does not already point at nextUrl.
+    if (!urlsLooselyEqual(this.video.src || "", nextUrl) && !urlsLooselyEqual(this.video.currentSrc || "", nextUrl)) {
+      this.video.src = nextUrl;
+      this.video.load();
+    }
+    this.loadedUrl = nextUrl;
+
+    try {
+      await waitForLoadedMetadata(this.video);
+    } catch {
+      if (gen !== this.loadGeneration) return;
+      return;
+    }
+    if (gen !== this.loadGeneration) return;
+    if (!this.isSameLoadedUrl(nextUrl)) return;
+
+    this.updateScrubMax();
+    this.applyVideoLayout();
+    if (autoplay) await this.safePlay();
+    this.updatePlayButton();
+    this.updateTimeLabel();
+  }
+
+  /** Single-flight play(); ignores AbortError; no-op if already playing. */
+  private async safePlay(): Promise<void> {
+    if (this.mode !== "video") return;
+    if (!this.video.paused && !this.video.ended) return;
+    if (this.playPromise) {
+      try {
+        await this.playPromise;
+      } catch {
+        /* prior play aborted / failed */
+      }
+      if (!this.video.paused && !this.video.ended) return;
+    }
+
+    this.playPromise = this.video
+      .play()
+      .then(() => undefined)
+      .catch((error: unknown) => {
+        if (isAbortError(error)) return;
+        // Autoplay policy / transient errors — do not throw out of UI.
+        console.warn("[video] play failed", error);
+      })
+      .finally(() => {
+        this.playPromise = null;
+        this.updatePlayButton();
+      });
+
+    await this.playPromise;
   }
 
   private async flushPreview(): Promise<void> {
@@ -379,6 +485,79 @@ export class VideoPlayerController {
     this.updatePlayButton();
     this.updateTimeLabel();
   }
+}
+
+function resolveMediaUrl(url: string): string {
+  const raw = String(url || "").trim();
+  if (!raw) return "";
+  try {
+    return new URL(raw, typeof location !== "undefined" ? location.href : undefined).href;
+  } catch {
+    return raw;
+  }
+}
+
+function urlsLooselyEqual(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  let left = a;
+  let right = b;
+  try {
+    left = decodeURIComponent(a);
+  } catch {
+    /* keep */
+  }
+  try {
+    right = decodeURIComponent(b);
+  } catch {
+    /* keep */
+  }
+  if (left === right) return true;
+  // Compare path+query when hosts match after resolution
+  try {
+    const ua = new URL(left, typeof location !== "undefined" ? location.href : undefined);
+    const ub = new URL(right, typeof location !== "undefined" ? location.href : undefined);
+    if (ua.href === ub.href) return true;
+    if (ua.pathname + ua.search === ub.pathname + ub.search) {
+      if (!ua.host || !ub.host || ua.host === ub.host) return true;
+    }
+    if (ua.pathname.endsWith(ub.pathname) || ub.pathname.endsWith(ua.pathname)) {
+      if (ua.search === ub.search) return true;
+    }
+  } catch {
+    /* fall through */
+  }
+  return left.endsWith(right) || right.endsWith(left);
+}
+
+function isAbortError(error: unknown): boolean {
+  return (
+    (typeof DOMException !== "undefined" && error instanceof DOMException && error.name === "AbortError") ||
+    (typeof error === "object" &&
+      error !== null &&
+      "name" in error &&
+      (error as { name: string }).name === "AbortError")
+  );
+}
+
+function waitForLoadedMetadata(video: HTMLVideoElement): Promise<void> {
+  if (video.readyState >= 1) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const onMeta = (): void => {
+      cleanup();
+      resolve();
+    };
+    const onErr = (): void => {
+      cleanup();
+      reject(new Error("video load failed"));
+    };
+    const cleanup = (): void => {
+      video.removeEventListener("loadedmetadata", onMeta);
+      video.removeEventListener("error", onErr);
+    };
+    video.addEventListener("loadedmetadata", onMeta);
+    video.addEventListener("error", onErr);
+  });
 }
 
 function decodeToImage(img: HTMLImageElement, dataUrl: string): Promise<void> {

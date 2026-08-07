@@ -1,6 +1,7 @@
 /** Camera ↔ mat sync + AI results API (talktail_gait back). */
 
 import type { SyncConfig } from "../core/types.js";
+import { normalizeApiBase } from "./apiUrl.js";
 
 const trim = (s: string): string => s.replace(/\/$/, "");
 
@@ -13,15 +14,20 @@ export function configureSync(cfg: SyncConfig): void {
 
 function envApiBase(): string | undefined {
   const v = import.meta.env.VITE_API_BASE_URL;
-  return v ? trim(String(v)) : undefined;
+  if (v === undefined || v === null || String(v).trim() === "") return undefined;
+  return normalizeApiBase(String(v));
 }
 
-/** HTTP base for `/api/results/*`. Empty in dev → same-origin + Vite proxy. */
+/**
+ * HTTP base for API calls.
+ * May end with `/api` when the public domain only routes that prefix
+ * (e.g. https://gait.o-r.kr/api).
+ */
 export function resolveApiBase(): string {
   const fromEnv = envApiBase();
-  if (fromEnv) return fromEnv;
+  if (fromEnv !== undefined) return fromEnv;
   const fromCfg = runtime?.apiBaseUrl?.trim();
-  if (fromCfg) return trim(fromCfg);
+  if (fromCfg) return normalizeApiBase(fromCfg);
   if (import.meta.env.DEV && typeof location !== "undefined") return location.origin;
   return "http://localhost:3000";
 }
@@ -32,8 +38,12 @@ export function resolveWsUrl(): string {
   if (fromEnv) return String(fromEnv);
   const fromCfg = runtime?.wsUrl?.trim();
   if (fromCfg) return fromCfg;
-  const api = envApiBase() || runtime?.apiBaseUrl?.trim();
-  if (api) return `${trim(api).replace(/^http/, "ws")}/ws`;
+  const api = envApiBase() || (runtime?.apiBaseUrl ? normalizeApiBase(runtime.apiBaseUrl) : "");
+  if (api) {
+    // WS is usually on host `/ws`, not under `/api/ws`
+    const host = trim(api).replace(/\/api$/i, "");
+    return `${host.replace(/^http/, "ws")}/ws`;
+  }
   if (typeof location !== "undefined") {
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
     return `${proto}//${location.host}/ws`;

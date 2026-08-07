@@ -2,6 +2,8 @@
  * Backend results API (talktail_gait back → ai-server proxy).
  */
 
+import { joinApiUrl } from "../config/apiUrl.js";
+
 export type ResultDate = {
   date: string;
   displayDate: string;
@@ -88,19 +90,13 @@ export type ResultDetail = {
   };
 };
 
-function base(apiBaseUrl: string): string {
-  return apiBaseUrl.replace(/\/$/, "");
-}
-
 function absolutize(apiBaseUrl: string, url: string | null | undefined): string | null {
   if (!url) return null;
-  if (url.startsWith("http://") || url.startsWith("https://")) return url;
-  const b = base(apiBaseUrl);
-  return url.startsWith("/") ? `${b}${url}` : `${b}/${url}`;
+  return joinApiUrl(apiBaseUrl, url);
 }
 
 export async function listResultDates(apiBaseUrl: string): Promise<ResultDate[]> {
-  const res = await fetch(`${base(apiBaseUrl)}/api/results/dates`);
+  const res = await fetch(joinApiUrl(apiBaseUrl, "/api/results/dates"));
   if (!res.ok) throw new Error(`dates HTTP ${res.status}`);
   const json = (await res.json()) as { dates: ResultDate[] };
   return json.dates || [];
@@ -110,7 +106,9 @@ export async function listResultSessions(
   apiBaseUrl: string,
   date: string,
 ): Promise<{ date: string; displayDate: string; sessions: ResultSession[] }> {
-  const res = await fetch(`${base(apiBaseUrl)}/api/results/${encodeURIComponent(date)}/sessions`);
+  const res = await fetch(
+    joinApiUrl(apiBaseUrl, `/api/results/${encodeURIComponent(date)}/sessions`),
+  );
   if (!res.ok) throw new Error(`sessions HTTP ${res.status}`);
   return (await res.json()) as { date: string; displayDate: string; sessions: ResultSession[] };
 }
@@ -121,7 +119,10 @@ export async function getResultDetail(
   stem: string,
 ): Promise<ResultDetail> {
   const res = await fetch(
-    `${base(apiBaseUrl)}/api/results/${encodeURIComponent(date)}/sessions/${encodeURIComponent(stem)}`,
+    joinApiUrl(
+      apiBaseUrl,
+      `/api/results/${encodeURIComponent(date)}/sessions/${encodeURIComponent(stem)}`,
+    ),
   );
   if (!res.ok) throw new Error(`detail HTTP ${res.status}`);
   const detail = (await res.json()) as ResultDetail;

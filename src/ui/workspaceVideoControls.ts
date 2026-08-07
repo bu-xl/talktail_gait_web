@@ -39,8 +39,19 @@ export class WorkspaceVideoControls {
 
   toggle(): void {
     if (!this.video.src) return;
-    if (this.video.paused) void this.video.play().catch(() => undefined);
-    else this.video.pause();
+    if (this.video.paused) {
+      void this.video.play().catch((error: unknown) => {
+        if (
+          typeof DOMException !== "undefined" &&
+          error instanceof DOMException &&
+          error.name === "AbortError"
+        ) {
+          return;
+        }
+      });
+    } else {
+      this.video.pause();
+    }
     this.syncPlayBtn();
   }
 

@@ -194,7 +194,8 @@ export class ResultsPanel {
     document.body.classList.add("modal-open");
     this.modalLoading.classList.remove("hidden");
     this.modalReport.innerHTML = "";
-    this.modalPlayer.showIdle();
+    // Do not stopVideo/showIdle here — loadVideo no-ops on the same URL and
+    // avoids AbortError when refresh re-opens the same session.
     this.fillModalHeader({
       date: date.date,
       displayDate: date.displayDate,
@@ -218,6 +219,7 @@ export class ResultsPanel {
           orientation: detail.session.orientation || session.orientation,
         });
       } else {
+        this.modalPlayer.stopVideo();
         this.modalPlayer.showIdle();
       }
       this.renderReport(this.lastPreview);
