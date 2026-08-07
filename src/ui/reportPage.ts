@@ -242,6 +242,7 @@ export class ReportPage {
     this.selectedDate = date;
     this.selectedSession = session;
     this.caveatsOpen = false;
+    const prevVideoUrl = this.lastDetail?.video.url ?? null;
     this.lastDetail = null;
     this.lastPreview = null;
     this.listEl.classList.add("hidden");
@@ -249,7 +250,6 @@ export class ReportPage {
     this.detailEl.classList.remove("hidden");
     this.detailLoading.classList.remove("hidden");
     this.detailBody.innerHTML = "";
-    this.player.showIdle();
     this.updateChrome();
 
     try {
@@ -258,12 +258,20 @@ export class ReportPage {
       this.lastPreview = detail.report.derived.preview ?? null;
       this.updateChrome();
       if (detail.video.url) {
+        // Same URL → VideoPlayerController no-ops (no src/load/play race).
+        // Only clear the surface when switching to a different clip.
+        if (!prevVideoUrl || prevVideoUrl !== detail.video.url) {
+          if (this.player.getLoadedUrl() && this.player.getLoadedUrl() !== detail.video.url) {
+            this.player.showIdle();
+          }
+        }
         this.player.loadVideo(detail.video.url, {
           autoplay: true,
           loop: true,
           orientation: detail.session.orientation || session.orientation,
         });
       } else {
+        this.player.stopVideo();
         this.player.showIdle(t("report_video_empty"));
       }
       this.renderReport(this.lastPreview);

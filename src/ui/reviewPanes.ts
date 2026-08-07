@@ -29,28 +29,72 @@ function syncVideoBar(video: HTMLVideoElement, enabled: boolean): void {
 function setPaneMedia(bodyId: string, media: HTMLImageElement | HTMLVideoElement, url: string | null): void {
   const body = bodyOf(bodyId);
   if (!url) {
-    media.removeAttribute("src");
     if (media instanceof HTMLVideoElement) {
-      media.load();
       media.pause();
+      media.removeAttribute("src");
+      media.load();
       syncVideoBar(media, false);
+    } else {
+      media.removeAttribute("src");
     }
     body.classList.remove("has-media");
     body.classList.add("is-empty");
     return;
   }
-  media.src = url;
-  if (media instanceof HTMLVideoElement) {
-    syncVideoBar(media, true);
-    void media
-      .play()
-      .then(() => syncVideoBar(media, true))
-      .catch(() => {
-        syncVideoBar(media, true);
-      });
+
+  if (media instanceof HTMLImageElement) {
+    if (media.getAttribute("src") === url) {
+      body.classList.add("has-media");
+      body.classList.remove("is-empty");
+      return;
+    }
+    media.src = url;
+    body.classList.add("has-media");
+    body.classList.remove("is-empty");
+    return;
   }
+
+  // Video: never re-assign the same URL (avoids AbortError from play↔load races).
+  let same = media.getAttribute("src") === url;
+  if (!same) {
+    const current = media.currentSrc || media.src || "";
+    if (current) {
+      try {
+        const curPath = new URL(current, location.href);
+        const nextPath = new URL(url, location.href);
+        same = curPath.href === nextPath.href || curPath.pathname + curPath.search === nextPath.pathname + nextPath.search;
+      } catch {
+        same = current === url || current.endsWith(url) || url.endsWith(current);
+      }
+    }
+  }
+  if (same) {
+    syncVideoBar(media, true);
+    body.classList.add("has-media");
+    body.classList.remove("is-empty");
+    return;
+  }
+
+  media.pause();
+  media.src = url;
+  media.load();
+  syncVideoBar(media, true);
   body.classList.add("has-media");
   body.classList.remove("is-empty");
+
+  if (media.paused) {
+    void media.play().then(() => syncVideoBar(media, true)).catch((error: unknown) => {
+      if (
+        typeof DOMException !== "undefined" &&
+        error instanceof DOMException &&
+        error.name === "AbortError"
+      ) {
+        syncVideoBar(media, true);
+        return;
+      }
+      syncVideoBar(media, true);
+    });
+  }
 }
 
 export function clearReviewPanes(): void {
