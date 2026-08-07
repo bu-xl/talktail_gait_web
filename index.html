@@ -37,49 +37,48 @@
       }
       #stage {
         flex: 1; display: flex; flex-direction: column; align-items: stretch;
-        justify-content: flex-start; padding: 16px; gap: 12px; min-width: 0; overflow-y: auto;
-      }
-      #stage.sync-active { justify-content: flex-start; }
-      #stage.sync-active #matWrap {
-        height: min(38vh, calc(50vw - 180px));
-        flex-shrink: 0;
+        justify-content: stretch; padding: 12px; gap: 10px; min-width: 0; overflow: hidden;
       }
       #cameraSection {
-        width: 100%; max-width: min(920px, calc(100vw - 320px));
-        align-self: center;
-        display: flex; flex-direction: column; gap: 8px;
-        flex: 1 1 280px; min-height: 280px;
+        width: 100%; align-self: stretch;
+        display: flex; flex-direction: column; gap: 6px;
+        flex: 1 1 0; min-height: 0;
       }
       .sync-pane-label {
         font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
-        color: var(--muted);
+        color: var(--muted); flex-shrink: 0;
       }
       #cameraPanel.video-panel {
         background: var(--mat-frame); border: 1px solid var(--border); border-radius: 8px;
-        overflow: hidden; display: flex; flex-direction: column; flex: 1; min-height: 280px;
+        overflow: hidden; display: flex; flex-direction: column; flex: 1; min-height: 0;
       }
-      #cameraPanel .video-viewport { flex: 1; min-height: 220px; }
+      #cameraPanel .video-viewport { flex: 1; min-height: 0; }
       #cameraPanel .video-controls {
-        background: var(--surface); border-top: 1px solid var(--divider);
+        background: var(--surface); border-top: 1px solid var(--divider); flex-shrink: 0;
       }
       #cameraPanel .btn-video-play {
         background: var(--surface); color: var(--fg); border-color: var(--border);
       }
       #cameraPanel .video-time { color: var(--muted); }
-      #btnSyncBackLive { align-self: flex-end; }
+      #btnSyncBackLive { align-self: flex-end; flex-shrink: 0; }
       #btnSyncBackLive.hidden { display: none; }
-      #syncMatLabel { display: none; align-self: center; width: 100%; max-width: min(920px, calc(100vw - 320px)); }
+      #syncMatLabel { display: none; width: 100%; }
       #stage.sync-active #syncMatLabel { display: block; }
       #stage.sync-active #cameraPanelLabel { display: none; }
-      /* The mat is 73×168cm (cells 1.825×4.2) -> width:height = 1:2.3014. Never square.
-         Displayed rotated 90° to the left (counter-clockwise): the canvases render
-         portrait, the wrapper is turned to landscape purely for display. Intrinsic
-         height (= post-rotation visual width) is capped so it never runs under the
-         console. Data pipeline / exports / gait geometry are untouched. */
+      /* Mat on top half — portrait canvas rotated -90° for landscape display;
+         slot takes flex space so transform does not break the column layout. */
+      #matSlot {
+        flex: 1 1 0; min-height: 0; width: 100%;
+        position: relative; overflow: hidden;
+        container-type: size;
+        background: var(--mat-frame); border: 1px solid var(--border); border-radius: 8px;
+      }
       #matWrap {
-        position: relative; height: min(62vh, calc(100vw - 380px)); aspect-ratio: 73 / 168;
-        background: var(--mat-frame); border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
-        transform: rotate(-90deg); align-self: center; flex-shrink: 0;
+        position: absolute; top: 50%; left: 50%;
+        height: min(100cqw, calc(100cqh * 168 / 73));
+        aspect-ratio: 73 / 168; width: auto;
+        background: transparent; overflow: hidden;
+        transform: translate(-50%, -50%) rotate(-90deg);
       }
       #heatmap { width: 100%; height: 100%; display: block; image-rendering: auto; }
       /* Paw-label overlay sits directly on top of the heatmap, same box. */
@@ -320,7 +319,9 @@
   <body>
     <div id="stage">
       <div class="sync-pane-label" id="syncMatLabel" data-i18n="sync_mat_label">Recorded mat</div>
-      <div id="matWrap"><canvas id="heatmap"></canvas><canvas id="overlay"></canvas></div>
+      <div id="matSlot">
+        <div id="matWrap"><canvas id="heatmap"></canvas><canvas id="overlay"></canvas></div>
+      </div>
       <div id="cameraSection">
         <div class="sync-pane-label" id="cameraPanelLabel" data-i18n="camera_panel_label">Phone camera</div>
         <div id="cameraPanel" class="video-panel">
