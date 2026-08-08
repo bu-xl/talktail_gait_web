@@ -32,11 +32,22 @@ export type ReportRow = {
   higher?: "left" | "right" | null;
 };
 
+export type ReportLocaleBundle = {
+  report?: ReportRow[];
+  advisory?: string | null;
+  caveats?: string[];
+};
+
 export type DerivedPreview = {
   schema_version?: number;
   advisory?: string | null;
   report?: ReportRow[];
   caveats?: string[];
+  /** schema v3+: bilingual bundles. Missing `en` means legacy Korean-only. */
+  locales?: {
+    ko?: ReportLocaleBundle;
+    en?: ReportLocaleBundle;
+  };
   quality?: {
     detect_rate?: number | null;
     usable_rate?: number | null;
@@ -50,43 +61,28 @@ export type DerivedPreview = {
   note?: string;
 };
 
+export type MediaArtifact = {
+  filename?: string | null;
+  url: string | null;
+  available?: boolean;
+};
+
 export type ResultDetail = {
   source?: string;
   date: string;
   displayDate: string;
   session: ResultSession;
-  video: {
-    filename: string;
-    url: string | null;
-    available?: boolean;
-  };
+  video: MediaArtifact & { filename: string };
+  original?: MediaArtifact;
   report: {
-    keypoints: {
+    keypoints: MediaArtifact & { filename: string };
+    derived: MediaArtifact & {
       filename: string;
-      url: string | null;
-      available?: boolean;
-    };
-    derived: {
-      filename: string;
-      url: string | null;
-      available?: boolean;
       preview?: DerivedPreview | null;
     };
-    cyclogram?: {
-      filename: string;
-      url: string | null;
-      available?: boolean;
-    };
-    stride?: {
-      filename: string;
-      url: string | null;
-      available?: boolean;
-    };
-    angle_pawy?: {
-      filename: string;
-      url: string | null;
-      available?: boolean;
-    };
+    cyclogram?: MediaArtifact;
+    stride?: MediaArtifact;
+    angle_pawy?: MediaArtifact;
   };
 };
 
@@ -130,6 +126,12 @@ export async function getResultDetail(
     ...detail.video,
     url: absolutize(apiBaseUrl, detail.video?.url),
   };
+  if (detail.original) {
+    detail.original = {
+      ...detail.original,
+      url: absolutize(apiBaseUrl, detail.original.url),
+    };
+  }
   const absArtifact = <T extends { url?: string | null } | null | undefined>(item: T): T => {
     if (!item || typeof item !== "object") return item;
     return { ...item, url: absolutize(apiBaseUrl, item.url) };
@@ -142,4 +144,32 @@ export async function getResultDetail(
     angle_pawy: absArtifact(detail.report?.angle_pawy),
   };
   return detail;
+}
+
+/** Pick KO/EN report body from preview (falls back to top-level Korean fields). */
+export function pickReportLocale(
+  preview: DerivedPreview | null | undefined,
+  lang: "ko" | "en",
+): ReportLocaleBundle {
+  const locales = preview?.locales;
+  const bundle = locales?.[lang];
+  if (bundle && ((bundle.report?.length ?? 0) > 0 || bundle.advisory || (bundle.caveats?.length ?? 0) > 0)) {
+    return {
+      report: bundle.report || [],
+      advisory: bundle.advisory ?? null,
+      caveats: bundle.caveats || [],
+    };
+  }
+  if (lang === "ko" || !locales?.en?.report?.length) {
+    return {
+      report: preview?.report || [],
+      advisory: preview?.advisory ?? null,
+      caveats: preview?.caveats || [],
+    };
+  }
+  return {
+    report: locales.en.report || [],
+    advisory: locales.en.advisory ?? null,
+    caveats: locales.en.caveats || [],
+  };
 }

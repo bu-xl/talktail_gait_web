@@ -142,6 +142,104 @@
         background: var(--mat-frame); border: 1px solid var(--border); border-radius: 12px;
         overflow: hidden; display: flex; flex-direction: column; min-height: 280px; position: sticky; top: 0;
       }
+      #rpDetailVideo .video-viewport { min-height: 280px; }
+      #rpCyclogramVideo {
+        position: absolute; inset: 0; width: 100%; height: 100%;
+        object-fit: contain; display: none; background: #05070a;
+      }
+      #rpDetailVideo.has-media #rpCyclogramVideo { display: block; }
+      #rpDetailVideo.has-media .camera-placeholder { display: none; }
+      #rpDetailActions {
+        display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+        margin: 0 0 14px;
+      }
+      #rpDetailActions .rp-lang-toggle {
+        display: inline-flex; border: 1px solid var(--border); border-radius: 999px;
+        overflow: hidden; background: var(--surface);
+      }
+      #rpDetailActions .rp-lang-toggle button {
+        border: 0; border-radius: 0; background: transparent; color: var(--muted);
+        padding: 7px 14px; font-size: 12px; font-weight: 600;
+      }
+      #rpDetailActions .rp-lang-toggle button.active {
+        background: var(--fg); color: var(--bg);
+      }
+      #rpViewMedia {
+        margin-left: auto;
+        background: #1f6f6a; color: #fff; border-color: #1f6f6a;
+      }
+      #rpViewMedia:hover { filter: brightness(1.06); }
+      #rpLangHint { width: 100%; font-size: 12px; color: var(--muted); margin: 0; }
+
+      /* Report session replay — same 5 panes as measure, visually distinct archive mode */
+      #rpReviewOverlay {
+        display: none; position: fixed; inset: 0; z-index: 80;
+        background: rgba(12, 18, 22, 0.72); backdrop-filter: blur(4px);
+        padding: 18px; box-sizing: border-box;
+      }
+      #rpReviewOverlay.open { display: flex; flex-direction: column; }
+      #rpReviewShell {
+        flex: 1; min-height: 0; display: flex; flex-direction: column;
+        background: #eef3f2; border: 1px solid #c5d4d1; border-radius: 16px;
+        overflow: hidden; box-shadow: 0 18px 48px rgba(12, 28, 26, 0.28);
+      }
+      #rpReviewTop {
+        flex-shrink: 0; display: flex; align-items: flex-start; justify-content: space-between;
+        gap: 12px; padding: 14px 18px; background: #163a37; color: #e8f4f2;
+      }
+      #rpReviewBadge {
+        display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .08em;
+        text-transform: uppercase; color: #7fd4c8; margin-bottom: 4px;
+      }
+      #rpReviewTitle { margin: 0; font-size: 18px; font-weight: 700; }
+      #rpReviewSub { margin: 4px 0 0; font-size: 12px; color: rgba(232,244,242,.72); }
+      #rpReviewClose {
+        background: transparent; color: #e8f4f2; border-color: rgba(232,244,242,.35);
+      }
+      #rpReviewStage {
+        flex: 1; min-height: 0; display: grid;
+        container-type: size;
+        grid-template-columns:
+          minmax(120px, 1fr)
+          minmax(0, calc((100cqh - 52px) * 8 / 9))
+          minmax(0, 1.6fr);
+        gap: 10px; padding: 12px;
+      }
+      #rpReviewStage .ws-pane, #rpReviewStage .ws-cell {
+        min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 6px;
+      }
+      #rpReviewStage .ws-pane-2, #rpReviewStage .ws-pane-3 {
+        display: grid; grid-template-rows: 1fr 1fr; gap: 10px;
+      }
+      #rpReviewStage .ws-label {
+        flex-shrink: 0; font-size: 11px; font-weight: 600; letter-spacing: .05em;
+        text-transform: uppercase; color: #3d5c58;
+      }
+      #rpReviewStage .ws-body {
+        flex: 1; min-height: 0; position: relative; overflow: hidden;
+        background: #05070a; border: 1px solid #b7c9c5; border-radius: 8px;
+        display: flex; align-items: center; justify-content: center;
+      }
+      #rpReviewStage .ws-pane-2 .ws-body { aspect-ratio: 16 / 9; }
+      #rpReviewStage .ws-body > img, #rpReviewStage .ws-body > video {
+        width: 100%; height: 100%; object-fit: contain; display: none; background: #05070a;
+      }
+      #rpReviewStage .ws-body.has-media > img[src],
+      #rpReviewStage .ws-body.has-media > video[src] { display: block; }
+      #rpReviewStage .ws-body.is-empty::after {
+        content: attr(data-empty);
+        color: rgba(255,255,255,.28); font-size: 12px; font-weight: 600;
+        letter-spacing: .04em; text-align: center; padding: 12px;
+      }
+      #rpReviewStage .ws-body.has-media.is-empty::after { display: none; }
+      #rpReviewStage .ws-media-controls {
+        flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+        gap: 10px; padding: 6px 4px 2px; min-height: 40px;
+      }
+      @media (max-width: 900px) {
+        #rpReviewStage { grid-template-columns: 1fr; overflow: auto; }
+      }
+
       #rpDetailLoading { text-align: center; color: var(--muted); padding: 24px; }
       #rpDetailBody { min-width: 0; }
       .rp-detail-main { min-width: 0; }
@@ -947,37 +1045,105 @@
         <div id="rpDetail" class="hidden">
           <div id="rpDetailVideo" class="video-panel">
             <div class="video-viewport">
-              <div class="video-media-wrap">
-                <canvas class="camera-preview-canvas"></canvas>
-                <img class="camera-preview" alt="" hidden />
-                <video class="ai-video" playsinline></video>
-                <div class="camera-placeholder" data-i18n="video_placeholder">AI 분석 영상</div>
-                <div class="camera-loading"><span>…</span></div>
-              </div>
-            </div>
-            <div class="video-controls">
-              <button type="button" class="btn-video-play" title="Play">▶</button>
-              <input type="range" class="video-scrub" min="0" max="1000" value="0" />
-              <span class="video-time">0:00 / 0:00</span>
-              <select class="video-speed" aria-label="Speed">
-                <option value="0.2">0.2×</option>
-                <option value="0.25">0.25×</option>
-                <option value="0.5">0.5×</option>
-                <option value="1" selected>1×</option>
-                <option value="1.5">1.5×</option>
-                <option value="2">2×</option>
-              </select>
-              <input type="range" class="video-zoom" min="100" max="300" value="100" title="Zoom" />
-              <button type="button" class="btn-video-rotate hidden"></button>
+              <video id="rpCyclogramVideo" muted loop playsinline></video>
+              <div class="camera-placeholder" data-i18n="video_placeholder">AI 분석 영상</div>
             </div>
           </div>
           <div class="rp-detail-main">
+            <div id="rpDetailActions">
+              <div class="rp-lang-toggle" role="group" aria-label="Report language">
+                <button type="button" id="rpLangKo" class="active">한국어 버전</button>
+                <button type="button" id="rpLangEn">영어 버전</button>
+              </div>
+              <button type="button" id="rpViewMedia" data-i18n="report_view_media">영상보기</button>
+              <p id="rpLangHint" class="hidden"></p>
+            </div>
             <div id="rpDetailLoading" class="hidden">…</div>
             <div id="rpDetailBody"></div>
           </div>
         </div>
       </div>
     </section>
+
+    <div id="rpReviewOverlay" aria-hidden="true">
+      <div id="rpReviewShell">
+        <div id="rpReviewTop">
+          <div>
+            <div id="rpReviewBadge">ARCHIVE</div>
+            <h2 id="rpReviewTitle" data-i18n="report_review_title">저장된 세션 다시보기</h2>
+            <p id="rpReviewSub" data-i18n="report_review_sub">메인과 같은 5개 패널</p>
+          </div>
+          <button type="button" id="rpReviewClose" data-i18n="report_review_close">닫기</button>
+        </div>
+        <div id="rpReviewStage">
+          <section class="ws-pane ws-pane-1">
+            <div class="ws-label" data-i18n="ws_label_1">1 · 압력패드</div>
+            <div class="ws-body is-empty" id="rpBody1" data-empty="">
+              <img id="rpPressureGif" alt="" />
+              <video id="rpPressureVideo" muted loop playsinline></video>
+            </div>
+          </section>
+          <section class="ws-pane ws-pane-2">
+            <div class="ws-cell">
+              <div class="ws-label" data-i18n="ws_label_21">2-1 · 촬영 영상</div>
+              <div class="ws-body is-empty" id="rpBody21" data-empty="">
+                <video id="rpOriginVideo" muted loop playsinline></video>
+              </div>
+              <div class="ws-media-controls" data-video="rpOriginVideo">
+                <button type="button" class="ws-play" title="재생" disabled>▶</button>
+                <select class="ws-speed" aria-label="배속" disabled>
+                  <option value="0.25">0.25×</option>
+                  <option value="0.5">0.5×</option>
+                  <option value="1" selected>1×</option>
+                  <option value="1.5">1.5×</option>
+                  <option value="2">2×</option>
+                </select>
+              </div>
+            </div>
+            <div class="ws-cell">
+              <div class="ws-label" data-i18n="ws_label_22">2-2 · 스켈레톤 분석</div>
+              <div class="ws-body is-empty" id="rpBody22" data-empty="">
+                <video id="rpAnalysisVideo" muted loop playsinline></video>
+              </div>
+              <div class="ws-media-controls" data-video="rpAnalysisVideo">
+                <button type="button" class="ws-play" title="재생" disabled>▶</button>
+                <select class="ws-speed" aria-label="배속" disabled>
+                  <option value="0.25">0.25×</option>
+                  <option value="0.5">0.5×</option>
+                  <option value="1" selected>1×</option>
+                  <option value="1.5">1.5×</option>
+                  <option value="2">2×</option>
+                </select>
+              </div>
+            </div>
+          </section>
+          <section class="ws-pane ws-pane-3">
+            <div class="ws-cell">
+              <div class="ws-label" data-i18n="ws_label_31">3-1 · 각도 분석</div>
+              <div class="ws-body is-empty" id="rpBody31" data-empty="">
+                <video id="rpAngleVideo" muted loop playsinline></video>
+              </div>
+              <div class="ws-media-controls" data-video="rpAngleVideo">
+                <button type="button" class="ws-play" title="재생" disabled>▶</button>
+                <select class="ws-speed" aria-label="배속" disabled>
+                  <option value="0.25">0.25×</option>
+                  <option value="0.5">0.5×</option>
+                  <option value="1" selected>1×</option>
+                  <option value="1.5">1.5×</option>
+                  <option value="2">2×</option>
+                </select>
+              </div>
+            </div>
+            <div class="ws-cell">
+              <div class="ws-label" data-i18n="ws_label_32">3-2 · 보폭분석</div>
+              <div class="ws-body is-empty" id="rpBody32" data-empty="">
+                <img id="rpStrideImg" alt="" />
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
 
     <div id="portModal" role="dialog" aria-modal="true" aria-labelledby="portModalTitle">
       <div class="dialog">
