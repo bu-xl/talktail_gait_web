@@ -97,16 +97,51 @@ function setPaneMedia(bodyId: string, media: HTMLImageElement | HTMLVideoElement
   }
 }
 
+function isVideoUrl(url: string): boolean {
+  return /\.(mp4|webm|ogg)(\?|#|$)/i.test(url);
+}
+
 export function clearReviewPanes(): void {
-  setPaneMedia("wsBody1", bodyOf("wsPressureGif") as HTMLImageElement, null);
+  setPressureMedia(null);
   setPaneMedia("wsBody21", bodyOf("wsOriginVideo") as HTMLVideoElement, null);
   setPaneMedia("wsBody22", bodyOf("wsAnalysisVideo") as HTMLVideoElement, null);
   setPaneMedia("wsBody31", bodyOf("wsMaxMinVideo") as HTMLVideoElement, null);
   setPaneMedia("wsBody32", bodyOf("wsShadowImg") as HTMLImageElement, null);
 }
 
+/** Pane 1: GIF (img) or pressboard/promo MP4 (video). */
+export function setPressureMedia(url: string | null): void {
+  const img = bodyOf("wsPressureGif") as HTMLImageElement;
+  const video = bodyOf("wsPressureVideo") as HTMLVideoElement;
+  const body = bodyOf("wsBody1");
+
+  if (!url) {
+    img.removeAttribute("src");
+    video.pause();
+    video.removeAttribute("src");
+    video.load();
+    syncVideoBar(video, false);
+    body.classList.remove("has-media");
+    body.classList.add("is-empty");
+    return;
+  }
+
+  if (isVideoUrl(url)) {
+    img.removeAttribute("src");
+    setPaneMedia("wsBody1", video, url);
+    return;
+  }
+
+  video.pause();
+  video.removeAttribute("src");
+  video.load();
+  syncVideoBar(video, false);
+  setPaneMedia("wsBody1", img, url);
+}
+
+/** @deprecated Prefer setPressureMedia — kept for existing call sites. */
 export function setPressureGif(url: string | null): void {
-  setPaneMedia("wsBody1", bodyOf("wsPressureGif") as HTMLImageElement, url);
+  setPressureMedia(url);
 }
 
 export function setOriginVideo(url: string | null): void {

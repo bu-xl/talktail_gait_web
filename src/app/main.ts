@@ -71,12 +71,13 @@ import {
   setMaxMinVideo,
   setOriginVideo,
   setPressureGif,
+  setPressureMedia,
   setShadowImage,
 } from "../ui/reviewPanes.js";
 import { SyncPlaybackDock } from "../ui/syncPlaybackDock.js";
 import { wireWorkspaceVideoControls } from "../ui/workspaceVideoControls.js";
 
-/** Promo filming cases from `dashboard_analysis/<time>/`. Open with `?promo=165529`. */
+/** Promo filming cases. Open with `?promo=ami` (local dashboard_analysis) or `?promo=165529`. */
 type PromoDogInfo = {
   name: { ko: string; en: string };
   breed: { ko: string; en: string };
@@ -90,10 +91,34 @@ type PromoCase = {
   time: string;
   stem: string;
   originUpload: string;
+  /** Pane 1 pressure media (gif or mp4). When set, overrides pad-session GIF. */
+  pressureUrl?: string;
+  /**
+   * Artifact folder base. Defaults to `/api/ai-results/{date}/{time}`.
+   * Local promo uses `/dashboard_analysis/<dog>_analysis/<time>`.
+   */
+  resultsBase?: string;
   dog: PromoDogInfo;
 };
 
+/** Pane 1 for every promo dog — `gait_project/foot2.gif` (animated GIF loops in <img>). */
+const PROMO_PRESSURE_GIF = "/promo-assets/foot2.gif";
+
 const PROMO_CASES: Record<string, PromoCase> = {
+  ami: {
+    date: "260807",
+    time: "175433",
+    stem: "analyzed-1366x768-18s-29p92fps-260807-175433",
+    originUpload: "/dashboard_analysis/ami_analysis/ami_origin.mp4",
+    pressureUrl: PROMO_PRESSURE_GIF,
+    resultsBase: "/dashboard_analysis/ami_analysis/175433",
+    dog: {
+      name: { ko: "아미", en: "Ami" },
+      breed: { ko: "저먼 셰퍼드", en: "German Shepherd" },
+      weightKg: 23,
+      heightCm: null,
+    },
+  },
   "165529": {
     date: "260807",
     time: "165529",
@@ -136,7 +161,7 @@ function promoAssetUrl(path: string): string {
 }
 
 function promoArtifactUrls(c: PromoCase): SessionArtifacts {
-  const base = `/api/ai-results/${c.date}/${c.time}`;
+  const base = c.resultsBase ?? `/api/ai-results/${c.date}/${c.time}`;
   const videoPath = `${base}/result_video/${c.stem}.mp4`;
   return {
     video: {
@@ -504,6 +529,8 @@ async function boot(): Promise<void> {
   const enterReview = (opts: {
     analysisUrl: string;
     originalUrl?: string | null;
+    /** Pane 1 override (promo pressboard mp4 / gif). */
+    pressureUrl?: string | null;
     artifacts?: SessionArtifacts | null;
     date?: string | null;
     time?: string | null;
@@ -545,9 +572,17 @@ async function boot(): Promise<void> {
       setShadowImage(abs);
     }
 
-    // 1번 압력 GIF (패드 세션) — 없으면 simulate 일 때 foot.gif
-    const gifUrl = buildPressureGifUrl() ?? (isSimulateAi() ? placeholderUrl("foot.gif") : null);
-    if (gifUrl) setPressureGif(gifUrl);
+    // 1번 압력: promo override → pad-session GIF → simulate placeholder
+    if (opts.pressureUrl) {
+      const abs =
+        opts.pressureUrl.startsWith("http://") || opts.pressureUrl.startsWith("https://")
+          ? opts.pressureUrl
+          : absolutizeResultUrl(apiBase, opts.pressureUrl);
+      setPressureMedia(abs);
+    } else {
+      const gifUrl = buildPressureGifUrl() ?? (isSimulateAi() ? placeholderUrl("foot.gif") : null);
+      if (gifUrl) setPressureGif(gifUrl);
+    }
 
     lastReportBundle = {
       originalUrl: originalUrl ?? null,
@@ -1539,6 +1574,7 @@ async function boot(): Promise<void> {
         enterReview({
           analysisUrl,
           originalUrl: promoAssetUrl(promoCase.originUpload),
+          pressureUrl: promoAssetUrl(promoCase.pressureUrl ?? PROMO_PRESSURE_GIF),
           artifacts,
           date: promoCase.date,
           time: promoCase.time,

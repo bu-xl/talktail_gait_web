@@ -205,7 +205,8 @@
       .ws-body > img, .ws-body > video {
         width: 100%; height: 100%; object-fit: contain; display: none; background: #05070a;
       }
-      .ws-body.has-media > img, .ws-body.has-media > video { display: block; }
+      /* Only show the media that actually has a src (pane 1 may be gif img or mp4 video). */
+      .ws-body.has-media > img[src], .ws-body.has-media > video[src] { display: block; }
       .ws-body.is-empty::after {
         content: attr(data-slot);
         color: rgba(255,255,255,.18); font-size: 12px; font-weight: 600;
@@ -807,11 +808,22 @@
         </div>
       </div>
 
-      <!-- 1 · pressure GIF (USB raw → gif) -->
+      <!-- 1 · pressure GIF (USB raw → gif) or promo pressboard mp4 -->
       <section class="ws-pane ws-pane-1" id="wsPane1" aria-label="Section 1">
         <div class="ws-label" data-i18n="ws_label_1">1 · 압력패드</div>
         <div class="ws-body is-empty" data-slot="pressure" id="wsBody1">
           <img id="wsPressureGif" alt="" />
+          <video id="wsPressureVideo" muted loop playsinline></video>
+        </div>
+        <div class="ws-media-controls" data-video="wsPressureVideo">
+          <button type="button" class="ws-play" title="재생" disabled>▶</button>
+          <select class="ws-speed" aria-label="배속" disabled>
+            <option value="0.25">0.25×</option>
+            <option value="0.5">0.5×</option>
+            <option value="1" selected>1×</option>
+            <option value="1.5">1.5×</option>
+            <option value="2">2×</option>
+          </select>
         </div>
       </section>
 
