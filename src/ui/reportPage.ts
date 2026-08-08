@@ -561,7 +561,7 @@ export class ReportPage {
 
 function rt(lang: Lang, key: LocaleKey, vars?: Record<string, string | number | null | undefined>): string {
   const table = LOCALES[lang] ?? LOCALES.en;
-  let s = table[key] ?? LOCALES.en[key] ?? key;
+  let s: string = table[key] ?? LOCALES.en[key] ?? key;
   if (vars) {
     s = s.replace(/\{\{(\w+)\}\}/g, (_, k: string) => {
       const v = vars[k];
