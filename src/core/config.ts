@@ -83,7 +83,8 @@ export const DEFAULT_CONFIG: AppConfig = {
   },
   sync: {
     enabled: true,
-    apiBaseUrl: "http://210.91.154.131:20443/deployment2/41e3dafa47605ab5",
+    // Empty = same-origin (works with HTTPS tunnel / reverse proxy).
+    apiBaseUrl: "",
     wsUrl: "",
     roomId: "gait-default",
   },

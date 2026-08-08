@@ -106,8 +106,8 @@ function serveDashboardAnalysis(): Plugin {
 // Plain TS + Canvas app; config.json is copied into dist for production/Electron.
 export default defineConfig({
   root: ".",
-  // Relative paths so Electron loadFile(file://) resolves JS/CSS assets correctly.
-  base: "./",
+  // Relative for Electron file:// ; set VITE_BASE for reverse-proxy path prefix (H100).
+  base: process.env.VITE_BASE || "./",
   build: { outDir: "dist", target: "es2022" },
   server: {
     port: 5173,

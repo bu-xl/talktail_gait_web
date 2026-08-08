@@ -1,0 +1,16 @@
+---
+description: >-
+  Promo/화면녹화 세팅. 사용자가 dashboard_analysis, ami_analysis, jenny_analysis,
+  영상 녹화, promo 세팅을 말하면 PROMO_RECORDING.md를 읽고 복원한다.
+alwaysApply: true
+---
+
+# Promo recording handoff
+
+사용자가 **영상 녹화**, **`dashboard_analysis`**, **`ami_analysis`**, **`jenny_analysis`**, **`?promo=`** 세팅을 요청하면:
+
+1. 반드시 `front_web/PROMO_RECORDING.md` 를 읽고 그 체크리스트대로 작업한다.
+2. `*.mp4` 는 루트 gitignore라 GitHub에 없다 — 파일이 없으면 복사하라고 안내한다.
+3. 완료 후 `http://localhost:5173/?promo=ami` (또는 `jenny`) 로 확인하게 안내한다.
+
+서비스/배포 모드와 프로모 모드는 `?promo=` 유무로 구분한다. 상세·파일 매핑·코드 위치는 위 MD가 단일 소스다.

@@ -72,8 +72,8 @@
   },
   "sync": {
     "enabled": true,
-    "apiBaseUrl": "http://210.91.154.131:20443/deployment2/41e3dafa47605ab5",
-    "wsUrl": "ws://210.91.154.131:20443/deployment2/41e3dafa47605ab5/ws",
+    "apiBaseUrl": "",
+    "wsUrl": "",
     "roomId": "gait-default"
   }
 }

@@ -23,32 +23,58 @@ function envApiBase(): string | undefined {
  * May end with `/api` when the public domain only routes that prefix
  * (e.g. https://gait.o-r.kr/api).
  */
+function isInsecureHttpOnHttpsPage(url: string): boolean {
+  return (
+    typeof location !== "undefined" &&
+    location.protocol === "https:" &&
+    /^http:\/\//i.test(url)
+  );
+}
+
 export function resolveApiBase(): string {
   const fromEnv = envApiBase();
-  if (fromEnv !== undefined) return fromEnv;
+  if (fromEnv !== undefined && !isInsecureHttpOnHttpsPage(fromEnv)) return fromEnv;
   const fromCfg = runtime?.apiBaseUrl?.trim();
-  if (fromCfg) return normalizeApiBase(fromCfg);
-  if (import.meta.env.DEV && typeof location !== "undefined") return location.origin;
+  if (fromCfg) {
+    const api = normalizeApiBase(fromCfg);
+    if (!isInsecureHttpOnHttpsPage(api)) return api;
+  }
+  // Same-origin (HTTPS tunnel / reverse proxy) when unset or mixed-content unsafe.
+  if (typeof location !== "undefined") return location.origin;
   return "http://localhost:3000";
+}
+
+function sameOriginWs(): string {
+  if (typeof location === "undefined") return "ws://localhost:3000/ws";
+  const proto = location.protocol === "https:" ? "wss:" : "ws:";
+  return `${proto}//${location.host}/ws`;
+}
+
+function isInsecureWsOnHttpsPage(wsUrl: string): boolean {
+  return (
+    typeof location !== "undefined" &&
+    location.protocol === "https:" &&
+    /^ws:\/\//i.test(wsUrl)
+  );
 }
 
 /** WebSocket hub URL (`/ws` on the back server). */
 export function resolveWsUrl(): string {
   const fromEnv = import.meta.env.VITE_WS_URL;
-  if (fromEnv) return String(fromEnv);
+  if (fromEnv && String(fromEnv).trim()) {
+    const ws = String(fromEnv).trim();
+    if (!isInsecureWsOnHttpsPage(ws)) return ws;
+  }
   const fromCfg = runtime?.wsUrl?.trim();
-  if (fromCfg) return fromCfg;
-  const api = envApiBase() || (runtime?.apiBaseUrl ? normalizeApiBase(runtime.apiBaseUrl) : "");
+  if (fromCfg && !isInsecureWsOnHttpsPage(fromCfg)) return fromCfg;
+  const api = envApiBase() || (runtime?.apiBaseUrl?.trim() ? normalizeApiBase(runtime.apiBaseUrl) : "");
   if (api) {
     // WS is usually on host `/ws`, not under `/api/ws`
     const host = trim(api).replace(/\/api$/i, "");
-    return `${host.replace(/^http/, "ws")}/ws`;
+    const ws = `${host.replace(/^http/, "ws")}/ws`;
+    if (!isInsecureWsOnHttpsPage(ws)) return ws;
   }
-  if (typeof location !== "undefined") {
-    const proto = location.protocol === "https:" ? "wss:" : "ws:";
-    return `${proto}//${location.host}/ws`;
-  }
-  return "ws://localhost:3000/ws";
+  return sameOriginWs();
 }
 
 export function resolveRoomId(): string {
