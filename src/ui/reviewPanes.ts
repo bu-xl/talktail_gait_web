@@ -144,7 +144,67 @@ export function setPressureGif(url: string | null): void {
   setPressureMedia(url);
 }
 
+/**
+ * 2-1 촬영 영상은 항상 가로(landscape)로 보이게 한다.
+ * 세로로 촬영된 원본(휴대폰 등)이면 90° 회전시켜 팬을 가로로 채운다.
+ * 가로 원본은 기본 CSS(object-fit: contain)를 그대로 쓴다.
+ */
+function applyOriginLandscape(video: HTMLVideoElement): void {
+  const body = video.parentElement as HTMLElement | null;
+  if (!body) return;
+  const srcW = video.videoWidth;
+  const srcH = video.videoHeight;
+  const vw = body.clientWidth;
+  const vh = body.clientHeight;
+  const portrait = srcW > 0 && srcH > 0 && srcH > srcW;
+
+  if (portrait && vw > 0 && vh > 0) {
+    // 회전 전 요소 박스를 컨테이너와 가로/세로를 맞바꿔 잡으면, rotate(90deg) 후
+    // 화면상 박스가 컨테이너와 일치한다. object-fit: contain 으로 프레임을 맞춘다.
+    video.style.position = "absolute";
+    video.style.left = "50%";
+    video.style.top = "50%";
+    video.style.width = `${vh}px`;
+    video.style.height = `${vw}px`;
+    video.style.maxWidth = "none";
+    video.style.maxHeight = "none";
+    video.style.objectFit = "contain";
+    // 반시계 90° 회전 → 세로 원본의 위(TOP)가 화면 왼쪽으로 온다.
+    video.style.transform = "translate(-50%, -50%) rotate(-90deg)";
+  } else {
+    // 가로거나 아직 메타데이터 미확보 → 인라인 스타일 제거(기본 CSS 사용).
+    video.style.position = "";
+    video.style.left = "";
+    video.style.top = "";
+    video.style.width = "";
+    video.style.height = "";
+    video.style.maxWidth = "";
+    video.style.maxHeight = "";
+    video.style.objectFit = "";
+    video.style.transform = "";
+  }
+}
+
+let originLandscapeWired = false;
+function ensureOriginLandscape(): void {
+  if (originLandscapeWired) return;
+  const video = document.getElementById("wsOriginVideo") as HTMLVideoElement | null;
+  if (!video) return;
+  const reapply = (): void => applyOriginLandscape(video);
+  // 새 영상 로드 시(메타데이터 확보) · 소스 제거 시 · 팬 크기 변경 시 재계산.
+  video.addEventListener("loadedmetadata", reapply);
+  video.addEventListener("emptied", reapply);
+  const body = video.parentElement as HTMLElement | null;
+  if (typeof ResizeObserver !== "undefined" && body) {
+    new ResizeObserver(reapply).observe(body);
+  } else if (typeof window !== "undefined") {
+    window.addEventListener("resize", reapply);
+  }
+  originLandscapeWired = true;
+}
+
 export function setOriginVideo(url: string | null): void {
+  ensureOriginLandscape();
   setPaneMedia("wsBody21", bodyOf("wsOriginVideo") as HTMLVideoElement, url);
 }
 
