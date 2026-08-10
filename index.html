@@ -602,6 +602,25 @@
       #syncStatus.wait, #syncHub.wait { color: var(--warning); }
       #syncStatus.off, #syncHub.off { color: var(--muted); }
 
+      /* 압력판 녹화 · 저장 CSV 목록 */
+      #btnPressureRec.recording { background: var(--warning, #e6a700); }
+      .rec-status { font-size: 12px; min-height: 1.2em; color: var(--muted); }
+      .rec-status.ok { color: var(--success); }
+      .rec-status.warn { color: var(--warning); }
+      .rec-status.bad { color: var(--danger, #eb463c); }
+      .pressure-rec-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; }
+      .pressure-rec-empty { font-size: 12px; color: var(--muted); padding: 6px 0; }
+      .pressure-rec-item {
+        display: flex; align-items: center; justify-content: space-between; gap: 8px;
+        padding: 8px 10px; border-radius: 8px; background: var(--surface); border: 1px solid var(--border);
+      }
+      .pressure-rec-meta { min-width: 0; }
+      .pressure-rec-title { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .pressure-rec-sub { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .pressure-rec-actions { display: flex; gap: 8px; flex-shrink: 0; }
+      .pressure-rec-actions a { font-size: 12px; color: var(--primary); cursor: pointer; text-decoration: none; }
+      .pressure-rec-actions a:hover { text-decoration: underline; }
+
       /* Report modal — light clinic surface for video + metrics */
       body.modal-open { overflow: hidden; }
       #reportModal {
@@ -790,6 +809,33 @@
       <div class="controls">
         <button type="button" id="btnSession" class="primary" data-i18n="btn_session_start">시작</button>
       </div>
+
+      <!-- 압력판 녹화 → CSV 저장 (백엔드 pressure_data 저장 · 기존 흐름과 독립) -->
+      <div class="section">압력판 녹화 · CSV 저장</div>
+      <div class="dog-info" id="pressureRecForm">
+        <div class="field-col">
+          <label for="recDogName">이름</label>
+          <input id="recDogName" type="text" placeholder="예: 바둑이" autocomplete="off" />
+        </div>
+        <div class="field-col">
+          <label for="recDogBreed">견종</label>
+          <input id="recDogBreed" type="text" placeholder="예: 진돗개" autocomplete="off" />
+        </div>
+        <div class="field-col">
+          <label for="recDogWeight">몸무게 (kg)</label>
+          <input id="recDogWeight" type="number" placeholder="kg" min="0" step="0.1" />
+        </div>
+      </div>
+      <div class="controls">
+        <button type="button" id="btnPressureRec" class="primary">● 압력판 녹화 시작</button>
+      </div>
+      <div id="pressureRecStatus" class="rec-status"></div>
+
+      <div class="results-head" style="margin-top:8px;">
+        <div class="section" style="margin:0;">저장된 CSV</div>
+        <button type="button" id="btnPressureRefresh">새로고침</button>
+      </div>
+      <ul id="pressureRecList" class="pressure-rec-list"></ul>
 
       <!-- 녹화 섹션 (임시 비표시)
       <div class="section" data-i18n="section_recording">Recording</div>

@@ -41,6 +41,7 @@ import { gaitSummaryToCsv } from "../export/gaitReportCsv.js";
 import { gaitSummaryToJson } from "../export/gaitJson.js";
 import { gaitReportToPdfBytes } from "../export/gaitReportPdf.js";
 import { pawTrackToCsv } from "../export/pawTrackCsv.js";
+import { wirePressureRecorder } from "../pressure/pressureRecorderUI.js";
 import { applyDocumentI18n, getLang, initI18n, onLangChange, setLang, t } from "../i18n/index.js";
 import type { LocaleKey } from "../i18n/locales.js";
 import {
@@ -962,6 +963,20 @@ async function boot(): Promise<void> {
     updateRecordingStatus();
     persistSettings();
   };
+
+  // 압력판 녹화 → CSV 업로드 → 저장 기록 열람 (기존 흐름과 독립적인 로컬 전용 기능).
+  wirePressureRecorder({
+    apiBase,
+    startLocalRecording,
+    stopLocalRecording,
+    isRecording: () => recorder.isRecording,
+    frameCount: () => recorder.frameCount,
+    durationSec: () => recorder.durationSec,
+    fps: () => recorder.fps,
+    buildCsv: () => framesToCanineGaitCsv(recorder.getFrames(), GRID_ROWS, GRID_COLS),
+    rows: GRID_ROWS,
+    cols: GRID_COLS,
+  });
 
   const gaitSync = new GaitSyncSocket({ wsUrl: resolveWsUrl(), roomId: resolveRoomId() });
   gaitSync.onConnectionChange((connected) => {
