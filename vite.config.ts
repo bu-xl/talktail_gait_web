@@ -112,6 +112,7 @@ export default defineConfig({
   server: {
     port: 5173,
     host: "0.0.0.0",
+    allowedHosts: ["gait.o-r.kr"],
     fs: {
       allow: [".", projectRoot, dashboardAnalysisRoot],
     },
