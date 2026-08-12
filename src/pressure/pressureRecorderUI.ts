@@ -35,7 +35,7 @@ export interface PressureCsvDeps {
 
 export interface PressureCsvController {
   /** 세션 종료 시 호출 — 프레임이 있으면 CSV 를 만들어 업로드하고 목록을 갱신한다. */
-  uploadRecorded: () => void;
+  uploadRecorded: () => Promise<void>;
   /** 저장된 CSV 목록 새로고침. */
   refresh: () => Promise<void>;
 }
@@ -133,7 +133,7 @@ export function createPressureCsvController(deps: PressureCsvDeps): PressureCsvC
   };
 
   let busy = false;
-  const uploadRecorded = (): void => {
+  const uploadRecorded = async (): Promise<void> => {
     if (busy) return;
     const frames = deps.frameCount();
     if (frames < 2) return; // 데이터가 없으면 조용히 무시(기존 흐름 방해 금지).
@@ -159,17 +159,15 @@ export function createPressureCsvController(deps: PressureCsvDeps): PressureCsvC
 
     busy = true;
     setStatus(`CSV 업로드 중… (${frames} 프레임)`, "warn");
-    void uploadPressureCsv(deps.apiBase, { csv, dog, recording, sessionId })
-      .then(async (record) => {
-        setStatus(`CSV 저장 완료: ${record.csv.filename}`, "ok");
-        await refresh();
-      })
-      .catch((err) => {
-        setStatus(`CSV 저장 실패: ${err instanceof Error ? err.message : String(err)}`, "bad");
-      })
-      .finally(() => {
-        busy = false;
-      });
+    try {
+      const record = await uploadPressureCsv(deps.apiBase, { csv, dog, recording, sessionId });
+      setStatus(`CSV 저장 완료: ${record.csv.filename}`, "ok");
+      await refresh();
+    } catch (err) {
+      setStatus(`CSV 저장 실패: ${err instanceof Error ? err.message : String(err)}`, "bad");
+    } finally {
+      busy = false;
+    }
   };
 
   refreshBtn?.addEventListener("click", () => void refresh());

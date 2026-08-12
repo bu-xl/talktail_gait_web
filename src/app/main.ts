@@ -997,7 +997,7 @@ async function boot(): Promise<void> {
   const stopLocalRecording = (): void => {
     recorder.stop();
     // 세션 종료 → 캡처된 압력 프레임을 CSV 로 서버에 저장(프레임 없으면 내부에서 무시).
-    pressureCsv.uploadRecorded();
+    void pressureCsv.uploadRecorded();
     setExportsEnabled(recorder.frameCount > 0);
     displayMode = "hold";
     const myToken = ++holdToken;
