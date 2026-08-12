@@ -1,0 +1,1977 @@
+{
+ "schema_version": 1,
+ "video": "/mnt/c/Donghan/creamoff/talktail_gait2/talktail_gait/ai-server/uploads/resized-e1ca8a83c5d54d828d2c0a8e6c82141e.mp4",
+ "ckpt": "/mnt/c/Donghan/creamoff/talktail_gait2/talktail_gait/ai-server/models/fs-v4/pose.pth",
+ "width": 1366,
+ "height": 768,
+ "fps": 30.0,
+ "frames": 102,
+ "frames_detected": 102,
+ "frames_used_max": 102,
+ "conf_min": 0.05,
+ "warn_conf": 0.5,
+ "primary_metric": "range_p5p95_deg",
+ "cross_primary_metric": "si_diff_pp",
+ "definition_source": "pawpose.metrics.angle_diff + pawpose.overlay.angles::LIMBS (import, 사본 없음)",
+ "note": "프레임별 2D 투영 관절각의 클립 분포와 좌우·앞뒤 차이. 보행 이벤트를 보지 않으므로 사이클을 못 잡는 클립에서도 값이 나온다 — 대신 위상 정보는 없다.",
+ "joints": {
+  "front_left.어깨": {
+   "limb": "front_left",
+   "joint_ko": "어깨",
+   "joint": "shoulder",
+   "kind": "joint",
+   "n": 102,
+   "n_excluded": 0,
+   "min_deg": 121.8,
+   "max_deg": 177.5,
+   "mean_deg": 148.1,
+   "p5_deg": 128.1,
+   "p50_deg": 148.6,
+   "p95_deg": 163.7,
+   "range_deg": 55.7,
+   "range_p5p95_deg": 35.6,
+   "saturated": {
+    "min": false,
+    "max": false,
+    "upper_deg": 180.0
+   },
+   "conf_p50": 0.682,
+   "low_conf_frac": 0.108
+  },
+  "front_left.팔꿈치": {
+   "limb": "front_left",
+   "joint_ko": "팔꿈치",
+   "joint": "elbow",
+   "kind": "joint",
+   "n": 102,
+   "n_excluded": 0,
+   "min_deg": 71.5,
+   "max_deg": 160.7,
+   "mean_deg": 130.9,
+   "p5_deg": 89.3,
+   "p50_deg": 136.4,
+   "p95_deg": 153.1,
+   "range_deg": 89.2,
+   "range_p5p95_deg": 63.8,
+   "saturated": {
+    "min": false,
+    "max": false,
+    "upper_deg": 180.0
+   },
+   "conf_p50": 0.706,
+   "low_conf_frac": 0.108
+  },
+  "front_left.앞발목": {
+   "limb": "front_left",
+   "joint_ko": "앞발목",
+   "joint": "carpus",
+   "kind": "joint",
+   "n": 102,
+   "n_excluded": 0,
+   "min_deg": 77.7,
+   "max_deg": 179.9,
+   "mean_deg": 146.7,
+   "p5_deg": 99.4,
+   "p50_deg": 150.6,
+   "p95_deg": 176.1,
+   "range_deg": 102.2,
+   "range_p5p95_deg": 76.6,
+   "saturated": {
+    "min": false,
+    "max": true,
+    "upper_deg": 180.0
+   },
+   "conf_p50": 0.673,
+   "low_conf_frac": 0.196
+  },
+  "front_left.앞발": {
+   "limb": "front_left",
+   "joint_ko": "앞발",
+   "joint": "front_paw",
+   "kind": "segment_ground",
+   "n": 102,
+   "n_excluded": 0,
+   "min_deg": 21.8,
+   "max_deg": 90.0,
+   "mean_deg": 57.2,
+   "p5_deg": 28.7,
+   "p50_deg": 56.7,
+   "p95_deg": 84.7,
+   "range_deg": 68.2,
+   "range_p5p95_deg": 56.0,
+   "saturated": {
+    "min": false,
+    "max": true,
+    "upper_deg": 90.0
+   },
+   "conf_p50": 0.675,
+   "low_conf_frac": 0.118
+  },
+  "front_right.어깨": {
+   "limb": "front_right",
+   "joint_ko": "어깨",
+   "joint": "shoulder",
+   "kind": "joint",
+   "n": 102,
+   "n_excluded": 0,
+   "min_deg": 66.8,
+   "max_deg": 176.2,
+   "mean_deg": 123.4,
+   "p5_deg": 81.4,
+   "p50_deg": 117.9,
+   "p95_deg": 171.2,
+   "range_deg": 109.4,
+   "range_p5p95_deg": 89.8,
+   "saturated": {
+    "min": false,
+    "max": false,
+    "upper_deg": 180.0
+   },
+   "conf_p50": 0.466,
+   "low_conf_frac": 0.637
+  },
+  "front_right.팔꿈치": {
+   "limb": "front_right",
+   "joint_ko": "팔꿈치",
+   "joint": "elbow",
+   "kind": "joint",
+   "n": 102,
+   "n_excluded": 0,
+   "min_deg": 35.8,
+   "max_deg": 178.3,
+   "mean_deg": 115.2,
+   "p5_deg": 48.4,
+   "p50_deg": 126.0,
+   "p95_deg": 173.1,
+   "range_deg": 142.5,
+   "range_p5p95_deg": 124.7,
+   "saturated": {
+    "min": false,
+    "max": false,
+    "upper_deg": 180.0
+   },
+   "conf_p50": 0.467,
+   "low_conf_frac": 0.598
+  },
+  "front_right.앞발목": {
+   "limb": "front_right",
+   "joint_ko": "앞발목",
+   "joint": "carpus",
+   "kind": "joint",
+   "n": 102,
+   "n_excluded": 0,
+   "min_deg": 43.1,
+   "max_deg": 178.2,
+   "mean_deg": 149.9,
+   "p5_deg": 119.9,
+   "p50_deg": 153.1,
+   "p95_deg": 175.9,
+   "range_deg": 135.1,
+   "range_p5p95_deg": 56.0,
+   "saturated": {
+    "min": false,
+    "max": false,
+    "upper_deg": 180.0
+   },
+   "conf_p50": 0.465,
+   "low_conf_frac": 0.618
+  },
+  "front_right.앞발": {
+   "limb": "front_right",
+   "joint_ko": "앞발",
+   "joint": "front_paw",
+   "kind": "segment_ground",
+   "n": 102,
+   "n_excluded": 0,
+   "min_deg": 6.5,
+   "max_deg": 90.0,
+   "mean_deg": 62.5,
+   "p5_deg": 28.4,
+   "p50_deg": 65.8,
+   "p95_deg": 87.4,
+   "range_deg": 83.5,
+   "range_p5p95_deg": 59.0,
+   "saturated": {
+    "min": false,
+    "max": true,
+    "upper_deg": 90.0
+   },
+   "conf_p50": 0.631,
+   "low_conf_frac": 0.265
+  },
+  "rear_left.고관절": {
+   "limb": "rear_left",
+   "joint_ko": "고관절",
+   "joint": "hip",
+   "kind": "joint",
+   "n": 102,
+   "n_excluded": 0,
+   "min_deg": 99.3,
+   "max_deg": 178.9,
+   "mean_deg": 137.0,
+   "p5_deg": 106.4,
+   "p50_deg": 135.7,
+   "p95_deg": 162.6,
+   "range_deg": 79.6,
+   "range_p5p95_deg": 56.2,
+   "saturated": {
+    "min": false,
+    "max": false,
+    "upper_deg": 180.0
+   },
+   "conf_p50": 0.556,
+   "low_conf_frac": 0.294
+  },
+  "rear_left.무릎": {
+   "limb": "rear_left",
+   "joint_ko": "무릎",
+   "joint": "knee",
+   "kind": "joint",
+   "n": 102,
+   "n_excluded": 0,
+   "min_deg": 59.1,
+   "max_deg": 169.6,
+   "mean_deg": 103.9,
+   "p5_deg": 77.2,
+   "p50_deg": 102.9,
+   "p95_deg": 139.2,
+   "range_deg": 110.5,
+   "range_p5p95_deg": 62.0,
+   "saturated": {
+    "min": false,
+    "max": false,
+    "upper_deg": 180.0
+   },
+   "conf_p50": 0.558,
+   "low_conf_frac": 0.284
+  },
+  "rear_left.뒷발목": {
+   "limb": "rear_left",
+   "joint_ko": "뒷발목",
+   "joint": "tarsus",
+   "kind": "joint",
+   "n": 102,
+   "n_excluded": 0,
+   "min_deg": 19.6,
+   "max_deg": 168.7,
+   "mean_deg": 113.4,
+   "p5_deg": 82.6,
+   "p50_deg": 110.9,
+   "p95_deg": 147.8,
+   "range_deg": 149.1,
+   "range_p5p95_deg": 65.1,
+   "saturated": {
+    "min": false,
+    "max": false,
+    "upper_deg": 180.0
+   },
+   "conf_p50": 0.52,
+   "low_conf_frac": 0.402
+  },
+  "rear_left.뒷발": {
+   "limb": "rear_left",
+   "joint_ko": "뒷발",
+   "joint": "rear_paw",
+   "kind": "segment_ground",
+   "n": 102,
+   "n_excluded": 0,
+   "min_deg": 14.5,
+   "max_deg": 90.0,
+   "mean_deg": 60.5,
+   "p5_deg": 29.7,
+   "p50_deg": 61.4,
+   "p95_deg": 86.1,
+   "range_deg": 75.5,
+   "range_p5p95_deg": 56.4,
+   "saturated": {
+    "min": false,
+    "max": true,
+    "upper_deg": 90.0
+   },
+   "conf_p50": 0.52,
+   "low_conf_frac": 0.402
+  },
+  "rear_right.고관절": {
+   "limb": "rear_right",
+   "joint_ko": "고관절",
+   "joint": "hip",
+   "kind": "joint",
+   "n": 102,
+   "n_excluded": 0,
+   "min_deg": 30.2,
+   "max_deg": 178.7,
+   "mean_deg": 116.0,
+   "p5_deg": 71.7,
+   "p50_deg": 112.0,
+   "p95_deg": 163.6,
+   "range_deg": 148.5,
+   "range_p5p95_deg": 91.8,
+   "saturated": {
+    "min": false,
+    "max": false,
+    "upper_deg": 180.0
+   },
+   "conf_p50": 0.512,
+   "low_conf_frac": 0.441
+  },
+  "rear_right.무릎": {
+   "limb": "rear_right",
+   "joint_ko": "무릎",
+   "joint": "knee",
+   "kind": "joint",
+   "n": 102,
+   "n_excluded": 0,
+   "min_deg": 37.2,
+   "max_deg": 178.0,
+   "mean_deg": 99.3,
+   "p5_deg": 64.3,
+   "p50_deg": 99.0,
+   "p95_deg": 143.8,
+   "range_deg": 140.8,
+   "range_p5p95_deg": 79.5,
+   "saturated": {
+    "min": false,
+    "max": false,
+    "upper_deg": 180.0
+   },
+   "conf_p50": 0.512,
+   "low_conf_frac": 0.451
+  },
+  "rear_right.뒷발목": {
+   "limb": "rear_right",
+   "joint_ko": "뒷발목",
+   "joint": "tarsus",
+   "kind": "joint",
+   "n": 102,
+   "n_excluded": 0,
+   "min_deg": 23.6,
+   "max_deg": 178.3,
+   "mean_deg": 111.1,
+   "p5_deg": 76.1,
+   "p50_deg": 112.3,
+   "p95_deg": 162.0,
+   "range_deg": 154.7,
+   "range_p5p95_deg": 85.9,
+   "saturated": {
+    "min": false,
+    "max": false,
+    "upper_deg": 180.0
+   },
+   "conf_p50": 0.571,
+   "low_conf_frac": 0.314
+  },
+  "rear_right.뒷발": {
+   "limb": "rear_right",
+   "joint_ko": "뒷발",
+   "joint": "rear_paw",
+   "kind": "segment_ground",
+   "n": 102,
+   "n_excluded": 0,
+   "min_deg": 18.7,
+   "max_deg": 90.0,
+   "mean_deg": 65.9,
+   "p5_deg": 25.8,
+   "p50_deg": 69.2,
+   "p95_deg": 88.2,
+   "range_deg": 71.3,
+   "range_p5p95_deg": 62.4,
+   "saturated": {
+    "min": false,
+    "max": true,
+    "upper_deg": 90.0
+   },
+   "conf_p50": 0.635,
+   "low_conf_frac": 0.176
+  }
+ },
+ "pairs": {
+  "front_shoulder": {
+   "key": "front_shoulder",
+   "axis": "left_right",
+   "label": "앞-어깨 좌우 차이",
+   "label_en": "Front shoulder L–R difference",
+   "kind": "joint",
+   "unit": "deg",
+   "joint": "shoulder",
+   "joint_ko": "어깨",
+   "side": "front",
+   "left": {
+    "min_deg": 121.8,
+    "max_deg": 177.5,
+    "mean_deg": 148.1,
+    "p5_deg": 128.1,
+    "p50_deg": 148.6,
+    "p95_deg": 163.7,
+    "range_deg": 55.7,
+    "range_p5p95_deg": 35.6
+   },
+   "right": {
+    "min_deg": 66.8,
+    "max_deg": 176.2,
+    "mean_deg": 123.4,
+    "p5_deg": 81.4,
+    "p50_deg": 117.9,
+    "p95_deg": 171.2,
+    "range_deg": 109.4,
+    "range_p5p95_deg": 89.8
+   },
+   "delta": {
+    "min_deg": 55.0,
+    "max_deg": 1.3,
+    "mean_deg": 24.7,
+    "p5_deg": 46.7,
+    "p50_deg": 30.7,
+    "p95_deg": -7.5,
+    "range_deg": -53.7,
+    "range_p5p95_deg": -54.2
+   },
+   "si": {
+    "min_deg": 58.32,
+    "max_deg": 0.74,
+    "mean_deg": 18.2,
+    "p5_deg": 44.58,
+    "p50_deg": 23.04,
+    "p95_deg": 4.48,
+    "range_deg": 65.05,
+    "range_p5p95_deg": 86.44
+   },
+   "primary_metric": "range_p5p95_deg",
+   "primary_delta": -54.2,
+   "primary_si": 86.44,
+   "valid": true,
+   "why": null,
+   "why_en": null,
+   "saturated": {
+    "left": {
+     "min": false,
+     "max": false,
+     "upper_deg": 180.0
+    },
+    "right": {
+     "min": false,
+     "max": false,
+     "upper_deg": 180.0
+    }
+   },
+   "conf": {
+    "left": 0.682,
+    "right": 0.466,
+    "gap": 0.216,
+    "low_frac": {
+     "left": 0.108,
+     "right": 0.637
+    },
+    "wider_side": "right",
+    "lower_conf_side": "right",
+    "wider_is_lower_conf": true
+   },
+   "n": {
+    "left": 102,
+    "right": 102
+   }
+  },
+  "front_elbow": {
+   "key": "front_elbow",
+   "axis": "left_right",
+   "label": "앞-팔꿈치 좌우 차이",
+   "label_en": "Front elbow L–R difference",
+   "kind": "joint",
+   "unit": "deg",
+   "joint": "elbow",
+   "joint_ko": "팔꿈치",
+   "side": "front",
+   "left": {
+    "min_deg": 71.5,
+    "max_deg": 160.7,
+    "mean_deg": 130.9,
+    "p5_deg": 89.3,
+    "p50_deg": 136.4,
+    "p95_deg": 153.1,
+    "range_deg": 89.2,
+    "range_p5p95_deg": 63.8
+   },
+   "right": {
+    "min_deg": 35.8,
+    "max_deg": 178.3,
+    "mean_deg": 115.2,
+    "p5_deg": 48.4,
+    "p50_deg": 126.0,
+    "p95_deg": 173.1,
+    "range_deg": 142.5,
+    "range_p5p95_deg": 124.7
+   },
+   "delta": {
+    "min_deg": 35.7,
+    "max_deg": -17.6,
+    "mean_deg": 15.7,
+    "p5_deg": 40.9,
+    "p50_deg": 10.4,
+    "p95_deg": -20.0,
+    "range_deg": -53.3,
+    "range_p5p95_deg": -60.9
+   },
+   "si": {
+    "min_deg": 66.54,
+    "max_deg": 10.38,
+    "mean_deg": 12.76,
+    "p5_deg": 59.4,
+    "p50_deg": 7.93,
+    "p95_deg": 12.26,
+    "range_deg": 46.01,
+    "range_p5p95_deg": 64.62
+   },
+   "primary_metric": "range_p5p95_deg",
+   "primary_delta": -60.9,
+   "primary_si": 64.62,
+   "valid": true,
+   "why": null,
+   "why_en": null,
+   "saturated": {
+    "left": {
+     "min": false,
+     "max": false,
+     "upper_deg": 180.0
+    },
+    "right": {
+     "min": false,
+     "max": false,
+     "upper_deg": 180.0
+    }
+   },
+   "conf": {
+    "left": 0.706,
+    "right": 0.467,
+    "gap": 0.239,
+    "low_frac": {
+     "left": 0.108,
+     "right": 0.598
+    },
+    "wider_side": "right",
+    "lower_conf_side": "right",
+    "wider_is_lower_conf": true
+   },
+   "n": {
+    "left": 102,
+    "right": 102
+   }
+  },
+  "front_carpus": {
+   "key": "front_carpus",
+   "axis": "left_right",
+   "label": "앞-앞발목 좌우 차이",
+   "label_en": "Front carpus L–R difference",
+   "kind": "joint",
+   "unit": "deg",
+   "joint": "carpus",
+   "joint_ko": "앞발목",
+   "side": "front",
+   "left": {
+    "min_deg": 77.7,
+    "max_deg": 179.9,
+    "mean_deg": 146.7,
+    "p5_deg": 99.4,
+    "p50_deg": 150.6,
+    "p95_deg": 176.1,
+    "range_deg": 102.2,
+    "range_p5p95_deg": 76.6
+   },
+   "right": {
+    "min_deg": 43.1,
+    "max_deg": 178.2,
+    "mean_deg": 149.9,
+    "p5_deg": 119.9,
+    "p50_deg": 153.1,
+    "p95_deg": 175.9,
+    "range_deg": 135.1,
+    "range_p5p95_deg": 56.0
+   },
+   "delta": {
+    "min_deg": 34.6,
+    "max_deg": 1.7,
+    "mean_deg": -3.2,
+    "p5_deg": -20.5,
+    "p50_deg": -2.5,
+    "p95_deg": 0.2,
+    "range_deg": -32.9,
+    "range_p5p95_deg": 20.6
+   },
+   "si": {
+    "min_deg": 57.28,
+    "max_deg": 0.95,
+    "mean_deg": 2.16,
+    "p5_deg": 18.7,
+    "p50_deg": 1.65,
+    "p95_deg": 0.11,
+    "range_deg": 27.73,
+    "range_p5p95_deg": 31.07
+   },
+   "primary_metric": "range_p5p95_deg",
+   "primary_delta": 20.6,
+   "primary_si": 31.07,
+   "valid": true,
+   "why": null,
+   "why_en": null,
+   "saturated": {
+    "left": {
+     "min": false,
+     "max": true,
+     "upper_deg": 180.0
+    },
+    "right": {
+     "min": false,
+     "max": false,
+     "upper_deg": 180.0
+    }
+   },
+   "conf": {
+    "left": 0.673,
+    "right": 0.465,
+    "gap": 0.208,
+    "low_frac": {
+     "left": 0.196,
+     "right": 0.618
+    },
+    "wider_side": "left",
+    "lower_conf_side": "right",
+    "wider_is_lower_conf": false
+   },
+   "n": {
+    "left": 102,
+    "right": 102
+   }
+  },
+  "front_paw": {
+   "key": "front_paw",
+   "axis": "left_right",
+   "label": "앞-앞발 좌우 차이",
+   "label_en": "Front front_paw L–R difference",
+   "kind": "segment_ground",
+   "unit": "deg",
+   "joint": "front_paw",
+   "joint_ko": "앞발",
+   "side": "front",
+   "left": {
+    "min_deg": 21.8,
+    "max_deg": 90.0,
+    "mean_deg": 57.2,
+    "p5_deg": 28.7,
+    "p50_deg": 56.7,
+    "p95_deg": 84.7,
+    "range_deg": 68.2,
+    "range_p5p95_deg": 56.0
+   },
+   "right": {
+    "min_deg": 6.5,
+    "max_deg": 90.0,
+    "mean_deg": 62.5,
+    "p5_deg": 28.4,
+    "p50_deg": 65.8,
+    "p95_deg": 87.4,
+    "range_deg": 83.5,
+    "range_p5p95_deg": 59.0
+   },
+   "delta": {
+    "min_deg": 15.3,
+    "max_deg": 0.0,
+    "mean_deg": -5.3,
+    "p5_deg": 0.3,
+    "p50_deg": -9.1,
+    "p95_deg": -2.7,
+    "range_deg": -15.3,
+    "range_p5p95_deg": -3.0
+   },
+   "si": {
+    "min_deg": 108.13,
+    "max_deg": 0.0,
+    "mean_deg": 8.86,
+    "p5_deg": 1.05,
+    "p50_deg": 14.86,
+    "p95_deg": 3.14,
+    "range_deg": 20.17,
+    "range_p5p95_deg": 5.22
+   },
+   "primary_metric": "range_p5p95_deg",
+   "primary_delta": -3.0,
+   "primary_si": 5.22,
+   "valid": true,
+   "why": null,
+   "why_en": null,
+   "saturated": {
+    "left": {
+     "min": false,
+     "max": true,
+     "upper_deg": 90.0
+    },
+    "right": {
+     "min": false,
+     "max": true,
+     "upper_deg": 90.0
+    }
+   },
+   "conf": {
+    "left": 0.675,
+    "right": 0.631,
+    "gap": 0.044,
+    "low_frac": {
+     "left": 0.118,
+     "right": 0.265
+    },
+    "wider_side": "right",
+    "lower_conf_side": "right",
+    "wider_is_lower_conf": true
+   },
+   "n": {
+    "left": 102,
+    "right": 102
+   }
+  },
+  "rear_hip": {
+   "key": "rear_hip",
+   "axis": "left_right",
+   "label": "뒤-고관절 좌우 차이",
+   "label_en": "Rear hip L–R difference",
+   "kind": "joint",
+   "unit": "deg",
+   "joint": "hip",
+   "joint_ko": "고관절",
+   "side": "rear",
+   "left": {
+    "min_deg": 99.3,
+    "max_deg": 178.9,
+    "mean_deg": 137.0,
+    "p5_deg": 106.4,
+    "p50_deg": 135.7,
+    "p95_deg": 162.6,
+    "range_deg": 79.6,
+    "range_p5p95_deg": 56.2
+   },
+   "right": {
+    "min_deg": 30.2,
+    "max_deg": 178.7,
+    "mean_deg": 116.0,
+    "p5_deg": 71.7,
+    "p50_deg": 112.0,
+    "p95_deg": 163.6,
+    "range_deg": 148.5,
+    "range_p5p95_deg": 91.8
+   },
+   "delta": {
+    "min_deg": 69.1,
+    "max_deg": 0.2,
+    "mean_deg": 21.0,
+    "p5_deg": 34.7,
+    "p50_deg": 23.7,
+    "p95_deg": -1.0,
+    "range_deg": -68.9,
+    "range_p5p95_deg": -35.6
+   },
+   "si": {
+    "min_deg": 106.72,
+    "max_deg": 0.11,
+    "mean_deg": 16.6,
+    "p5_deg": 38.97,
+    "p50_deg": 19.14,
+    "p95_deg": 0.61,
+    "range_deg": 60.41,
+    "range_p5p95_deg": 48.11
+   },
+   "primary_metric": "range_p5p95_deg",
+   "primary_delta": -35.6,
+   "primary_si": 48.11,
+   "valid": true,
+   "why": null,
+   "why_en": null,
+   "saturated": {
+    "left": {
+     "min": false,
+     "max": false,
+     "upper_deg": 180.0
+    },
+    "right": {
+     "min": false,
+     "max": false,
+     "upper_deg": 180.0
+    }
+   },
+   "conf": {
+    "left": 0.556,
+    "right": 0.512,
+    "gap": 0.044,
+    "low_frac": {
+     "left": 0.294,
+     "right": 0.441
+    },
+    "wider_side": "right",
+    "lower_conf_side": "right",
+    "wider_is_lower_conf": true
+   },
+   "n": {
+    "left": 102,
+    "right": 102
+   }
+  },
+  "rear_knee": {
+   "key": "rear_knee",
+   "axis": "left_right",
+   "label": "뒤-무릎 좌우 차이",
+   "label_en": "Rear knee L–R difference",
+   "kind": "joint",
+   "unit": "deg",
+   "joint": "knee",
+   "joint_ko": "무릎",
+   "side": "rear",
+   "left": {
+    "min_deg": 59.1,
+    "max_deg": 169.6,
+    "mean_deg": 103.9,
+    "p5_deg": 77.2,
+    "p50_deg": 102.9,
+    "p95_deg": 139.2,
+    "range_deg": 110.5,
+    "range_p5p95_deg": 62.0
+   },
+   "right": {
+    "min_deg": 37.2,
+    "max_deg": 178.0,
+    "mean_deg": 99.3,
+    "p5_deg": 64.3,
+    "p50_deg": 99.0,
+    "p95_deg": 143.8,
+    "range_deg": 140.8,
+    "range_p5p95_deg": 79.5
+   },
+   "delta": {
+    "min_deg": 21.9,
+    "max_deg": -8.4,
+    "mean_deg": 4.6,
+    "p5_deg": 12.9,
+    "p50_deg": 3.9,
+    "p95_deg": -4.6,
+    "range_deg": -30.3,
+    "range_p5p95_deg": -17.5
+   },
+   "si": {
+    "min_deg": 45.48,
+    "max_deg": 4.83,
+    "mean_deg": 4.53,
+    "p5_deg": 18.23,
+    "p50_deg": 3.86,
+    "p95_deg": 3.25,
+    "range_deg": 24.11,
+    "range_p5p95_deg": 24.73
+   },
+   "primary_metric": "range_p5p95_deg",
+   "primary_delta": -17.5,
+   "primary_si": 24.73,
+   "valid": true,
+   "why": null,
+   "why_en": null,
+   "saturated": {
+    "left": {
+     "min": false,
+     "max": false,
+     "upper_deg": 180.0
+    },
+    "right": {
+     "min": false,
+     "max": false,
+     "upper_deg": 180.0
+    }
+   },
+   "conf": {
+    "left": 0.558,
+    "right": 0.512,
+    "gap": 0.046,
+    "low_frac": {
+     "left": 0.284,
+     "right": 0.451
+    },
+    "wider_side": "right",
+    "lower_conf_side": "right",
+    "wider_is_lower_conf": true
+   },
+   "n": {
+    "left": 102,
+    "right": 102
+   }
+  },
+  "rear_tarsus": {
+   "key": "rear_tarsus",
+   "axis": "left_right",
+   "label": "뒤-뒷발목 좌우 차이",
+   "label_en": "Rear tarsus L–R difference",
+   "kind": "joint",
+   "unit": "deg",
+   "joint": "tarsus",
+   "joint_ko": "뒷발목",
+   "side": "rear",
+   "left": {
+    "min_deg": 19.6,
+    "max_deg": 168.7,
+    "mean_deg": 113.4,
+    "p5_deg": 82.6,
+    "p50_deg": 110.9,
+    "p95_deg": 147.8,
+    "range_deg": 149.1,
+    "range_p5p95_deg": 65.1
+   },
+   "right": {
+    "min_deg": 23.6,
+    "max_deg": 178.3,
+    "mean_deg": 111.1,
+    "p5_deg": 76.1,
+    "p50_deg": 112.3,
+    "p95_deg": 162.0,
+    "range_deg": 154.7,
+    "range_p5p95_deg": 85.9
+   },
+   "delta": {
+    "min_deg": -4.0,
+    "max_deg": -9.6,
+    "mean_deg": 2.3,
+    "p5_deg": 6.5,
+    "p50_deg": -1.4,
+    "p95_deg": -14.2,
+    "range_deg": -5.6,
+    "range_p5p95_deg": -20.8
+   },
+   "si": {
+    "min_deg": 18.52,
+    "max_deg": 5.53,
+    "mean_deg": 2.05,
+    "p5_deg": 8.19,
+    "p50_deg": 1.25,
+    "p95_deg": 9.17,
+    "range_deg": 3.69,
+    "range_p5p95_deg": 27.55
+   },
+   "primary_metric": "range_p5p95_deg",
+   "primary_delta": -20.8,
+   "primary_si": 27.55,
+   "valid": true,
+   "why": null,
+   "why_en": null,
+   "saturated": {
+    "left": {
+     "min": false,
+     "max": false,
+     "upper_deg": 180.0
+    },
+    "right": {
+     "min": false,
+     "max": false,
+     "upper_deg": 180.0
+    }
+   },
+   "conf": {
+    "left": 0.52,
+    "right": 0.571,
+    "gap": -0.051,
+    "low_frac": {
+     "left": 0.402,
+     "right": 0.314
+    },
+    "wider_side": "right",
+    "lower_conf_side": "left",
+    "wider_is_lower_conf": false
+   },
+   "n": {
+    "left": 102,
+    "right": 102
+   }
+  },
+  "rear_paw": {
+   "key": "rear_paw",
+   "axis": "left_right",
+   "label": "뒤-뒷발 좌우 차이",
+   "label_en": "Rear rear_paw L–R difference",
+   "kind": "segment_ground",
+   "unit": "deg",
+   "joint": "rear_paw",
+   "joint_ko": "뒷발",
+   "side": "rear",
+   "left": {
+    "min_deg": 14.5,
+    "max_deg": 90.0,
+    "mean_deg": 60.5,
+    "p5_deg": 29.7,
+    "p50_deg": 61.4,
+    "p95_deg": 86.1,
+    "range_deg": 75.5,
+    "range_p5p95_deg": 56.4
+   },
+   "right": {
+    "min_deg": 18.7,
+    "max_deg": 90.0,
+    "mean_deg": 65.9,
+    "p5_deg": 25.8,
+    "p50_deg": 69.2,
+    "p95_deg": 88.2,
+    "range_deg": 71.3,
+    "range_p5p95_deg": 62.4
+   },
+   "delta": {
+    "min_deg": -4.2,
+    "max_deg": 0.0,
+    "mean_deg": -5.4,
+    "p5_deg": 3.9,
+    "p50_deg": -7.8,
+    "p95_deg": -2.1,
+    "range_deg": 4.2,
+    "range_p5p95_deg": -6.0
+   },
+   "si": {
+    "min_deg": 25.3,
+    "max_deg": 0.0,
+    "mean_deg": 8.54,
+    "p5_deg": 14.05,
+    "p50_deg": 11.94,
+    "p95_deg": 2.41,
+    "range_deg": 5.72,
+    "range_p5p95_deg": 10.1
+   },
+   "primary_metric": "range_p5p95_deg",
+   "primary_delta": -6.0,
+   "primary_si": 10.1,
+   "valid": true,
+   "why": null,
+   "why_en": null,
+   "saturated": {
+    "left": {
+     "min": false,
+     "max": true,
+     "upper_deg": 90.0
+    },
+    "right": {
+     "min": false,
+     "max": true,
+     "upper_deg": 90.0
+    }
+   },
+   "conf": {
+    "left": 0.52,
+    "right": 0.635,
+    "gap": -0.115,
+    "low_frac": {
+     "left": 0.402,
+     "right": 0.176
+    },
+    "wider_side": "right",
+    "lower_conf_side": "left",
+    "wider_is_lower_conf": false
+   },
+   "n": {
+    "left": 102,
+    "right": 102
+   }
+  }
+ },
+ "fore_hind": {
+  "left_shoulder_hip": {
+   "key": "left_shoulder_hip",
+   "axis": "fore_hind",
+   "label": "왼쪽 어깨↔고관절 앞뒤 차이",
+   "label_en": "Left shoulder↔hip fore–hind difference",
+   "kind": "joint",
+   "unit": "deg",
+   "side": "left",
+   "fore_joint": "shoulder",
+   "fore_joint_ko": "어깨",
+   "hind_joint": "hip",
+   "hind_joint_ko": "고관절",
+   "fore": {
+    "min_deg": 121.8,
+    "max_deg": 177.5,
+    "mean_deg": 148.1,
+    "p5_deg": 128.1,
+    "p50_deg": 148.6,
+    "p95_deg": 163.7,
+    "range_deg": 55.7,
+    "range_p5p95_deg": 35.6
+   },
+   "hind": {
+    "min_deg": 99.3,
+    "max_deg": 178.9,
+    "mean_deg": 137.0,
+    "p5_deg": 106.4,
+    "p50_deg": 135.7,
+    "p95_deg": 162.6,
+    "range_deg": 79.6,
+    "range_p5p95_deg": 56.2
+   },
+   "delta": {
+    "min_deg": 22.5,
+    "max_deg": -1.4,
+    "mean_deg": 11.1,
+    "p5_deg": 21.7,
+    "p50_deg": 12.9,
+    "p95_deg": 1.1,
+    "range_deg": -23.9,
+    "range_p5p95_deg": -20.6
+   },
+   "si": {
+    "min_deg": 20.35,
+    "max_deg": 0.79,
+    "mean_deg": 7.79,
+    "p5_deg": 18.51,
+    "p50_deg": 9.07,
+    "p95_deg": 0.67,
+    "range_deg": 35.33,
+    "range_p5p95_deg": 44.88
+   },
+   "primary_metric": "range_p5p95_deg",
+   "primary_delta": -20.6,
+   "primary_si": 44.88,
+   "valid": true,
+   "why": null,
+   "why_en": null,
+   "saturated": {
+    "fore": {
+     "min": false,
+     "max": false,
+     "upper_deg": 180.0
+    },
+    "hind": {
+     "min": false,
+     "max": false,
+     "upper_deg": 180.0
+    }
+   },
+   "conf": {
+    "fore": 0.682,
+    "hind": 0.556,
+    "gap": 0.126,
+    "low_frac": {
+     "fore": 0.108,
+     "hind": 0.294
+    },
+    "wider_side": "hind",
+    "lower_conf_side": "hind",
+    "wider_is_lower_conf": true
+   },
+   "n": {
+    "fore": 102,
+    "hind": 102
+   },
+   "comparable": false,
+   "comparable_note": "앞다리·뒷다리는 사슬 위치로 맺은 서로 다른 관절이다 — 절대각 Δ 는 읽지 말고 range_p5p95_deg(가동범위 폭)만 볼 것",
+   "comparable_note_en": "Fore and hind are different joints matched by chain position — read range_p5p95_deg only, not absolute deltas"
+  },
+  "left_elbow_knee": {
+   "key": "left_elbow_knee",
+   "axis": "fore_hind",
+   "label": "왼쪽 팔꿈치↔무릎 앞뒤 차이",
+   "label_en": "Left elbow↔knee fore–hind difference",
+   "kind": "joint",
+   "unit": "deg",
+   "side": "left",
+   "fore_joint": "elbow",
+   "fore_joint_ko": "팔꿈치",
+   "hind_joint": "knee",
+   "hind_joint_ko": "무릎",
+   "fore": {
+    "min_deg": 71.5,
+    "max_deg": 160.7,
+    "mean_deg": 130.9,
+    "p5_deg": 89.3,
+    "p50_deg": 136.4,
+    "p95_deg": 153.1,
+    "range_deg": 89.2,
+    "range_p5p95_deg": 63.8
+   },
+   "hind": {
+    "min_deg": 59.1,
+    "max_deg": 169.6,
+    "mean_deg": 103.9,
+    "p5_deg": 77.2,
+    "p50_deg": 102.9,
+    "p95_deg": 139.2,
+    "range_deg": 110.5,
+    "range_p5p95_deg": 62.0
+   },
+   "delta": {
+    "min_deg": 12.4,
+    "max_deg": -8.9,
+    "mean_deg": 27.0,
+    "p5_deg": 12.1,
+    "p50_deg": 33.5,
+    "p95_deg": 13.9,
+    "range_deg": -21.3,
+    "range_p5p95_deg": 1.8
+   },
+   "si": {
+    "min_deg": 18.99,
+    "max_deg": 5.39,
+    "mean_deg": 23.0,
+    "p5_deg": 14.53,
+    "p50_deg": 28.0,
+    "p95_deg": 9.51,
+    "range_deg": 21.33,
+    "range_p5p95_deg": 2.86
+   },
+   "primary_metric": "range_p5p95_deg",
+   "primary_delta": 1.8,
+   "primary_si": 2.86,
+   "valid": true,
+   "why": null,
+   "why_en": null,
+   "saturated": {
+    "fore": {
+     "min": false,
+     "max": false,
+     "upper_deg": 180.0
+    },
+    "hind": {
+     "min": false,
+     "max": false,
+     "upper_deg": 180.0
+    }
+   },
+   "conf": {
+    "fore": 0.706,
+    "hind": 0.558,
+    "gap": 0.148,
+    "low_frac": {
+     "fore": 0.108,
+     "hind": 0.284
+    },
+    "wider_side": "fore",
+    "lower_conf_side": "hind",
+    "wider_is_lower_conf": false
+   },
+   "n": {
+    "fore": 102,
+    "hind": 102
+   },
+   "comparable": false,
+   "comparable_note": "앞다리·뒷다리는 사슬 위치로 맺은 서로 다른 관절이다 — 절대각 Δ 는 읽지 말고 range_p5p95_deg(가동범위 폭)만 볼 것",
+   "comparable_note_en": "Fore and hind are different joints matched by chain position — read range_p5p95_deg only, not absolute deltas"
+  },
+  "left_carpus_tarsus": {
+   "key": "left_carpus_tarsus",
+   "axis": "fore_hind",
+   "label": "왼쪽 앞발목↔뒷발목 앞뒤 차이",
+   "label_en": "Left carpus↔tarsus fore–hind difference",
+   "kind": "joint",
+   "unit": "deg",
+   "side": "left",
+   "fore_joint": "carpus",
+   "fore_joint_ko": "앞발목",
+   "hind_joint": "tarsus",
+   "hind_joint_ko": "뒷발목",
+   "fore": {
+    "min_deg": 77.7,
+    "max_deg": 179.9,
+    "mean_deg": 146.7,
+    "p5_deg": 99.4,
+    "p50_deg": 150.6,
+    "p95_deg": 176.1,
+    "range_deg": 102.2,
+    "range_p5p95_deg": 76.6
+   },
+   "hind": {
+    "min_deg": 19.6,
+    "max_deg": 168.7,
+    "mean_deg": 113.4,
+    "p5_deg": 82.6,
+    "p50_deg": 110.9,
+    "p95_deg": 147.8,
+    "range_deg": 149.1,
+    "range_p5p95_deg": 65.1
+   },
+   "delta": {
+    "min_deg": 58.1,
+    "max_deg": 11.2,
+    "mean_deg": 33.3,
+    "p5_deg": 16.8,
+    "p50_deg": 39.7,
+    "p95_deg": 28.3,
+    "range_deg": -46.9,
+    "range_p5p95_deg": 11.5
+   },
+   "si": {
+    "min_deg": 119.42,
+    "max_deg": 6.43,
+    "mean_deg": 25.61,
+    "p5_deg": 18.46,
+    "p50_deg": 30.36,
+    "p95_deg": 17.47,
+    "range_deg": 37.33,
+    "range_p5p95_deg": 16.23
+   },
+   "primary_metric": "range_p5p95_deg",
+   "primary_delta": 11.5,
+   "primary_si": 16.23,
+   "valid": true,
+   "why": null,
+   "why_en": null,
+   "saturated": {
+    "fore": {
+     "min": false,
+     "max": true,
+     "upper_deg": 180.0
+    },
+    "hind": {
+     "min": false,
+     "max": false,
+     "upper_deg": 180.0
+    }
+   },
+   "conf": {
+    "fore": 0.673,
+    "hind": 0.52,
+    "gap": 0.153,
+    "low_frac": {
+     "fore": 0.196,
+     "hind": 0.402
+    },
+    "wider_side": "fore",
+    "lower_conf_side": "hind",
+    "wider_is_lower_conf": false
+   },
+   "n": {
+    "fore": 102,
+    "hind": 102
+   },
+   "comparable": false,
+   "comparable_note": "앞다리·뒷다리는 사슬 위치로 맺은 서로 다른 관절이다 — 절대각 Δ 는 읽지 말고 range_p5p95_deg(가동범위 폭)만 볼 것",
+   "comparable_note_en": "Fore and hind are different joints matched by chain position — read range_p5p95_deg only, not absolute deltas"
+  },
+  "left_paw": {
+   "key": "left_paw",
+   "axis": "fore_hind",
+   "label": "왼쪽 앞발↔뒷발 앞뒤 차이",
+   "label_en": "Left front_paw↔rear_paw fore–hind difference",
+   "kind": "segment_ground",
+   "unit": "deg",
+   "side": "left",
+   "fore_joint": "front_paw",
+   "fore_joint_ko": "앞발",
+   "hind_joint": "rear_paw",
+   "hind_joint_ko": "뒷발",
+   "fore": {
+    "min_deg": 21.8,
+    "max_deg": 90.0,
+    "mean_deg": 57.2,
+    "p5_deg": 28.7,
+    "p50_deg": 56.7,
+    "p95_deg": 84.7,
+    "range_deg": 68.2,
+    "range_p5p95_deg": 56.0
+   },
+   "hind": {
+    "min_deg": 14.5,
+    "max_deg": 90.0,
+    "mean_deg": 60.5,
+    "p5_deg": 29.7,
+    "p50_deg": 61.4,
+    "p95_deg": 86.1,
+    "range_deg": 75.5,
+    "range_p5p95_deg": 56.4
+   },
+   "delta": {
+    "min_deg": 7.3,
+    "max_deg": 0.0,
+    "mean_deg": -3.3,
+    "p5_deg": -1.0,
+    "p50_deg": -4.7,
+    "p95_deg": -1.4,
+    "range_deg": -7.3,
+    "range_p5p95_deg": -0.4
+   },
+   "si": {
+    "min_deg": 40.22,
+    "max_deg": 0.0,
+    "mean_deg": 5.61,
+    "p5_deg": 3.42,
+    "p50_deg": 7.96,
+    "p95_deg": 1.64,
+    "range_deg": 10.16,
+    "range_p5p95_deg": 0.71
+   },
+   "primary_metric": "range_p5p95_deg",
+   "primary_delta": -0.4,
+   "primary_si": 0.71,
+   "valid": true,
+   "why": null,
+   "why_en": null,
+   "saturated": {
+    "fore": {
+     "min": false,
+     "max": true,
+     "upper_deg": 90.0
+    },
+    "hind": {
+     "min": false,
+     "max": true,
+     "upper_deg": 90.0
+    }
+   },
+   "conf": {
+    "fore": 0.675,
+    "hind": 0.52,
+    "gap": 0.155,
+    "low_frac": {
+     "fore": 0.118,
+     "hind": 0.402
+    },
+    "wider_side": "hind",
+    "lower_conf_side": "hind",
+    "wider_is_lower_conf": true
+   },
+   "n": {
+    "fore": 102,
+    "hind": 102
+   },
+   "comparable": false,
+   "comparable_note": "앞다리·뒷다리는 사슬 위치로 맺은 서로 다른 관절이다 — 절대각 Δ 는 읽지 말고 range_p5p95_deg(가동범위 폭)만 볼 것",
+   "comparable_note_en": "Fore and hind are different joints matched by chain position — read range_p5p95_deg only, not absolute deltas"
+  },
+  "right_shoulder_hip": {
+   "key": "right_shoulder_hip",
+   "axis": "fore_hind",
+   "label": "오른쪽 어깨↔고관절 앞뒤 차이",
+   "label_en": "Right shoulder↔hip fore–hind difference",
+   "kind": "joint",
+   "unit": "deg",
+   "side": "right",
+   "fore_joint": "shoulder",
+   "fore_joint_ko": "어깨",
+   "hind_joint": "hip",
+   "hind_joint_ko": "고관절",
+   "fore": {
+    "min_deg": 66.8,
+    "max_deg": 176.2,
+    "mean_deg": 123.4,
+    "p5_deg": 81.4,
+    "p50_deg": 117.9,
+    "p95_deg": 171.2,
+    "range_deg": 109.4,
+    "range_p5p95_deg": 89.8
+   },
+   "hind": {
+    "min_deg": 30.2,
+    "max_deg": 178.7,
+    "mean_deg": 116.0,
+    "p5_deg": 71.7,
+    "p50_deg": 112.0,
+    "p95_deg": 163.6,
+    "range_deg": 148.5,
+    "range_p5p95_deg": 91.8
+   },
+   "delta": {
+    "min_deg": 36.6,
+    "max_deg": -2.5,
+    "mean_deg": 7.4,
+    "p5_deg": 9.7,
+    "p50_deg": 5.9,
+    "p95_deg": 7.6,
+    "range_deg": -39.1,
+    "range_p5p95_deg": -2.0
+   },
+   "si": {
+    "min_deg": 75.46,
+    "max_deg": 1.41,
+    "mean_deg": 6.18,
+    "p5_deg": 12.67,
+    "p50_deg": 5.13,
+    "p95_deg": 4.54,
+    "range_deg": 30.32,
+    "range_p5p95_deg": 2.2
+   },
+   "primary_metric": "range_p5p95_deg",
+   "primary_delta": -2.0,
+   "primary_si": 2.2,
+   "valid": true,
+   "why": null,
+   "why_en": null,
+   "saturated": {
+    "fore": {
+     "min": false,
+     "max": false,
+     "upper_deg": 180.0
+    },
+    "hind": {
+     "min": false,
+     "max": false,
+     "upper_deg": 180.0
+    }
+   },
+   "conf": {
+    "fore": 0.466,
+    "hind": 0.512,
+    "gap": -0.046,
+    "low_frac": {
+     "fore": 0.637,
+     "hind": 0.441
+    },
+    "wider_side": "hind",
+    "lower_conf_side": "fore",
+    "wider_is_lower_conf": false
+   },
+   "n": {
+    "fore": 102,
+    "hind": 102
+   },
+   "comparable": false,
+   "comparable_note": "앞다리·뒷다리는 사슬 위치로 맺은 서로 다른 관절이다 — 절대각 Δ 는 읽지 말고 range_p5p95_deg(가동범위 폭)만 볼 것",
+   "comparable_note_en": "Fore and hind are different joints matched by chain position — read range_p5p95_deg only, not absolute deltas"
+  },
+  "right_elbow_knee": {
+   "key": "right_elbow_knee",
+   "axis": "fore_hind",
+   "label": "오른쪽 팔꿈치↔무릎 앞뒤 차이",
+   "label_en": "Right elbow↔knee fore–hind difference",
+   "kind": "joint",
+   "unit": "deg",
+   "side": "right",
+   "fore_joint": "elbow",
+   "fore_joint_ko": "팔꿈치",
+   "hind_joint": "knee",
+   "hind_joint_ko": "무릎",
+   "fore": {
+    "min_deg": 35.8,
+    "max_deg": 178.3,
+    "mean_deg": 115.2,
+    "p5_deg": 48.4,
+    "p50_deg": 126.0,
+    "p95_deg": 173.1,
+    "range_deg": 142.5,
+    "range_p5p95_deg": 124.7
+   },
+   "hind": {
+    "min_deg": 37.2,
+    "max_deg": 178.0,
+    "mean_deg": 99.3,
+    "p5_deg": 64.3,
+    "p50_deg": 99.0,
+    "p95_deg": 143.8,
+    "range_deg": 140.8,
+    "range_p5p95_deg": 79.5
+   },
+   "delta": {
+    "min_deg": -1.4,
+    "max_deg": 0.3,
+    "mean_deg": 15.9,
+    "p5_deg": -15.9,
+    "p50_deg": 27.0,
+    "p95_deg": 29.3,
+    "range_deg": 1.7,
+    "range_p5p95_deg": 45.2
+   },
+   "si": {
+    "min_deg": 3.84,
+    "max_deg": 0.17,
+    "mean_deg": 14.83,
+    "p5_deg": 28.22,
+    "p50_deg": 24.0,
+    "p95_deg": 18.49,
+    "range_deg": 1.2,
+    "range_p5p95_deg": 44.27
+   },
+   "primary_metric": "range_p5p95_deg",
+   "primary_delta": 45.2,
+   "primary_si": 44.27,
+   "valid": true,
+   "why": null,
+   "why_en": null,
+   "saturated": {
+    "fore": {
+     "min": false,
+     "max": false,
+     "upper_deg": 180.0
+    },
+    "hind": {
+     "min": false,
+     "max": false,
+     "upper_deg": 180.0
+    }
+   },
+   "conf": {
+    "fore": 0.467,
+    "hind": 0.512,
+    "gap": -0.045,
+    "low_frac": {
+     "fore": 0.598,
+     "hind": 0.451
+    },
+    "wider_side": "fore",
+    "lower_conf_side": "fore",
+    "wider_is_lower_conf": true
+   },
+   "n": {
+    "fore": 102,
+    "hind": 102
+   },
+   "comparable": false,
+   "comparable_note": "앞다리·뒷다리는 사슬 위치로 맺은 서로 다른 관절이다 — 절대각 Δ 는 읽지 말고 range_p5p95_deg(가동범위 폭)만 볼 것",
+   "comparable_note_en": "Fore and hind are different joints matched by chain position — read range_p5p95_deg only, not absolute deltas"
+  },
+  "right_carpus_tarsus": {
+   "key": "right_carpus_tarsus",
+   "axis": "fore_hind",
+   "label": "오른쪽 앞발목↔뒷발목 앞뒤 차이",
+   "label_en": "Right carpus↔tarsus fore–hind difference",
+   "kind": "joint",
+   "unit": "deg",
+   "side": "right",
+   "fore_joint": "carpus",
+   "fore_joint_ko": "앞발목",
+   "hind_joint": "tarsus",
+   "hind_joint_ko": "뒷발목",
+   "fore": {
+    "min_deg": 43.1,
+    "max_deg": 178.2,
+    "mean_deg": 149.9,
+    "p5_deg": 119.9,
+    "p50_deg": 153.1,
+    "p95_deg": 175.9,
+    "range_deg": 135.1,
+    "range_p5p95_deg": 56.0
+   },
+   "hind": {
+    "min_deg": 23.6,
+    "max_deg": 178.3,
+    "mean_deg": 111.1,
+    "p5_deg": 76.1,
+    "p50_deg": 112.3,
+    "p95_deg": 162.0,
+    "range_deg": 154.7,
+    "range_p5p95_deg": 85.9
+   },
+   "delta": {
+    "min_deg": 19.5,
+    "max_deg": -0.1,
+    "mean_deg": 38.8,
+    "p5_deg": 43.8,
+    "p50_deg": 40.8,
+    "p95_deg": 13.9,
+    "range_deg": -19.6,
+    "range_p5p95_deg": -29.9
+   },
+   "si": {
+    "min_deg": 58.47,
+    "max_deg": 0.06,
+    "mean_deg": 29.73,
+    "p5_deg": 44.69,
+    "p50_deg": 30.75,
+    "p95_deg": 8.23,
+    "range_deg": 13.53,
+    "range_p5p95_deg": 42.14
+   },
+   "primary_metric": "range_p5p95_deg",
+   "primary_delta": -29.9,
+   "primary_si": 42.14,
+   "valid": true,
+   "why": null,
+   "why_en": null,
+   "saturated": {
+    "fore": {
+     "min": false,
+     "max": false,
+     "upper_deg": 180.0
+    },
+    "hind": {
+     "min": false,
+     "max": false,
+     "upper_deg": 180.0
+    }
+   },
+   "conf": {
+    "fore": 0.465,
+    "hind": 0.571,
+    "gap": -0.106,
+    "low_frac": {
+     "fore": 0.618,
+     "hind": 0.314
+    },
+    "wider_side": "hind",
+    "lower_conf_side": "fore",
+    "wider_is_lower_conf": false
+   },
+   "n": {
+    "fore": 102,
+    "hind": 102
+   },
+   "comparable": false,
+   "comparable_note": "앞다리·뒷다리는 사슬 위치로 맺은 서로 다른 관절이다 — 절대각 Δ 는 읽지 말고 range_p5p95_deg(가동범위 폭)만 볼 것",
+   "comparable_note_en": "Fore and hind are different joints matched by chain position — read range_p5p95_deg only, not absolute deltas"
+  },
+  "right_paw": {
+   "key": "right_paw",
+   "axis": "fore_hind",
+   "label": "오른쪽 앞발↔뒷발 앞뒤 차이",
+   "label_en": "Right front_paw↔rear_paw fore–hind difference",
+   "kind": "segment_ground",
+   "unit": "deg",
+   "side": "right",
+   "fore_joint": "front_paw",
+   "fore_joint_ko": "앞발",
+   "hind_joint": "rear_paw",
+   "hind_joint_ko": "뒷발",
+   "fore": {
+    "min_deg": 6.5,
+    "max_deg": 90.0,
+    "mean_deg": 62.5,
+    "p5_deg": 28.4,
+    "p50_deg": 65.8,
+    "p95_deg": 87.4,
+    "range_deg": 83.5,
+    "range_p5p95_deg": 59.0
+   },
+   "hind": {
+    "min_deg": 18.7,
+    "max_deg": 90.0,
+    "mean_deg": 65.9,
+    "p5_deg": 25.8,
+    "p50_deg": 69.2,
+    "p95_deg": 88.2,
+    "range_deg": 71.3,
+    "range_p5p95_deg": 62.4
+   },
+   "delta": {
+    "min_deg": -12.2,
+    "max_deg": 0.0,
+    "mean_deg": -3.4,
+    "p5_deg": 2.6,
+    "p50_deg": -3.4,
+    "p95_deg": -0.8,
+    "range_deg": 12.2,
+    "range_p5p95_deg": -3.4
+   },
+   "si": {
+    "min_deg": 96.83,
+    "max_deg": 0.0,
+    "mean_deg": 5.3,
+    "p5_deg": 9.59,
+    "p50_deg": 5.04,
+    "p95_deg": 0.91,
+    "range_deg": 15.76,
+    "range_p5p95_deg": 5.6
+   },
+   "primary_metric": "range_p5p95_deg",
+   "primary_delta": -3.4,
+   "primary_si": 5.6,
+   "valid": true,
+   "why": null,
+   "why_en": null,
+   "saturated": {
+    "fore": {
+     "min": false,
+     "max": true,
+     "upper_deg": 90.0
+    },
+    "hind": {
+     "min": false,
+     "max": true,
+     "upper_deg": 90.0
+    }
+   },
+   "conf": {
+    "fore": 0.631,
+    "hind": 0.635,
+    "gap": -0.004,
+    "low_frac": {
+     "fore": 0.265,
+     "hind": 0.176
+    },
+    "wider_side": "hind",
+    "lower_conf_side": "fore",
+    "wider_is_lower_conf": false
+   },
+   "n": {
+    "fore": 102,
+    "hind": 102
+   },
+   "comparable": false,
+   "comparable_note": "앞다리·뒷다리는 사슬 위치로 맺은 서로 다른 관절이다 — 절대각 Δ 는 읽지 말고 range_p5p95_deg(가동범위 폭)만 볼 것",
+   "comparable_note_en": "Fore and hind are different joints matched by chain position — read range_p5p95_deg only, not absolute deltas"
+  }
+ },
+ "cross": {
+  "shoulder_hip": {
+   "key": "shoulder_hip",
+   "axis": "cross",
+   "label": "어깨 좌우차 ↔ 고관절 좌우차",
+   "label_en": "shoulder L–R vs hip L–R",
+   "kind": "joint",
+   "fore_joint": "shoulder",
+   "fore_joint_ko": "어깨",
+   "hind_joint": "hip",
+   "hind_joint_ko": "고관절",
+   "front": {
+    "pair": "front_shoulder",
+    "delta_deg": -54.2,
+    "si_pct": 86.44,
+    "left": 35.6,
+    "right": 89.8
+   },
+   "rear": {
+    "pair": "rear_hip",
+    "delta_deg": -35.6,
+    "si_pct": 48.11,
+    "left": 56.2,
+    "right": 91.8
+   },
+   "source_metric": "range_p5p95_deg",
+   "conf_floor": 0.466,
+   "delta_signed_deg": -18.6,
+   "magnitude_diff_deg": 18.6,
+   "si_diff_pp": 38.33,
+   "same_direction": true,
+   "primary_metric": "si_diff_pp",
+   "primary": 38.33,
+   "valid": true,
+   "deg_comparable": false,
+   "deg_comparable_note": "앞발목·뒷발목처럼 기본 가동범위가 다른 관절의 도(°) 차이를 다시 뺀 값이다 — 크기는 si_diff_pp(%p)로 보고, 도 필드는 방향(same_direction) 확인용으로만 쓸 것",
+   "deg_comparable_note_en": "Degree fields subtract deltas of joints with different native ranges — read si_diff_pp for magnitude; use the degree fields only via same_direction"
+  },
+  "elbow_knee": {
+   "key": "elbow_knee",
+   "axis": "cross",
+   "label": "팔꿈치 좌우차 ↔ 무릎 좌우차",
+   "label_en": "elbow L–R vs knee L–R",
+   "kind": "joint",
+   "fore_joint": "elbow",
+   "fore_joint_ko": "팔꿈치",
+   "hind_joint": "knee",
+   "hind_joint_ko": "무릎",
+   "front": {
+    "pair": "front_elbow",
+    "delta_deg": -60.9,
+    "si_pct": 64.62,
+    "left": 63.8,
+    "right": 124.7
+   },
+   "rear": {
+    "pair": "rear_knee",
+    "delta_deg": -17.5,
+    "si_pct": 24.73,
+    "left": 62.0,
+    "right": 79.5
+   },
+   "source_metric": "range_p5p95_deg",
+   "conf_floor": 0.467,
+   "delta_signed_deg": -43.4,
+   "magnitude_diff_deg": 43.4,
+   "si_diff_pp": 39.89,
+   "same_direction": true,
+   "primary_metric": "si_diff_pp",
+   "primary": 39.89,
+   "valid": true,
+   "deg_comparable": false,
+   "deg_comparable_note": "앞발목·뒷발목처럼 기본 가동범위가 다른 관절의 도(°) 차이를 다시 뺀 값이다 — 크기는 si_diff_pp(%p)로 보고, 도 필드는 방향(same_direction) 확인용으로만 쓸 것",
+   "deg_comparable_note_en": "Degree fields subtract deltas of joints with different native ranges — read si_diff_pp for magnitude; use the degree fields only via same_direction"
+  },
+  "carpus_tarsus": {
+   "key": "carpus_tarsus",
+   "axis": "cross",
+   "label": "앞발목 좌우차 ↔ 뒷발목 좌우차",
+   "label_en": "carpus L–R vs tarsus L–R",
+   "kind": "joint",
+   "fore_joint": "carpus",
+   "fore_joint_ko": "앞발목",
+   "hind_joint": "tarsus",
+   "hind_joint_ko": "뒷발목",
+   "front": {
+    "pair": "front_carpus",
+    "delta_deg": 20.6,
+    "si_pct": 31.07,
+    "left": 76.6,
+    "right": 56.0
+   },
+   "rear": {
+    "pair": "rear_tarsus",
+    "delta_deg": -20.8,
+    "si_pct": 27.55,
+    "left": 65.1,
+    "right": 85.9
+   },
+   "source_metric": "range_p5p95_deg",
+   "conf_floor": 0.465,
+   "delta_signed_deg": 41.4,
+   "magnitude_diff_deg": -0.2,
+   "si_diff_pp": 3.52,
+   "same_direction": false,
+   "primary_metric": "si_diff_pp",
+   "primary": 3.52,
+   "valid": true,
+   "deg_comparable": false,
+   "deg_comparable_note": "앞발목·뒷발목처럼 기본 가동범위가 다른 관절의 도(°) 차이를 다시 뺀 값이다 — 크기는 si_diff_pp(%p)로 보고, 도 필드는 방향(same_direction) 확인용으로만 쓸 것",
+   "deg_comparable_note_en": "Degree fields subtract deltas of joints with different native ranges — read si_diff_pp for magnitude; use the degree fields only via same_direction"
+  },
+  "paw": {
+   "key": "paw",
+   "axis": "cross",
+   "label": "앞발 좌우차 ↔ 뒷발 좌우차",
+   "label_en": "front_paw L–R vs rear_paw L–R",
+   "kind": "segment_ground",
+   "fore_joint": "front_paw",
+   "fore_joint_ko": "앞발",
+   "hind_joint": "rear_paw",
+   "hind_joint_ko": "뒷발",
+   "front": {
+    "pair": "front_paw",
+    "delta_deg": -3.0,
+    "si_pct": 5.22,
+    "left": 56.0,
+    "right": 59.0
+   },
+   "rear": {
+    "pair": "rear_paw",
+    "delta_deg": -6.0,
+    "si_pct": 10.1,
+    "left": 56.4,
+    "right": 62.4
+   },
+   "source_metric": "range_p5p95_deg",
+   "conf_floor": 0.52,
+   "delta_signed_deg": 3.0,
+   "magnitude_diff_deg": -3.0,
+   "si_diff_pp": -4.88,
+   "same_direction": true,
+   "primary_metric": "si_diff_pp",
+   "primary": -4.88,
+   "valid": true,
+   "deg_comparable": false,
+   "deg_comparable_note": "앞발목·뒷발목처럼 기본 가동범위가 다른 관절의 도(°) 차이를 다시 뺀 값이다 — 크기는 si_diff_pp(%p)로 보고, 도 필드는 방향(same_direction) 확인용으로만 쓸 것",
+   "deg_comparable_note_en": "Degree fields subtract deltas of joints with different native ranges — read si_diff_pp for magnitude; use the degree fields only via same_direction"
+  }
+ },
+ "caveats": [
+  "2D 투영각 — 사지가 카메라 평면에서 기울면 실제보다 작게 읽힌다. 임상 규범치와 절대값을 비교하지 말 것",
+  "'앞발/뒷발'(kind=segment_ground)은 관절각이 아니라 중수·중족골 축의 지면 대비 경사각이다 — 관절각과 같은 축에 그리지 말 것",
+  "원측(카메라 반대편) 사지는 의사라벨로 학습된 슬롯에서 나온다 — 근측과 같은 신뢰로 읽지 말 것",
+  "saturated 가 true 인 min/max 는 상·하한에 닿은 값이라 좌우 차이가 0 에 눌린다 — 대표값은 range_p5p95_deg 를 쓸 것",
+  "fore_hind(앞뒤)는 좌우와 다르다 — 앞다리와 뒷다리는 사슬 위치로 맺은 **서로 다른 관절**이라 절대각 차이는 해부학적 의미가 없다. 가동범위 폭 비교로만 읽을 것",
+  "cross(좌우차의 앞뒤 비교)의 크기는 si_diff_pp(%p)로 읽을 것. 도(°) 필드는 다른 관절의 차를 다시 뺀 값이라 스케일이 섞인다 — 방향(same_direction) 확인용이다",
+  "magnitude_diff_deg 는 절댓값이 아니라 |Δ앞|−|Δ뒤| 라 **음수가 나온다** — 음수면 뒤쪽 비대칭이 더 크다는 뜻이다",
+  "폭은 지터로도 커진다. conf.wider_is_lower_conf 가 true 면 넓은 쪽이 동시에 못 믿는 쪽이라는 뜻이라, 그 차이는 개가 아니라 검출 때문일 수 있다(low_conf_frac 은 conf < 0.5 프레임 비율)"
+ ],
+ "locales": {
+  "ko": {
+   "caveats": [
+    "2D 투영각 — 사지가 카메라 평면에서 기울면 실제보다 작게 읽힌다. 임상 규범치와 절대값을 비교하지 말 것",
+    "'앞발/뒷발'(kind=segment_ground)은 관절각이 아니라 중수·중족골 축의 지면 대비 경사각이다 — 관절각과 같은 축에 그리지 말 것",
+    "원측(카메라 반대편) 사지는 의사라벨로 학습된 슬롯에서 나온다 — 근측과 같은 신뢰로 읽지 말 것",
+    "saturated 가 true 인 min/max 는 상·하한에 닿은 값이라 좌우 차이가 0 에 눌린다 — 대표값은 range_p5p95_deg 를 쓸 것",
+    "fore_hind(앞뒤)는 좌우와 다르다 — 앞다리와 뒷다리는 사슬 위치로 맺은 **서로 다른 관절**이라 절대각 차이는 해부학적 의미가 없다. 가동범위 폭 비교로만 읽을 것",
+    "cross(좌우차의 앞뒤 비교)의 크기는 si_diff_pp(%p)로 읽을 것. 도(°) 필드는 다른 관절의 차를 다시 뺀 값이라 스케일이 섞인다 — 방향(same_direction) 확인용이다",
+    "magnitude_diff_deg 는 절댓값이 아니라 |Δ앞|−|Δ뒤| 라 **음수가 나온다** — 음수면 뒤쪽 비대칭이 더 크다는 뜻이다",
+    "폭은 지터로도 커진다. conf.wider_is_lower_conf 가 true 면 넓은 쪽이 동시에 못 믿는 쪽이라는 뜻이라, 그 차이는 개가 아니라 검출 때문일 수 있다(low_conf_frac 은 conf < 0.5 프레임 비율)"
+   ]
+  },
+  "en": {
+   "caveats": [
+    "2D projected angles — limbs tilted out of the camera plane read smaller. Do not compare absolute values against clinical norms",
+    "'front_paw'/'rear_paw' (kind=segment_ground) is not a joint angle but the metacarpal/metatarsal axis tilt vs ground — do not plot on the same axis",
+    "Far-side limbs come from pseudo-labelled slots — do not trust them like near-side",
+    "min/max marked saturated hit the hard bound, so their L–R delta collapses toward zero — use range_p5p95_deg as the headline",
+    "Range also grows from keypoint jitter. conf.wider_is_lower_conf = true means the wider side is also the less-confident one, so the gap may be detection, not the dog (low_conf_frac is the share of frames with conf < 0.5)",
+    "For cross (L–R delta compared fore vs hind) read si_diff_pp (%p) as magnitude; the degree fields subtract deltas of different joints, so use them only for direction",
+    "magnitude_diff_deg is |Δfore|−|Δhind|, not an absolute value — it CAN be negative, meaning the hind asymmetry is the larger one",
+    "fore_hind is not like left-right: fore and hind limbs are *different* joints matched by chain position, so absolute-angle deltas carry no anatomical meaning. Read the range comparison only"
+   ]
+  }
+ }
+}

@@ -275,7 +275,8 @@ export class ReportPage {
       btn.className = "rp-card";
       const orient = s.orientation ? orientationLabel(s.orientation) : "";
       const size = s.width && s.height ? `${s.width}×${s.height}` : "";
-      const meta = [orient, size].filter(Boolean).join(" · ");
+      const dog = s.dog?.name || "";
+      const meta = [dog, orient, size].filter(Boolean).join(" · ");
       btn.innerHTML = `<span class="rp-card-title">${escapeHtml(s.displayTime)}</span><span class="rp-card-meta">${escapeHtml(meta || s.stem)}</span>`;
       btn.addEventListener("click", () => void this.openDetail(date, s));
       this.listEl.appendChild(btn);
@@ -510,18 +511,38 @@ export class ReportPage {
     if (!detail) return;
 
     setReviewEmptyHints();
-    // 압력패드: DB 에 pressure mp4 가 있으면 재생, 없으면 빈 상태.
-    const pressureUrl = detail.report.pressure?.available ? detail.report.pressure.url : null;
-    setReviewMedia("rpBody1", document.getElementById("rpPressureGif") as HTMLImageElement, null);
-    setReviewMedia(
-      "rpBody1",
-      document.getElementById("rpPressureVideo") as HTMLVideoElement,
-      pressureUrl,
-    );
+    // 압력패드: mp4면 video, 그 외(gif 등)면 img.
+    const pressureUrl =
+      detail.report.pressure?.available && detail.report.pressure.url
+        ? detail.report.pressure.url
+        : null;
+    if (pressureUrl && /\.(mp4|webm|ogg)(\?|#|$)/i.test(pressureUrl)) {
+      setReviewMedia("rpBody1", document.getElementById("rpPressureGif") as HTMLImageElement, null);
+      setReviewMedia(
+        "rpBody1",
+        document.getElementById("rpPressureVideo") as HTMLVideoElement,
+        pressureUrl,
+      );
+    } else {
+      setReviewMedia(
+        "rpBody1",
+        document.getElementById("rpPressureVideo") as HTMLVideoElement,
+        null,
+      );
+      setReviewMedia(
+        "rpBody1",
+        document.getElementById("rpPressureGif") as HTMLImageElement,
+        pressureUrl,
+      );
+    }
     setReviewMedia(
       "rpBody21",
       document.getElementById("rpOriginVideo") as HTMLVideoElement,
-      detail.original?.available ? detail.original.url : null,
+      detail.original?.available && detail.original.url
+        ? detail.original.url
+        : detail.backOriginal?.available
+          ? detail.backOriginal.url
+          : null,
     );
     setReviewMedia(
       "rpBody22",

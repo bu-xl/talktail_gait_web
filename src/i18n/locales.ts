@@ -237,7 +237,7 @@ export const LOCALES = {
     ws_label_21: "2-1 · 촬영 영상",
     ws_label_22: "2-2 · 스켈레톤 분석",
     ws_label_31: "3-1 · 각도 분석",
-    ws_label_32: "3-2 · 보폭분석",
+    ws_label_32: "3-2 · 각도 분석",
   },
   en: {
     docTitle: "Talktail Gait",
@@ -471,6 +471,6 @@ export const LOCALES = {
     ws_label_21: "2-1 · Capture video",
     ws_label_22: "2-2 · Skeleton analysis",
     ws_label_31: "3-1 · Angle analysis",
-    ws_label_32: "3-2 · Stride analysis",
+    ws_label_32: "3-2 · Angle analysis",
   },
 } as const;

@@ -1,7 +1,9 @@
 /**
  * Review-layout panes (1 / 2-1 / 2-2 / 3-1 / 3-2).
- * Media stays black until an explicit load; AI paths for 3-* TBD with ai-server.
+ * Media stays black until an explicit load; 3-2 uses angle_diff JSON (see angleDiffPane).
  */
+
+import { clearAngleDiffPane } from "./angleDiffPane";
 
 function bodyOf(id: string): HTMLElement {
   const el = document.getElementById(id);
@@ -106,7 +108,12 @@ export function clearReviewPanes(): void {
   setPaneMedia("wsBody21", bodyOf("wsOriginVideo") as HTMLVideoElement, null);
   setPaneMedia("wsBody22", bodyOf("wsAnalysisVideo") as HTMLVideoElement, null);
   setPaneMedia("wsBody31", bodyOf("wsMaxMinVideo") as HTMLVideoElement, null);
-  setPaneMedia("wsBody32", bodyOf("wsShadowImg") as HTMLImageElement, null);
+  clearAngleDiffPane();
+  const shadow = document.getElementById("wsShadowImg") as HTMLImageElement | null;
+  if (shadow) {
+    shadow.removeAttribute("src");
+    shadow.setAttribute("hidden", "");
+  }
 }
 
 /** Pane 1: GIF (img) or pressboard/promo MP4 (video). */
@@ -217,6 +224,10 @@ export function setMaxMinVideo(url: string | null): void {
   setPaneMedia("wsBody31", bodyOf("wsMaxMinVideo") as HTMLVideoElement, url);
 }
 
+/** @deprecated 3-2 now renders angle_diff JSON via angleDiffPane. Kept for rare PNG fallback. */
 export function setShadowImage(url: string | null): void {
-  setPaneMedia("wsBody32", bodyOf("wsShadowImg") as HTMLImageElement, url);
+  clearAngleDiffPane();
+  const img = bodyOf("wsShadowImg") as HTMLImageElement;
+  img.removeAttribute("hidden");
+  setPaneMedia("wsBody32", img, url);
 }
