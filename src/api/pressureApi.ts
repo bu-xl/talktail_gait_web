@@ -11,6 +11,7 @@ export type PressureDog = {
   name: string | null;
   breed: string | null;
   weightKg: number | null;
+  heightCm: number | null;
 };
 
 export type PressureRecording = {
@@ -27,14 +28,19 @@ export type PressureRecord = {
   createdAt: string;
   dog: PressureDog;
   recording: PressureRecording;
-  csv: { filename: string; size: number };
+  csv: { filename: string; size: number; path?: string | null };
   /** 백엔드 상대 경로 (`/api/pressure/records/:id/csv`). */
   csvUrl: string;
 };
 
 export type UploadPressureInput = {
   csv: string;
-  dog: { name?: string; breed?: string; weightKg?: number | null };
+  dog: {
+    name?: string;
+    breed?: string;
+    weightKg?: number | null;
+    heightCm?: number | null;
+  };
   recording?: Partial<PressureRecording>;
 };
 
@@ -47,10 +53,11 @@ export async function uploadPressureCsv(
   const blob = new Blob([input.csv], { type: "text/csv;charset=utf-8" });
   form.append("csv", blob, "pressure.csv");
 
-  const { name, breed, weightKg } = input.dog;
+  const { name, breed, weightKg, heightCm } = input.dog;
   if (name) form.append("dogName", name);
   if (breed) form.append("dogBreed", breed);
   if (weightKg != null && Number.isFinite(weightKg)) form.append("dogWeightKg", String(weightKg));
+  if (heightCm != null && Number.isFinite(heightCm)) form.append("dogHeightCm", String(heightCm));
 
   const rec = input.recording || {};
   for (const key of ["frames", "durationSec", "fps", "rows", "cols"] as const) {

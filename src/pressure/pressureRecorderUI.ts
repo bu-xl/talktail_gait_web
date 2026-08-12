@@ -48,6 +48,7 @@ export function wirePressureRecorder(deps: PressureRecorderDeps): void {
   const nameInput = $("recDogName") as HTMLInputElement | null;
   const breedInput = $("recDogBreed") as HTMLInputElement | null;
   const weightInput = $("recDogWeight") as HTMLInputElement | null;
+  const heightInput = $("recDogHeight") as HTMLInputElement | null;
 
   // 필수 UI 가 없으면(HTML 미포함) 조용히 종료 — 기존 동작에 영향 없음.
   if (!recBtn) return;
@@ -63,7 +64,7 @@ export function wirePressureRecorder(deps: PressureRecorderDeps): void {
   };
 
   const setInputsDisabled = (disabled: boolean): void => {
-    for (const el of [nameInput, breedInput, weightInput]) {
+    for (const el of [nameInput, breedInput, weightInput, heightInput]) {
       if (el) el.disabled = disabled;
     }
   };
@@ -75,6 +76,13 @@ export function wirePressureRecorder(deps: PressureRecorderDeps): void {
 
   const readWeight = (): number | null => {
     const v = weightInput?.value?.trim();
+    if (!v) return null;
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+
+  const readHeight = (): number | null => {
+    const v = heightInput?.value?.trim();
     if (!v) return null;
     const n = Number(v);
     return Number.isFinite(n) && n > 0 ? n : null;
@@ -122,6 +130,7 @@ export function wirePressureRecorder(deps: PressureRecorderDeps): void {
           name: nameInput?.value?.trim() || undefined,
           breed: breedInput?.value?.trim() || undefined,
           weightKg: readWeight(),
+          heightCm: readHeight(),
         },
         recording: {
           frames,
@@ -168,13 +177,14 @@ export function wirePressureRecorder(deps: PressureRecorderDeps): void {
       meta.className = "pressure-rec-meta";
       const dur = r.recording.durationSec != null ? `${r.recording.durationSec.toFixed(1)}s` : "–";
       const weight = r.dog.weightKg != null ? `${r.dog.weightKg}kg` : "–";
+      const height = r.dog.heightCm != null ? `${r.dog.heightCm}cm` : "–";
       const breed = r.dog.breed || "–";
       const title = document.createElement("div");
       title.className = "pressure-rec-title";
       title.textContent = r.dog.name || "(이름 없음)";
       const sub = document.createElement("div");
       sub.className = "pressure-rec-sub";
-      sub.textContent = `${breed} · ${weight} · ${dur} · ${fmtDate(r.createdAt)}`;
+      sub.textContent = `${breed} · ${weight} · ${height} · ${dur} · ${fmtDate(r.createdAt)}`;
       meta.appendChild(title);
       meta.appendChild(sub);
 

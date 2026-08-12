@@ -16,6 +16,12 @@ export type ResultSession = {
   width?: number;
   height?: number;
   orientation?: "portrait" | "landscape" | "square" | "unknown";
+  dog?: {
+    name: string | null;
+    breed: string | null;
+    weightKg: number | null;
+    heightCm: number | null;
+  };
 };
 
 export type ReportRow = {
@@ -74,15 +80,22 @@ export type ResultDetail = {
   session: ResultSession;
   video: MediaArtifact & { filename: string };
   original?: MediaArtifact;
+  /** back/uploads 원본 (DB back_original_path). */
+  backOriginal?: MediaArtifact;
+  /** 연결된 압력 CSV (DB gait_sessions). */
+  csv?: MediaArtifact & { path?: string | null };
   report: {
     keypoints: MediaArtifact & { filename: string };
     derived: MediaArtifact & {
       filename: string;
       preview?: DerivedPreview | null;
     };
+    angle_diff?: MediaArtifact & { preview?: unknown };
     cyclogram?: MediaArtifact;
     stride?: MediaArtifact;
     angle_pawy?: MediaArtifact;
+    /** 압력판 히트맵 영상 (`result_pressure/{stem}_pressure.mp4`). */
+    pressure?: MediaArtifact;
   };
 };
 
@@ -132,6 +145,18 @@ export async function getResultDetail(
       url: absolutize(apiBaseUrl, detail.original.url),
     };
   }
+  if (detail.backOriginal) {
+    detail.backOriginal = {
+      ...detail.backOriginal,
+      url: absolutize(apiBaseUrl, detail.backOriginal.url),
+    };
+  }
+  if (detail.csv) {
+    detail.csv = {
+      ...detail.csv,
+      url: absolutize(apiBaseUrl, detail.csv.url),
+    };
+  }
   const absArtifact = <T extends { url?: string | null } | null | undefined>(item: T): T => {
     if (!item || typeof item !== "object") return item;
     return { ...item, url: absolutize(apiBaseUrl, item.url) };
@@ -139,9 +164,11 @@ export async function getResultDetail(
   detail.report = {
     keypoints: absArtifact(detail.report?.keypoints) as ResultDetail["report"]["keypoints"],
     derived: absArtifact(detail.report?.derived) as ResultDetail["report"]["derived"],
+    angle_diff: absArtifact(detail.report?.angle_diff),
     cyclogram: absArtifact(detail.report?.cyclogram),
     stride: absArtifact(detail.report?.stride),
     angle_pawy: absArtifact(detail.report?.angle_pawy),
+    pressure: absArtifact(detail.report?.pressure),
   };
   return detail;
 }

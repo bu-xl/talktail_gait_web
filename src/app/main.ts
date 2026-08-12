@@ -73,8 +73,8 @@ import {
   setOriginVideo,
   setPressureGif,
   setPressureMedia,
-  setShadowImage,
 } from "../ui/reviewPanes.js";
+import { angleDiffDemoUrl, loadAngleDiffPane } from "../ui/angleDiffPane.js";
 import { SyncPlaybackDock } from "../ui/syncPlaybackDock.js";
 import { wireWorkspaceVideoControls } from "../ui/workspaceVideoControls.js";
 
@@ -102,7 +102,7 @@ type PromoCase = {
   dog: PromoDogInfo;
 };
 
-/** Pane 1 for every promo dog — `gait_project/foot2.gif` (animated GIF loops in <img>). */
+/** Fallback pane 1 when a promo case has no result_pressure file — `gait_project/foot2.gif`. */
 const PROMO_PRESSURE_GIF = "/promo-assets/foot2.gif";
 
 const PROMO_CASES: Record<string, PromoCase> = {
@@ -111,7 +111,6 @@ const PROMO_CASES: Record<string, PromoCase> = {
     time: "175433",
     stem: "analyzed-1366x768-18s-29p92fps-260807-175433",
     originUpload: "/dashboard_analysis/ami_analysis/ami_origin.mp4",
-    pressureUrl: PROMO_PRESSURE_GIF,
     resultsBase: "/dashboard_analysis/ami_analysis/175433",
     dog: {
       name: { ko: "아미", en: "Ami" },
@@ -163,6 +162,8 @@ function promoAssetUrl(path: string): string {
 
 function promoArtifactUrls(c: PromoCase): SessionArtifacts {
   const base = c.resultsBase ?? `/api/ai-results/${c.date}/${c.time}`;
+  /** Pane 1 always from ai-server `results/<date>/<time>/result_pressure/`. */
+  const pressureBase = `/api/ai-results/${c.date}/${c.time}`;
   const videoPath = `${base}/result_video/${c.stem}.mp4`;
   return {
     video: {
@@ -170,6 +171,12 @@ function promoArtifactUrls(c: PromoCase): SessionArtifacts {
       available: true,
       url: promoAssetUrl(videoPath),
       filename: `${c.stem}.mp4`,
+    },
+    pressure: {
+      kind: "pressure",
+      available: true,
+      url: promoAssetUrl(`${pressureBase}/result_pressure/${c.stem}_pressure.mp4`),
+      filename: `${c.stem}_pressure.mp4`,
     },
     angle_pawy: {
       kind: "angle_pawy",
@@ -182,6 +189,13 @@ function promoArtifactUrls(c: PromoCase): SessionArtifacts {
       available: true,
       url: promoAssetUrl(`${base}/result_stride/${c.stem}_stride.png`),
       filename: `${c.stem}_stride.png`,
+    },
+    // Prefer result_angle_diff JSON when present on ai-server; demo fixture until then.
+    angle_diff: {
+      kind: "angle_diff",
+      available: true,
+      url: angleDiffDemoUrl(),
+      filename: `${c.stem}_angle_diff.json`,
     },
     cyclogram: {
       kind: "cyclogram",
@@ -450,6 +464,10 @@ async function boot(): Promise<void> {
   const reportPage = reportPageEl ? new ReportPage(reportPageEl) : null;
   reportPage?.setApiBase(apiBase);
   clearReviewPanes();
+  // Local preview: 3-2 angle_diff UI from fixture (later: ai-server result_angle_diff URL).
+  void loadAngleDiffPane().catch((err) => {
+    console.warn("[angle_diff] demo load failed", err);
+  });
 
   wireAppHeader({
     onModuleChange: (mod) => {
@@ -555,7 +573,7 @@ async function boot(): Promise<void> {
     }
     setAnalysisVideo(analysisUrl);
 
-    // 3-1 angle_pawy 영상, 3-2 stride png
+    // 3-1 angle_pawy 영상, 3-2 angle_diff JSON (result_angle_diff; local demo fallback)
     const angle = artifacts?.angle_pawy;
     if (angle?.available && angle.url) {
       const abs =
@@ -564,21 +582,27 @@ async function boot(): Promise<void> {
           : absolutizeResultUrl(apiBase, angle.url);
       setMaxMinVideo(abs);
     }
-    const stride = artifacts?.stride;
-    if (stride?.available && stride.url) {
-      const abs =
-        stride.url.startsWith("http://") || stride.url.startsWith("https://")
-          ? stride.url
-          : absolutizeResultUrl(apiBase, stride.url);
-      setShadowImage(abs);
-    }
+    const angleDiff = artifacts?.angle_diff;
+    const angleDiffUrl =
+      angleDiff?.available && angleDiff.url
+        ? angleDiff.url.startsWith("http://") || angleDiff.url.startsWith("https://")
+          ? angleDiff.url
+          : absolutizeResultUrl(apiBase, angleDiff.url)
+        : angleDiffDemoUrl();
+    void loadAngleDiffPane(angleDiffUrl).catch((err) => {
+      console.warn("[angle_diff] pane load failed", err);
+    });
 
-    // 1번 압력: promo override → pad-session GIF → simulate placeholder
-    if (opts.pressureUrl) {
+    // 1번 압력: result_pressure → explicit pressureUrl → pad-session GIF → placeholder
+    const pressureArt = artifacts?.pressure;
+    const pressureFromArtifacts =
+      pressureArt && pressureArt.available !== false && pressureArt.url ? pressureArt.url : null;
+    const pressureSrc = pressureFromArtifacts || opts.pressureUrl || null;
+    if (pressureSrc) {
       const abs =
-        opts.pressureUrl.startsWith("http://") || opts.pressureUrl.startsWith("https://")
-          ? opts.pressureUrl
-          : absolutizeResultUrl(apiBase, opts.pressureUrl);
+        pressureSrc.startsWith("http://") || pressureSrc.startsWith("https://")
+          ? pressureSrc
+          : absolutizeResultUrl(apiBase, pressureSrc);
       setPressureMedia(abs);
     } else {
       const gifUrl = buildPressureGifUrl() ?? (isSimulateAi() ? placeholderUrl("foot.gif") : null);
@@ -1589,7 +1613,10 @@ async function boot(): Promise<void> {
         enterReview({
           analysisUrl,
           originalUrl: promoAssetUrl(promoCase.originUpload),
-          pressureUrl: promoAssetUrl(promoCase.pressureUrl ?? PROMO_PRESSURE_GIF),
+          // Pane 1: artifacts.pressure → ai-server result_pressure; else optional promo override / GIF.
+          pressureUrl: promoCase.pressureUrl
+            ? promoAssetUrl(promoCase.pressureUrl)
+            : undefined,
           artifacts,
           date: promoCase.date,
           time: promoCase.time,
@@ -1597,7 +1624,7 @@ async function boot(): Promise<void> {
           sessionPath: `${promoCase.date}/${promoCase.time}`,
         });
         if (!$opt("wsBody1")?.classList.contains("has-media")) {
-          setPressureGif(placeholderUrl("foot.gif"));
+          setPressureGif(promoAssetUrl(PROMO_PRESSURE_GIF));
         }
 
         // Warm the results sidebar list (API may use localhost; failure is non-fatal).

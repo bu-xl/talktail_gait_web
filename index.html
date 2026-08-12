@@ -311,6 +311,121 @@
         letter-spacing: .06em; text-transform: uppercase;
       }
       .ws-body.has-media.is-empty::after { display: none; }
+
+      /* 3-2 · angle_diff JSON panel (carousel by joint) */
+      #wsBody32.has-angle-diff {
+        align-items: stretch; justify-content: stretch;
+        background: #0b0e12; padding: 0;
+      }
+      #wsBody32.has-angle-diff::after { display: none; }
+      #wsShadowImg[hidden] { display: none !important; }
+      .ad-root {
+        width: 100%; height: 100%; min-height: 0;
+        overflow: hidden; padding: 8px 8px 6px;
+        display: flex; flex-direction: column; gap: 6px;
+        color: rgba(255,255,255,.88);
+        font-family: var(--font-ui);
+        user-select: none;
+        touch-action: pan-y;
+      }
+      .ad-viewport {
+        flex: 1; min-height: 0; overflow: hidden; position: relative;
+        border-radius: 8px;
+      }
+      .ad-track {
+        display: flex; width: 100%; height: 100%;
+        transition: transform .28s ease;
+        will-change: transform;
+      }
+      .ad-track.is-dragging { transition: none; }
+      .ad-page {
+        flex: 0 0 100%; width: 100%; height: 100%; min-width: 0;
+        display: flex; flex-direction: column; gap: 8px;
+        padding: 2px 4px 0; box-sizing: border-box;
+      }
+      .ad-section {
+        flex: 1; min-height: 0;
+        display: flex; flex-direction: column; gap: 6px;
+      }
+      .ad-section-title {
+        flex-shrink: 0; text-align: center;
+        font-size: 15px; font-weight: 700; letter-spacing: -0.02em;
+        color: #fff;
+      }
+      .ad-side-row {
+        flex: 1; min-height: 0;
+        display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+      }
+      .ad-limb {
+        min-width: 0; min-height: 0;
+        background: rgba(255,255,255,.045);
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 8px;
+        padding: 10px 12px;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        gap: 0; position: relative;
+      }
+      .ad-limb--front_left, .ad-limb--rear_left { border-top: 2px solid #5b9fd4; }
+      .ad-limb--front_right, .ad-limb--rear_right { border-top: 2px solid #f0663f; }
+      .ad-limb-id {
+        position: absolute; top: 8px; left: 0; right: 0;
+        text-align: center;
+        font-size: 13px; font-weight: 700; letter-spacing: -0.01em;
+        color: rgba(255,255,255,.62);
+      }
+      .ad-limb-nums {
+        display: flex; align-items: baseline; justify-content: center; gap: 8px;
+        font-variant-numeric: tabular-nums;
+        font-size: 28px; font-weight: 700; color: #fff; line-height: 1.1;
+        letter-spacing: -0.03em;
+      }
+      .ad-sep { color: rgba(255,255,255,.32); font-weight: 500; font-size: 0.85em; }
+      .ad-limb-empty {
+        font-size: 26px; font-weight: 600; color: rgba(255,255,255,.25);
+        text-align: center;
+      }
+      .ad-nav {
+        flex-shrink: 0;
+        display: grid;
+        grid-template-columns: 30px 1fr 30px;
+        align-items: center;
+        gap: 6px;
+        padding: 0 2px 2px;
+        min-height: 30px;
+      }
+      .ad-nav-spacer { width: 30px; height: 30px; }
+      .ad-nav-center {
+        display: flex; align-items: center; justify-content: center; gap: 10px;
+        min-width: 0;
+      }
+      .ad-nav-btn {
+        width: 28px; height: 28px; border-radius: 8px;
+        border: 1px solid rgba(255,255,255,.12);
+        background: rgba(255,255,255,.06); color: #fff;
+        font-size: 18px; line-height: 1; cursor: pointer;
+        display: inline-flex; align-items: center; justify-content: center;
+        padding: 0;
+      }
+      .ad-nav-btn:hover { background: rgba(255,255,255,.12); }
+      .ad-nav-btn:disabled { opacity: .35; cursor: default; }
+      .ad-dots { display: flex; align-items: center; gap: 6px; }
+      .ad-dot {
+        width: 7px; height: 7px; border-radius: 99px; padding: 0;
+        border: none; background: rgba(255,255,255,.22); cursor: pointer;
+      }
+      .ad-dot.is-active { background: #f0663f; width: 16px; }
+      .ad-autoplay {
+        width: 30px; height: 30px; border-radius: 8px; justify-self: end;
+        border: 1px solid rgba(255,255,255,.14);
+        background: rgba(255,255,255,.06); color: #fff;
+        font-size: 13px; line-height: 1; cursor: pointer;
+        display: inline-flex; align-items: center; justify-content: center;
+        padding: 0;
+      }
+      .ad-autoplay:hover { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.28); }
+      .ad-autoplay.is-playing { color: #ffb39a; }
+
       .ws-media-controls {
         flex-shrink: 0;
         display: flex;
@@ -825,6 +940,10 @@
           <label for="recDogWeight">몸무게 (kg)</label>
           <input id="recDogWeight" type="number" placeholder="kg" min="0" step="0.1" />
         </div>
+        <div class="field-col">
+          <label for="recDogHeight">신장 (cm)</label>
+          <input id="recDogHeight" type="number" placeholder="cm" min="0" step="0.1" />
+        </div>
       </div>
       <div class="controls">
         <button type="button" id="btnPressureRec" class="primary">● 압력판 녹화 시작</button>
@@ -1026,9 +1145,10 @@
           </div>
         </div>
         <div class="ws-cell" id="wsPane32">
-          <div class="ws-label" data-i18n="ws_label_32">3-2 · 보폭분석</div>
-          <div class="ws-body is-empty" data-slot="shadow" id="wsBody32">
-            <img id="wsShadowImg" alt="" />
+          <div class="ws-label" data-i18n="ws_label_32">3-2 · 각도 분석</div>
+          <div class="ws-body is-empty" data-slot="angle-diff" id="wsBody32">
+            <img id="wsShadowImg" alt="" hidden />
+            <div id="wsAngleDiff" class="ad-root" hidden></div>
           </div>
         </div>
       </section>
@@ -1181,7 +1301,7 @@
               </div>
             </div>
             <div class="ws-cell">
-              <div class="ws-label" data-i18n="ws_label_32">3-2 · 보폭분석</div>
+              <div class="ws-label" data-i18n="ws_label_32">3-2 · 각도 분석</div>
               <div class="ws-body is-empty" id="rpBody32" data-empty="">
                 <img id="rpStrideImg" alt="" />
               </div>

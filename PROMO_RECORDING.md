@@ -33,8 +33,8 @@ gait_project/
 ├── front_web/                 ← 이 앱 (본 문서 위치)
 └── dashboard_analysis/
     ├── ami_analysis/
-    │   ├── ami_origin.mp4          ← 2-1 촬영 원본
-    │   ├── ami_pressboard.mp4      ← (미사용 — 섹션1은 공통 foot2.gif)
+    │       ├── ami_origin.mp4          ← 2-1 촬영 원본
+    │   ├── ami_pressboard.mp4      ← 1 · 압력패드
     │   └── 175433/                 ← AI 결과 세션
     │       ├── result_video/*.mp4
     │       ├── result_angle_pawy/*_angle_pawy.mp4
@@ -80,14 +80,15 @@ gait_project/
 
 | 섹션 | UI 라벨 | Ami 파일 | Jenny 파일 |
 |------|---------|----------|------------|
-| **1** | 압력패드 | `gait_project/foot2.gif` (공통) | 동일 (`/promo-assets/foot2.gif`) |
+| **1** | 압력패드 | `ai-server/results/<date>/<time>/result_pressure/<stem>_pressure.mp4` | 동일 규칙 |
 | **2-1** | 촬영 영상 | `ami_origin.mp4` | `jenny_origin.mp4` |
 | **2-2** | 스켈레톤 분석 | `175433/result_video/...mp4` | `175517/result_video/...mp4` |
 | **3-1** | 각도 분석 | `..._angle_pawy.mp4` | `..._angle_pawy.mp4` |
 | **3-2** | 보폭분석 | `..._stride.png` | `..._stride.png` |
 
-**섹션 1:** 모든 프로모 공통으로 `gait_project/foot2.gif` (`PROMO_PRESSURE_GIF` / `/promo-assets/foot2.gif`).  
-애니메이션 GIF는 `<img>`에서 파일 루프 설정대로 반복 재생된다. pressboard mp4는 쓰지 않는다.
+**섹션 1:** `/api/ai-results/{date}/{time}/result_pressure/{stem}_pressure.mp4`  
+(로컬 파일: `ai-server/results/.../result_pressure/..._pressure.mp4`).  
+없으면 fallback `gait_project/foot2.gif` (`PROMO_PRESSURE_GIF`).
 
 리포트/사이드용(5칸 밖): `result_cyclogram`, `result_derived`, `result_keypoints`.
 
@@ -108,7 +109,6 @@ ami: {
   time: "175433",
   stem: "analyzed-1366x768-18s-29p92fps-260807-175433",
   originUpload: "/dashboard_analysis/ami_analysis/ami_origin.mp4",
-  pressureUrl: PROMO_PRESSURE_GIF,
   resultsBase: "/dashboard_analysis/ami_analysis/175433",
   dog: {
     name: { ko: "아미", en: "Ami" },
@@ -119,7 +119,10 @@ ami: {
 },
 ```
 
-Jenny 추가 시 (`pressureUrl` 생략 시에도 부팅에서 `PROMO_PRESSURE_GIF`로 채움):
+압력(섹션1)은 `resultsBase`와 무관하게 항상  
+`/api/ai-results/{date}/{time}/result_pressure/{stem}_pressure.mp4` 를 쓴다.
+
+Jenny 추가 시:
 
 ```ts
 jenny: {
