@@ -74,7 +74,7 @@ import {
   setPressureGif,
   setPressureMedia,
 } from "../ui/reviewPanes.js";
-import { angleDiffDemoUrl, loadAngleDiffPane } from "../ui/angleDiffPane.js";
+import { loadAngleDiffPane } from "../ui/angleDiffPane.js";
 import { SyncPlaybackDock } from "../ui/syncPlaybackDock.js";
 import { wireWorkspaceVideoControls } from "../ui/workspaceVideoControls.js";
 
@@ -190,11 +190,10 @@ function promoArtifactUrls(c: PromoCase): SessionArtifacts {
       url: promoAssetUrl(`${base}/result_stride/${c.stem}_stride.png`),
       filename: `${c.stem}_stride.png`,
     },
-    // Prefer result_angle_diff JSON when present on ai-server; demo fixture until then.
     angle_diff: {
       kind: "angle_diff",
       available: true,
-      url: angleDiffDemoUrl(),
+      url: promoAssetUrl(`${base}/result_angle_diff/${c.stem}_angle_diff.json`),
       filename: `${c.stem}_angle_diff.json`,
     },
     cyclogram: {
@@ -464,10 +463,6 @@ async function boot(): Promise<void> {
   const reportPage = reportPageEl ? new ReportPage(reportPageEl) : null;
   reportPage?.setApiBase(apiBase);
   clearReviewPanes();
-  // Local preview: 3-2 angle_diff UI from fixture (later: ai-server result_angle_diff URL).
-  void loadAngleDiffPane().catch((err) => {
-    console.warn("[angle_diff] demo load failed", err);
-  });
 
   wireAppHeader({
     onModuleChange: (mod) => {
@@ -573,7 +568,7 @@ async function boot(): Promise<void> {
     }
     setAnalysisVideo(analysisUrl);
 
-    // 3-1 angle_pawy 영상, 3-2 angle_diff JSON (result_angle_diff; local demo fallback)
+    // 3-1 angle_pawy 영상, 3-2 angle_diff JSON (result_angle_diff)
     const angle = artifacts?.angle_pawy;
     if (angle?.available && angle.url) {
       const abs =
@@ -583,15 +578,17 @@ async function boot(): Promise<void> {
       setMaxMinVideo(abs);
     }
     const angleDiff = artifacts?.angle_diff;
-    const angleDiffUrl =
-      angleDiff?.available && angleDiff.url
-        ? angleDiff.url.startsWith("http://") || angleDiff.url.startsWith("https://")
+    if (angleDiff?.available && angleDiff.url) {
+      const abs =
+        angleDiff.url.startsWith("http://") || angleDiff.url.startsWith("https://")
           ? angleDiff.url
-          : absolutizeResultUrl(apiBase, angleDiff.url)
-        : angleDiffDemoUrl();
-    void loadAngleDiffPane(angleDiffUrl).catch((err) => {
-      console.warn("[angle_diff] pane load failed", err);
-    });
+          : absolutizeResultUrl(apiBase, angleDiff.url);
+      void loadAngleDiffPane(abs).catch((err) => {
+        console.warn("[angle_diff] pane load failed", err);
+      });
+    } else {
+      void loadAngleDiffPane(null);
+    }
 
     // 1번 압력: result_pressure → explicit pressureUrl → pad-session GIF → placeholder
     const pressureArt = artifacts?.pressure;

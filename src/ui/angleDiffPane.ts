@@ -1,7 +1,7 @@
 /**
  * Pane 3-2: joint angle min/max (angle_diff JSON from ai-server result_angle_diff).
  * Carousel: one chain level per slide; each slide shows front + rear sections
- * with 왼쪽 / 오른쪽. Auto-advances every 2s.
+ * with 왼쪽 / 오른쪽. Auto-advances every 4s (toggleable).
  */
 
 export type AngleDiffJoint = {
@@ -44,15 +44,6 @@ const SLIDES: ReadonlyArray<{
 function fmtDeg(n: number | undefined | null): string {
   if (n == null || Number.isNaN(n)) return "–";
   return `${n.toFixed(0)}°`;
-}
-
-/** Demo fixture served from Vite `public/fixtures`. Later: ai-server result_angle_diff URL. */
-export function angleDiffDemoUrl(): string {
-  try {
-    return new URL("fixtures/angle_diff_demo.json", document.baseURI).href;
-  } catch {
-    return "fixtures/angle_diff_demo.json";
-  }
 }
 
 function bodyOf(id: string): HTMLElement {
@@ -356,8 +347,12 @@ export async function loadAngleDiffFromUrl(url: string): Promise<void> {
   renderAngleDiff(data);
 }
 
-/** Prefer session artifact URL; fall back to local demo fixture. */
+/** Load angle_diff JSON into 3-2. Pass null/empty to clear the pane. */
 export async function loadAngleDiffPane(url?: string | null): Promise<void> {
-  const target = url?.trim() || angleDiffDemoUrl();
+  const target = url?.trim();
+  if (!target) {
+    clearAngleDiffPane();
+    return;
+  }
   await loadAngleDiffFromUrl(target);
 }
