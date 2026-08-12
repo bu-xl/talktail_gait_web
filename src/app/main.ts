@@ -41,7 +41,7 @@ import { gaitSummaryToCsv } from "../export/gaitReportCsv.js";
 import { gaitSummaryToJson } from "../export/gaitJson.js";
 import { gaitReportToPdfBytes } from "../export/gaitReportPdf.js";
 import { pawTrackToCsv } from "../export/pawTrackCsv.js";
-import { wirePressureRecorder } from "../pressure/pressureRecorderUI.js";
+import { createPressureCsvController } from "../pressure/pressureRecorderUI.js";
 import { applyDocumentI18n, getLang, initI18n, onLangChange, setLang, t } from "../i18n/index.js";
 import type { LocaleKey } from "../i18n/locales.js";
 import {
@@ -618,9 +618,21 @@ async function boot(): Promise<void> {
       hubEl.className = "ok";
     }
     const mobile = peers?.mobile ?? false;
+    const camCount = peers?.mobileCount ?? (mobile ? 1 : 0);
+    const hasMain = peers?.main;
     if (mobileEl) {
-      mobileEl.textContent = mobile ? t("sync_mobile_connected") : t("sync_mobile_waiting");
-      mobileEl.className = mobile ? "ok" : "wait";
+      if (!mobile) {
+        mobileEl.textContent = t("sync_mobile_waiting");
+        mobileEl.className = "wait";
+      } else if (hasMain === false) {
+        // 카메라는 있으나 Main 없음 → 분석 대상 없음 경고.
+        mobileEl.textContent = `카메라 ${camCount}대 · Main 없음`;
+        mobileEl.className = "wait";
+      } else {
+        mobileEl.textContent =
+          camCount > 1 ? `${t("sync_mobile_connected")} · ${camCount}대` : t("sync_mobile_connected");
+        mobileEl.className = "ok";
+      }
     }
     if (mobile && !syncPlaybackActive && cameraPlayer.getMode() === "idle") {
       cameraPlayer.showIdle(t("camera_preview_receiving"));
@@ -932,6 +944,19 @@ async function boot(): Promise<void> {
     }
   };
 
+  // 세션 종료 시 압력판 CSV 업로드 + 저장 CSV 목록. 강아지 정보는 "반려견" 입력란에서 읽는다.
+  const pressureCsv = createPressureCsvController({
+    apiBase,
+    frameCount: () => recorder.frameCount,
+    durationSec: () => recorder.durationSec,
+    fps: () => recorder.fps,
+    buildCsv: () => framesToCanineGaitCsv(recorder.getFrames(), GRID_ROWS, GRID_COLS),
+    rows: GRID_ROWS,
+    cols: GRID_COLS,
+    // 동기 촬영 세션과 같은 sessionId 로 묶어 back 이 영상+CSV 를 한 세션으로 연결하게 한다.
+    sessionId: () => syncSessionId,
+  });
+
   const startLocalRecording = (wallAnchorMs?: number): void => {
     syncDock.stop();
     syncDock.hide();
@@ -950,6 +975,8 @@ async function boot(): Promise<void> {
 
   const stopLocalRecording = (): void => {
     recorder.stop();
+    // 세션 종료 → 캡처된 압력 프레임을 CSV 로 서버에 저장(프레임 없으면 내부에서 무시).
+    pressureCsv.uploadRecorded();
     setExportsEnabled(recorder.frameCount > 0);
     displayMode = "hold";
     const myToken = ++holdToken;
@@ -963,20 +990,6 @@ async function boot(): Promise<void> {
     updateRecordingStatus();
     persistSettings();
   };
-
-  // 압력판 녹화 → CSV 업로드 → 저장 기록 열람 (기존 흐름과 독립적인 로컬 전용 기능).
-  wirePressureRecorder({
-    apiBase,
-    startLocalRecording,
-    stopLocalRecording,
-    isRecording: () => recorder.isRecording,
-    frameCount: () => recorder.frameCount,
-    durationSec: () => recorder.durationSec,
-    fps: () => recorder.fps,
-    buildCsv: () => framesToCanineGaitCsv(recorder.getFrames(), GRID_ROWS, GRID_COLS),
-    rows: GRID_ROWS,
-    cols: GRID_COLS,
-  });
 
   const gaitSync = new GaitSyncSocket({ wsUrl: resolveWsUrl(), roomId: resolveRoomId() });
   gaitSync.onConnectionChange((connected) => {
@@ -1150,13 +1163,59 @@ async function boot(): Promise<void> {
     scheduleSimulateReview();
   };
 
+  /**
+   * 측정 시작 전 ~1초 빈-매트 Zero/Baseline 보정.
+   * 무하중 RAW 로 센서별 median baseline 을 만들어 이후 측정에서 (baseline − raw)
+   * 신호가 정확히 잡히게 한다. 그동안 "매트에서 내려주세요" 안내를 띄운다.
+   */
+  const runZeroCalibration = async (): Promise<void> => {
+    const hz = measuredHz > 1 ? measuredHz : 43;
+    const seconds = Math.max(0.5, config.baseline.collect_seconds >= 1 ? 1 : config.baseline.collect_seconds);
+    pipeline.beginBaseline(hz, seconds);
+    liveBaseline = null;
+    liveTracker.reset();
+    latestOverlay = null;
+    clearOverlay();
+
+    const startAt = performance.now();
+    sessionOverlay.classList.add("show");
+    const titleEl = $("sessionOverlayTitle");
+    const subEl = $("sessionOverlaySub");
+    titleEl.textContent = "측정 준비 중";
+    // 타이머로 진행률/완료를 구동한다(백그라운드 탭에서 rAF 가 멈춰도 항상 종료됨).
+    await new Promise<void>((resolve) => {
+      let done = false;
+      const finish = (): void => {
+        if (done) return;
+        done = true;
+        window.clearInterval(iv);
+        subEl.textContent = "매트 위 모든 물체를 제거해주세요 · 영점 보정 100%";
+        resolve();
+      };
+      const iv = window.setInterval(() => {
+        const elapsed = (performance.now() - startAt) / 1000;
+        const pct = Math.min(100, Math.round((elapsed / seconds) * 100));
+        subEl.textContent = `매트 위 모든 물체를 제거해주세요 · 영점 보정 ${pct}%`;
+        if (elapsed >= seconds) finish();
+      }, 100);
+      window.setTimeout(finish, seconds * 1000 + 60);
+    });
+    // 창이 끝나면 수집을 마감(빈 매트 프레임이 없었으면 fallback baseline 유지).
+    pipeline.finishBaseline();
+  };
+
   sessionBtn.addEventListener("click", () => {
     if (sessionPhase === "recording") {
       stopClinicSession();
       return;
     }
     if (sessionPhase === "analyzing") return;
-    startClinicSession();
+    // 시작 → 1초 영점 보정 후 기존 세션 시작 흐름 진행.
+    sessionBtn.disabled = true;
+    void runZeroCalibration().finally(() => {
+      sessionBtn.disabled = false;
+      startClinicSession();
+    });
   });
 
   onClick("btnRecord", () => {
@@ -1632,6 +1691,21 @@ function updateStats(
   $("statCal").textContent =
     frame.state === "calibrated" ? t("cal_calibrated") : t("cal_uncalibrated");
   $("statCal").className = frame.state === "calibrated" ? "ok" : "warn";
+
+  // 압력패드 섹션 아래 간이 요약(요소가 있을 때만).
+  const setOpt = (id: string, text: string): void => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  };
+  const calibrated = frame.state === "calibrated";
+  setOpt("padSumPeak", `${f1(frame.stats.maxPressure)} ${u}`);
+  setOpt("padSumAvg", `${f1(frame.stats.avgPressure)} ${u}`);
+  setOpt("padSumContact", `${f1(frame.stats.contactAreaCm2)} cm²`);
+  const stateEl = document.getElementById("padSumState");
+  if (stateEl) {
+    stateEl.textContent = calibrated ? "보정됨 (kPa)" : "상대값 (미보정)";
+    stateEl.className = calibrated ? "ok" : "warn";
+  }
 }
 
 const DIRECTION_LABEL_KEY: Record<GaitSummary["direction"], LocaleKey> = {

@@ -40,14 +40,29 @@ export class ProcessingPipeline {
     );
   }
 
-  /** Begin baseline collection for `approxFps` * collect_seconds frames. */
-  beginBaseline(approxFps: number): void {
+  /**
+   * Begin baseline collection for `approxFps` * seconds frames.
+   * `seconds` defaults to config.baseline.collect_seconds (e.g. the manual
+   * calibrate button); the auto zero-calibration on session start passes ~1s.
+   */
+  beginBaseline(approxFps: number, seconds = this.config.baseline.collect_seconds): void {
     this.collecting = true;
-    this.framesNeeded = Math.max(1, Math.round(approxFps * this.config.baseline.collect_seconds));
+    this.framesNeeded = Math.max(1, Math.round(approxFps * seconds));
   }
 
   get isCalibrated(): boolean {
     return this.calibrator.calibratedBaseline;
+  }
+
+  /**
+   * Stop baseline collection now, building the baseline from whatever unloaded
+   * frames were seen so far. Called when the fixed zero-calibration window ends,
+   * so that later (loaded) recording frames are never consumed as baseline.
+   */
+  finishBaseline(): void {
+    if (!this.collecting) return;
+    this.calibrator.finalizeBaseline();
+    this.collecting = false;
   }
 
   /** Process one raw matrix into a render-ready, analysed frame. */

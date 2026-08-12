@@ -5,7 +5,16 @@
 
 import { joinApiUrl } from "../config/apiUrl.js";
 
-export type SyncPeers = { web: boolean; mobile: boolean };
+export type SyncPeers = {
+  web: boolean;
+  mobile: boolean;
+  /** 연결된 카메라 폰 수 (Main + Sub). 구버전 서버는 없음. */
+  mobileCount?: number;
+  /** Main 카메라 접속 여부 (분석 대상). */
+  main?: boolean;
+  /** Sub 카메라 수. */
+  subCount?: number;
+};
 
 export type SyncMessage =
   | { type: "joined"; role: string; roomId: string; peers: SyncPeers; serverNow: number }

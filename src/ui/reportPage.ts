@@ -510,7 +510,14 @@ export class ReportPage {
     if (!detail) return;
 
     setReviewEmptyHints();
+    // 압력패드: DB 에 pressure mp4 가 있으면 재생, 없으면 빈 상태.
+    const pressureUrl = detail.report.pressure?.available ? detail.report.pressure.url : null;
     setReviewMedia("rpBody1", document.getElementById("rpPressureGif") as HTMLImageElement, null);
+    setReviewMedia(
+      "rpBody1",
+      document.getElementById("rpPressureVideo") as HTMLVideoElement,
+      pressureUrl,
+    );
     setReviewMedia(
       "rpBody21",
       document.getElementById("rpOriginVideo") as HTMLVideoElement,

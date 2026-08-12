@@ -36,6 +36,8 @@ export type UploadPressureInput = {
   csv: string;
   dog: { name?: string; breed?: string; weightKg?: number | null };
   recording?: Partial<PressureRecording>;
+  /** 동기 촬영 세션 id — back 에서 영상과 CSV 를 한 세션으로 묶는다. */
+  sessionId?: string | null;
 };
 
 /** 녹화 CSV + 메타데이터를 업로드한다. 저장된 레코드를 반환. */
@@ -58,6 +60,7 @@ export async function uploadPressureCsv(
     if (v != null && Number.isFinite(v)) form.append(key, String(v));
   }
   if (rec.startedAt) form.append("startedAt", rec.startedAt);
+  if (input.sessionId) form.append("sessionId", input.sessionId);
 
   const res = await fetch(joinApiUrl(apiBaseUrl, "/api/pressure/records"), {
     method: "POST",

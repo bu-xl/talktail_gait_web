@@ -83,6 +83,8 @@ export type ResultDetail = {
     cyclogram?: MediaArtifact;
     stride?: MediaArtifact;
     angle_pawy?: MediaArtifact;
+    /** 압력 히트맵 mp4 (CSV 동봉 분석 시에만 존재) */
+    pressure?: MediaArtifact;
   };
 };
 
@@ -142,6 +144,7 @@ export async function getResultDetail(
     cyclogram: absArtifact(detail.report?.cyclogram),
     stride: absArtifact(detail.report?.stride),
     angle_pawy: absArtifact(detail.report?.angle_pawy),
+    pressure: absArtifact(detail.report?.pressure),
   };
   return detail;
 }

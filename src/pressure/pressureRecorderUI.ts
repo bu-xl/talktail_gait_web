@@ -1,13 +1,12 @@
 /**
- * 압력판 녹화 → CSV 업로드 → 저장 기록 열람 UI 컨트롤러.
+ * 압력판 CSV 저장/열람 컨트롤러.
  *
- * 기존 임상(clinic) 세션/카메라 동기화 흐름과 독립적으로 동작하는 로컬 전용 기능이다.
- * 강아지 이름/견종/체중을 입력받아 로컬 녹화를 시작/종료하고, 종료 시 canine_gait
- * 호환 CSV 를 백엔드(`back/pressure_data`)로 업로드한다. 저장된 CSV 는 목록에서
- * 열람/다운로드할 수 있다.
+ * 기존 세션 흐름(시작 버튼 → 영상 + 압력판 동시 녹화)을 그대로 두고, 세션이 종료될 때
+ * 캡처된 압력 프레임을 canine_gait 호환 CSV 로 만들어 백엔드(`back/pressure_data`)에
+ * 업로드한다. 강아지 이름/견종/몸무게는 "반려견" 입력란(#dogName/#dogBreed/#dogWeightInfo)
+ * 에서 읽는다. 저장된 CSV 는 "저장된 CSV" 목록에서 열람/다운로드할 수 있다.
  *
- * 기존 코드를 건드리지 않기 위해 필요한 의존성(recorder, 로컬 녹화 시작/종료,
- * CSV 빌더)을 주입받는다.
+ * 별도의 압력판 전용 녹화 UI 는 없다 — 업로드는 세션 종료 훅에서만 일어난다.
  */
 
 import {
@@ -17,14 +16,8 @@ import {
   type PressureRecord,
 } from "../api/pressureApi.js";
 
-export interface PressureRecorderDeps {
+export interface PressureCsvDeps {
   apiBase: string;
-  /** 로컬 녹화 시작(카메라 동기화 없이). */
-  startLocalRecording: () => void;
-  /** 로컬 녹화 종료. */
-  stopLocalRecording: () => void;
-  /** 현재 녹화 중인지(모든 흐름 공유 recorder 기준). */
-  isRecording: () => boolean;
   /** 캡처된 프레임 수. */
   frameCount: () => number;
   /** 캡처 길이(초). */
@@ -36,111 +29,40 @@ export interface PressureRecorderDeps {
   /** 그리드 크기(메타데이터용). */
   rows: number;
   cols: number;
+  /** 동기 촬영 세션 id (영상과 CSV 를 back 에서 한 세션으로 묶기 위함). */
+  sessionId?: () => string | null;
+}
+
+export interface PressureCsvController {
+  /** 세션 종료 시 호출 — 프레임이 있으면 CSV 를 만들어 업로드하고 목록을 갱신한다. */
+  uploadRecorded: () => void;
+  /** 저장된 CSV 목록 새로고침. */
+  refresh: () => Promise<void>;
 }
 
 const $ = (id: string): HTMLElement | null => document.getElementById(id);
 
-export function wirePressureRecorder(deps: PressureRecorderDeps): void {
-  const recBtn = $("btnPressureRec") as HTMLButtonElement | null;
-  const refreshBtn = $("btnPressureRefresh") as HTMLButtonElement | null;
+function readDogInfo(): { name?: string; breed?: string; weightKg?: number | null } {
+  const name = ($("dogName") as HTMLInputElement | null)?.value?.trim() || undefined;
+  const breed = ($("dogBreed") as HTMLInputElement | null)?.value?.trim() || undefined;
+  const weightRaw = ($("dogWeightInfo") as HTMLInputElement | null)?.value?.trim();
+  let weightKg: number | null = null;
+  if (weightRaw) {
+    const n = Number(weightRaw);
+    weightKg = Number.isFinite(n) && n > 0 ? n : null;
+  }
+  return { name, breed, weightKg };
+}
+
+export function createPressureCsvController(deps: PressureCsvDeps): PressureCsvController {
   const statusEl = $("pressureRecStatus");
   const listEl = $("pressureRecList") as HTMLUListElement | null;
-  const nameInput = $("recDogName") as HTMLInputElement | null;
-  const breedInput = $("recDogBreed") as HTMLInputElement | null;
-  const weightInput = $("recDogWeight") as HTMLInputElement | null;
-
-  // 필수 UI 가 없으면(HTML 미포함) 조용히 종료 — 기존 동작에 영향 없음.
-  if (!recBtn) return;
-
-  /** 이 UI 가 시작한 녹화인지 표시(다른 흐름의 녹화와 구분). */
-  let activeSession = false;
-  let busy = false;
+  const refreshBtn = $("btnPressureRefresh") as HTMLButtonElement | null;
 
   const setStatus = (text: string, kind: "" | "ok" | "warn" | "bad" = ""): void => {
     if (!statusEl) return;
     statusEl.textContent = text;
     statusEl.className = `rec-status ${kind}`.trim();
-  };
-
-  const setInputsDisabled = (disabled: boolean): void => {
-    for (const el of [nameInput, breedInput, weightInput]) {
-      if (el) el.disabled = disabled;
-    }
-  };
-
-  const syncButton = (): void => {
-    recBtn.textContent = activeSession ? "■ 녹화 종료 · 저장" : "● 압력판 녹화 시작";
-    recBtn.classList.toggle("recording", activeSession);
-  };
-
-  const readWeight = (): number | null => {
-    const v = weightInput?.value?.trim();
-    if (!v) return null;
-    const n = Number(v);
-    return Number.isFinite(n) && n > 0 ? n : null;
-  };
-
-  const startSession = (): void => {
-    if (busy) return;
-    if (deps.isRecording()) {
-      setStatus("이미 다른 녹화가 진행 중입니다.", "warn");
-      return;
-    }
-    if (!nameInput?.value?.trim()) {
-      setStatus("강아지 이름을 입력해 주세요.", "warn");
-      nameInput?.focus();
-      return;
-    }
-    deps.startLocalRecording();
-    activeSession = true;
-    setInputsDisabled(true);
-    setStatus("녹화 중… 종료를 누르면 CSV 로 저장됩니다.", "warn");
-    syncButton();
-  };
-
-  const stopAndUpload = async (): Promise<void> => {
-    if (busy) return;
-    deps.stopLocalRecording();
-    activeSession = false;
-    syncButton();
-
-    const frames = deps.frameCount();
-    if (frames < 2) {
-      setInputsDisabled(false);
-      setStatus("녹화된 프레임이 부족해 저장하지 않았습니다.", "bad");
-      return;
-    }
-
-    busy = true;
-    recBtn.disabled = true;
-    setStatus(`업로드 중… (${frames} 프레임)`, "warn");
-    try {
-      const csv = deps.buildCsv();
-      const record = await uploadPressureCsv(deps.apiBase, {
-        csv,
-        dog: {
-          name: nameInput?.value?.trim() || undefined,
-          breed: breedInput?.value?.trim() || undefined,
-          weightKg: readWeight(),
-        },
-        recording: {
-          frames,
-          durationSec: deps.durationSec(),
-          fps: deps.fps(),
-          rows: deps.rows,
-          cols: deps.cols,
-          startedAt: new Date().toISOString(),
-        },
-      });
-      setStatus(`저장 완료: ${record.csv.filename}`, "ok");
-      await refreshList();
-    } catch (err) {
-      setStatus(err instanceof Error ? err.message : String(err), "bad");
-    } finally {
-      busy = false;
-      recBtn.disabled = false;
-      setInputsDisabled(false);
-    }
   };
 
   const fmtDate = (iso: string): string => {
@@ -197,11 +119,10 @@ export function wirePressureRecorder(deps: PressureRecorderDeps): void {
     }
   };
 
-  const refreshList = async (): Promise<void> => {
+  const refresh = async (): Promise<void> => {
     if (!listEl) return;
     try {
-      const records = await listPressureRecords(deps.apiBase);
-      renderList(records);
+      renderList(await listPressureRecords(deps.apiBase));
     } catch (err) {
       listEl.innerHTML = "";
       const li = document.createElement("li");
@@ -211,12 +132,48 @@ export function wirePressureRecorder(deps: PressureRecorderDeps): void {
     }
   };
 
-  recBtn.addEventListener("click", () => {
-    if (activeSession) void stopAndUpload();
-    else startSession();
-  });
-  refreshBtn?.addEventListener("click", () => void refreshList());
+  let busy = false;
+  const uploadRecorded = (): void => {
+    if (busy) return;
+    const frames = deps.frameCount();
+    if (frames < 2) return; // 데이터가 없으면 조용히 무시(기존 흐름 방해 금지).
 
-  syncButton();
-  void refreshList();
+    // CSV 문자열/메타데이터는 recorder 가 다음 녹화로 초기화되기 전에 즉시 확보한다.
+    let csv: string;
+    try {
+      csv = deps.buildCsv();
+    } catch {
+      return;
+    }
+    const dog = readDogInfo();
+    // sessionId 는 record_stop 에서 null 로 지워지기 전에 지금 즉시 확보한다.
+    const sessionId = deps.sessionId?.() ?? null;
+    const recording = {
+      frames,
+      durationSec: deps.durationSec(),
+      fps: deps.fps(),
+      rows: deps.rows,
+      cols: deps.cols,
+      startedAt: new Date().toISOString(),
+    };
+
+    busy = true;
+    setStatus(`CSV 업로드 중… (${frames} 프레임)`, "warn");
+    void uploadPressureCsv(deps.apiBase, { csv, dog, recording, sessionId })
+      .then(async (record) => {
+        setStatus(`CSV 저장 완료: ${record.csv.filename}`, "ok");
+        await refresh();
+      })
+      .catch((err) => {
+        setStatus(`CSV 저장 실패: ${err instanceof Error ? err.message : String(err)}`, "bad");
+      })
+      .finally(() => {
+        busy = false;
+      });
+  };
+
+  refreshBtn?.addEventListener("click", () => void refresh());
+  void refresh();
+
+  return { uploadRecorded, refresh };
 }
