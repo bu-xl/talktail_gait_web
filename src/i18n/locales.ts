@@ -232,6 +232,7 @@ export const LOCALES = {
     report_review_analysis_empty: "분석 영상 없음",
     report_review_angle_empty: "각도 영상 없음",
     report_review_stride_empty: "보폭 이미지 없음",
+    report_review_angle_diff_empty: "각도 데이터 없음",
 
     ws_label_1: "1 · 압력패드",
     ws_label_21: "2-1 · 촬영 영상",
@@ -546,6 +547,7 @@ export const LOCALES = {
     report_review_analysis_empty: "No analysis video",
     report_review_angle_empty: "No angle video",
     report_review_stride_empty: "No stride image",
+    report_review_angle_diff_empty: "No angle data",
 
     ws_label_1: "1 · Pressure pad",
     ws_label_21: "2-1 · Capture video",

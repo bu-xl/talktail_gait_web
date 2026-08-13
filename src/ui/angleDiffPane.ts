@@ -53,18 +53,45 @@ function fmtDeg(n: number | undefined | null): string {
   return `${n.toFixed(0)}°`;
 }
 
+/**
+ * 이 패널이 붙을 자리. 측정 화면과 리포트 "영상보기" 오버레이가 **같은 렌더러**를 쓰되
+ * 서로 다른 DOM 에 그린다 — 두 화면이 갈라지지 않게 하려면 여기만 늘리면 된다.
+ */
+export type AngleDiffTarget = {
+  /** 패널을 담을 `.ws-body` 요소 id. */
+  bodyId: string;
+  /** 캐러셀 루트 `.ad-root` 요소 id (없으면 만들어 붙인다). */
+  rootId: string;
+  /** 같은 칸에 남아 있는 예전 이미지(stride PNG 등) id — 그릴 때 숨긴다. */
+  legacyImageId?: string;
+};
+
+/** 측정 화면 3-2. */
+export const MAIN_ANGLE_DIFF_TARGET: AngleDiffTarget = {
+  bodyId: "wsBody32",
+  rootId: "wsAngleDiff",
+  legacyImageId: "wsShadowImg",
+};
+
+/** 리포트 → "영상보기" 오버레이 3-2. */
+export const REVIEW_ANGLE_DIFF_TARGET: AngleDiffTarget = {
+  bodyId: "rpBody32",
+  rootId: "rpAngleDiff",
+  legacyImageId: "rpStrideImg",
+};
+
 function bodyOf(id: string): HTMLElement {
   const el = document.getElementById(id);
   if (!el) throw new Error(`#${id} missing`);
   return el;
 }
 
-function ensureRoot(): HTMLElement {
-  const body = bodyOf("wsBody32");
-  let root = document.getElementById("wsAngleDiff");
+function ensureRoot(target: AngleDiffTarget): HTMLElement {
+  const body = bodyOf(target.bodyId);
+  let root = document.getElementById(target.rootId);
   if (!root) {
     root = document.createElement("div");
-    root.id = "wsAngleDiff";
+    root.id = target.rootId;
     root.className = "ad-root";
     root.setAttribute("hidden", "");
     body.appendChild(root);
@@ -72,30 +99,41 @@ function ensureRoot(): HTMLElement {
   return root;
 }
 
-function hideLegacyImage(): void {
-  const img = document.getElementById("wsShadowImg") as HTMLImageElement | null;
+function hideLegacyImage(target: AngleDiffTarget): void {
+  if (!target.legacyImageId) return;
+  const img = document.getElementById(target.legacyImageId) as HTMLImageElement | null;
   if (!img) return;
   img.removeAttribute("src");
   img.setAttribute("hidden", "");
 }
 
-let autoTimer: number | null = null;
-/** 언어 전환 시 다시 그리기 위해 마지막 리포트를 들고 있는다. */
-let lastReport: AngleDiffReport | null = null;
+/** 자리마다 독립적인 상태(자동재생 타이머 + 마지막 리포트). */
+type PaneState = { timer: number | null; report: AngleDiffReport | null };
+const states = new Map<string, PaneState>();
 let langHookInstalled = false;
 
-function stopAutoplay(): void {
-  if (autoTimer != null) {
-    window.clearInterval(autoTimer);
-    autoTimer = null;
+function stateOf(target: AngleDiffTarget): PaneState {
+  let st = states.get(target.rootId);
+  if (!st) {
+    st = { timer: null, report: null };
+    states.set(target.rootId, st);
+  }
+  return st;
+}
+
+function stopAutoplay(target: AngleDiffTarget): void {
+  const st = stateOf(target);
+  if (st.timer != null) {
+    window.clearInterval(st.timer);
+    st.timer = null;
   }
 }
 
-export function clearAngleDiffPane(): void {
-  stopAutoplay();
-  lastReport = null;
-  const body = bodyOf("wsBody32");
-  const root = document.getElementById("wsAngleDiff");
+export function clearAngleDiffPane(target: AngleDiffTarget = MAIN_ANGLE_DIFF_TARGET): void {
+  stopAutoplay(target);
+  stateOf(target).report = null;
+  const body = bodyOf(target.bodyId);
+  const root = document.getElementById(target.rootId);
   if (root) {
     root.innerHTML = "";
     root.setAttribute("hidden", "");
@@ -164,18 +202,29 @@ function buildSection(
   return section;
 }
 
-export function renderAngleDiff(report: AngleDiffReport): void {
-  stopAutoplay();
-  lastReport = report;
+export function renderAngleDiff(
+  report: AngleDiffReport,
+  target: AngleDiffTarget = MAIN_ANGLE_DIFF_TARGET,
+): void {
+  stopAutoplay(target);
+  stateOf(target).report = report;
   if (!langHookInstalled) {
     langHookInstalled = true;
     onLangChange(() => {
-      if (lastReport) renderAngleDiff(lastReport);
+      // 열려 있는 모든 자리를 현재 언어로 다시 그린다.
+      for (const [rootId, st] of states) {
+        if (!st.report) continue;
+        const tgt =
+          rootId === REVIEW_ANGLE_DIFF_TARGET.rootId
+            ? REVIEW_ANGLE_DIFF_TARGET
+            : MAIN_ANGLE_DIFF_TARGET;
+        renderAngleDiff(st.report, tgt);
+      }
     });
   }
-  hideLegacyImage();
-  const body = bodyOf("wsBody32");
-  const root = ensureRoot();
+  hideLegacyImage(target);
+  const body = bodyOf(target.bodyId);
+  const root = ensureRoot(target);
   root.removeAttribute("hidden");
   root.innerHTML = "";
 
@@ -287,9 +336,9 @@ export function renderAngleDiff(report: AngleDiffReport): void {
   };
 
   const restartAutoplay = (): void => {
-    stopAutoplay();
+    stopAutoplay(target);
     if (!autoplayOn || dragging) return;
-    autoTimer = window.setInterval(() => {
+    stateOf(target).timer = window.setInterval(() => {
       setIndex(index + 1);
     }, AUTO_MS);
   };
@@ -304,7 +353,7 @@ export function renderAngleDiff(report: AngleDiffReport): void {
     autoplayOn = !autoplayOn;
     syncAutoBtn();
     if (autoplayOn) restartAutoplay();
-    else stopAutoplay();
+    else stopAutoplay(target);
   });
 
   prev.addEventListener("click", () => go(index - 1));
@@ -317,7 +366,7 @@ export function renderAngleDiff(report: AngleDiffReport): void {
     "pointerdown",
     (ev) => {
       dragging = true;
-      stopAutoplay();
+      stopAutoplay(target);
       startX = ev.clientX;
       dragX = 0;
       viewport.setPointerCapture(ev.pointerId);
@@ -356,22 +405,28 @@ export function renderAngleDiff(report: AngleDiffReport): void {
   body.classList.remove("is-empty");
 }
 
-export async function loadAngleDiffFromUrl(url: string): Promise<void> {
+export async function loadAngleDiffFromUrl(
+  url: string,
+  target: AngleDiffTarget = MAIN_ANGLE_DIFF_TARGET,
+): Promise<void> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`angle_diff fetch ${res.status}: ${url}`);
   const data = (await res.json()) as AngleDiffReport;
   if (!data?.joints || typeof data.joints !== "object") {
     throw new Error("angle_diff JSON missing joints");
   }
-  renderAngleDiff(data);
+  renderAngleDiff(data, target);
 }
 
-/** Load angle_diff JSON into 3-2. Pass null/empty to clear the pane. */
-export async function loadAngleDiffPane(url?: string | null): Promise<void> {
-  const target = url?.trim();
-  if (!target) {
-    clearAngleDiffPane();
+/** Load angle_diff JSON into a 3-2 pane. Pass null/empty to clear it. */
+export async function loadAngleDiffPane(
+  url?: string | null,
+  target: AngleDiffTarget = MAIN_ANGLE_DIFF_TARGET,
+): Promise<void> {
+  const src = url?.trim();
+  if (!src) {
+    clearAngleDiffPane(target);
     return;
   }
-  await loadAngleDiffFromUrl(target);
+  await loadAngleDiffFromUrl(src, target);
 }

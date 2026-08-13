@@ -18,6 +18,11 @@ import { hasDogInfo } from "../api/analyzeApi.js";
 import { onLangChange, t } from "../i18n/index.js";
 import { LOCALES, type Lang, type LocaleKey } from "../i18n/locales.js";
 import { openDogInfoModal } from "./dogInfoModal.js";
+import {
+  clearAngleDiffPane,
+  loadAngleDiffPane,
+  REVIEW_ANGLE_DIFF_TARGET,
+} from "./angleDiffPane.js";
 
 type Step = "dates" | "sessions" | "detail";
 type ReportLang = "ko" | "en";
@@ -559,11 +564,15 @@ export class ReportPage {
       document.getElementById("rpAngleVideo") as HTMLVideoElement,
       detail.report.angle_pawy?.available ? detail.report.angle_pawy.url : null,
     );
-    setReviewMedia(
-      "rpBody32",
-      document.getElementById("rpStrideImg") as HTMLImageElement,
-      detail.report.stride?.available ? detail.report.stride.url : null,
-    );
+    // 3-2 는 측정 화면과 같은 각도 캐러셀(angle_diff JSON)이다 — 예전 stride PNG 가 아니다.
+    const angleDiffUrl =
+      detail.report.angle_diff?.available && detail.report.angle_diff.url
+        ? detail.report.angle_diff.url
+        : null;
+    void loadAngleDiffPane(angleDiffUrl, REVIEW_ANGLE_DIFF_TARGET).catch((err) => {
+      console.warn("[angle_diff] review pane load failed", err);
+      clearAngleDiffPane(REVIEW_ANGLE_DIFF_TARGET);
+    });
 
     // 저장된 반려견 정보가 있을 때만 "정보" 버튼을 띄운다(레이아웃은 그대로 둔다).
     if (this.reviewInfoBtn) {
@@ -605,6 +614,8 @@ export class ReportPage {
       v.removeAttribute("src");
       v.load();
     }
+    // 3-2 는 캐러셀이라 자동재생 타이머까지 걷어내야 한다(닫아 두고 계속 돌면 안 된다).
+    clearAngleDiffPane(REVIEW_ANGLE_DIFF_TARGET);
     const img = document.getElementById("rpStrideImg") as HTMLImageElement | null;
     img?.removeAttribute("src");
     const gif = document.getElementById("rpPressureGif") as HTMLImageElement | null;
@@ -740,7 +751,7 @@ function setReviewEmptyHints(): void {
     rpBody21: "report_review_origin_empty",
     rpBody22: "report_review_analysis_empty",
     rpBody31: "report_review_angle_empty",
-    rpBody32: "report_review_stride_empty",
+    rpBody32: "report_review_angle_diff_empty",
   };
   for (const [id, key] of Object.entries(map)) {
     const el = document.getElementById(id);
