@@ -261,6 +261,63 @@ export const LOCALES = {
     dog_info_title: "반려견 정보",
     dog_info_empty: "입력된 반려견 정보가 없습니다.",
     dog_info_close: "닫기",
+
+    /* 3-2 · 각도 분석 캐러셀 (관절 이름은 수의 해부학 용어) */
+    ad_shoulder: "어깨",
+    ad_hip: "고관절",
+    ad_elbow: "팔꿈치",
+    ad_knee: "무릎",
+    ad_carpus: "앞발목",
+    ad_tarsus: "뒷발목",
+    ad_front_paw: "앞발",
+    ad_rear_paw: "뒷발",
+    ad_left: "왼쪽",
+    ad_right: "오른쪽",
+    ad_prev: "이전",
+    ad_next: "다음",
+    ad_autoplay_stop: "자동 슬라이드 정지",
+    ad_autoplay_start: "자동 슬라이드 시작",
+
+    /* 압력패드 하단 요약 */
+    pad_sum_state: "상태",
+    pad_sum_peak: "최고 압력",
+    pad_sum_avg: "평균 압력",
+    pad_sum_contact: "접촉 면적",
+    pad_state_calibrated: "보정됨 (kPa)",
+    pad_state_relative: "상대값 (미보정)",
+
+    /* 사이드 레일 · 저장된 CSV */
+    section_saved_csv: "저장된 CSV",
+    csv_list_empty: "저장된 기록이 없습니다.",
+    csv_no_name: "(이름 없음)",
+    btn_view: "보기",
+    btn_download: "다운로드",
+    csv_uploading: "CSV 업로드 중… ({{n}} 프레임)",
+    csv_upload_done: "CSV 저장 완료: {{name}}",
+    csv_upload_failed: "CSV 저장 실패: {{msg}}",
+
+    /* 공통 컨트롤 */
+    btn_play: "재생",
+    btn_pause: "정지",
+    side_toggle_open: "컨트롤 패널 열기",
+    side_toggle_close: "컨트롤 패널 접기",
+
+    /* 시작 직전 영점 보정 안내 */
+    zero_cal_title: "측정 준비 중",
+    zero_cal_sub: "매트 위 모든 물체를 제거해주세요 · 영점 보정 {{pct}}%",
+
+    /* 카메라 연결 상태 */
+    sync_no_main: "카메라 {{n}}대 · Main 없음",
+    sync_mobile_connected_n: "휴대 앱 연결됨 · {{n}}대",
+
+    /* 시뮬레이션 모드(VITE_SIMULATE_AI) */
+    promo_loading: "프로모 로딩… ({{id}})",
+    promo_ready: "프로모 준비됨 · {{id}}",
+    promo_failed: "프로모 로드 실패: {{msg}}",
+
+    sim_preparing: "시뮬레이션 결과 준비 중…",
+    sim_recording: "시뮬레이션 녹화 중…",
+    sim_done: "시뮬레이션 완료 (VITE_SIMULATE_AI)",
   },
   en: {
     docTitle: "Talktail Gait",
@@ -518,5 +575,62 @@ export const LOCALES = {
     dog_info_title: "Dog info",
     dog_info_empty: "No dog info was entered.",
     dog_info_close: "Close",
+
+    /* 3-2 · angle analysis carousel (veterinary joint names) */
+    ad_shoulder: "Shoulder",
+    ad_hip: "Hip",
+    ad_elbow: "Elbow",
+    ad_knee: "Stifle",
+    ad_carpus: "Carpus",
+    ad_tarsus: "Tarsus",
+    ad_front_paw: "Front paw",
+    ad_rear_paw: "Hind paw",
+    ad_left: "Left",
+    ad_right: "Right",
+    ad_prev: "Previous",
+    ad_next: "Next",
+    ad_autoplay_stop: "Pause auto-slide",
+    ad_autoplay_start: "Start auto-slide",
+
+    /* Pressure pad summary strip */
+    pad_sum_state: "State",
+    pad_sum_peak: "Peak pressure",
+    pad_sum_avg: "Avg pressure",
+    pad_sum_contact: "Contact area",
+    pad_state_calibrated: "Calibrated (kPa)",
+    pad_state_relative: "Relative (uncalibrated)",
+
+    /* Side rail · saved CSV */
+    section_saved_csv: "Saved CSV",
+    csv_list_empty: "No saved records.",
+    csv_no_name: "(no name)",
+    btn_view: "View",
+    btn_download: "Download",
+    csv_uploading: "Uploading CSV… ({{n}} frames)",
+    csv_upload_done: "CSV saved: {{name}}",
+    csv_upload_failed: "CSV upload failed: {{msg}}",
+
+    /* Shared controls */
+    btn_play: "Play",
+    btn_pause: "Pause",
+    side_toggle_open: "Open control panel",
+    side_toggle_close: "Collapse control panel",
+
+    /* Zero calibration before start */
+    zero_cal_title: "Preparing measurement",
+    zero_cal_sub: "Clear everything off the mat · Zero calibration {{pct}}%",
+
+    /* Camera link status */
+    sync_no_main: "{{n}} camera(s) · no Main",
+    sync_mobile_connected_n: "Mobile app connected · {{n}}",
+
+    /* Simulation mode (VITE_SIMULATE_AI) */
+    promo_loading: "Loading promo… ({{id}})",
+    promo_ready: "Promo ready · {{id}}",
+    promo_failed: "Promo load failed: {{msg}}",
+
+    sim_preparing: "Preparing simulated result…",
+    sim_recording: "Simulated recording…",
+    sim_done: "Simulation done (VITE_SIMULATE_AI)",
   },
 } as const;

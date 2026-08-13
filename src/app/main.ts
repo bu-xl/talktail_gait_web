@@ -324,12 +324,13 @@ function wireSideToggle(): void {
     btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
     /* Rail is on the right: collapsed → open with ‹, open → close with › */
     btn.textContent = collapsed ? "‹" : "›";
-    btn.title = collapsed ? "컨트롤 패널 열기" : "컨트롤 패널 접기";
+    btn.title = collapsed ? t("side_toggle_open") : t("side_toggle_close");
   };
   btn.addEventListener("click", () => {
     document.body.classList.toggle("side-collapsed");
     sync();
   });
+  onLangChange(sync);
   sync();
 }
 
@@ -433,7 +434,7 @@ async function boot(): Promise<void> {
   const scheduleSimulateReview = (): void => {
     if (!isSimulateAi()) return;
     clearSimulateTimer();
-    setSyncStatus("시뮬레이션 결과 준비 중…", "wait");
+    setSyncStatus(t("sim_preparing"), "wait");
     simulateTimer = window.setTimeout(() => {
       simulateTimer = null;
       if (sessionPhase !== "analyzing") return;
@@ -460,7 +461,7 @@ async function boot(): Promise<void> {
       if (!$opt("wsBody1")?.classList.contains("has-media")) {
         setPressureGif(placeholderUrl("foot.gif"));
       }
-      setSyncStatus("시뮬레이션 완료 (VITE_SIMULATE_AI)", "ok");
+      setSyncStatus(t("sim_done"), "ok");
     }, 2500);
   };
 
@@ -748,11 +749,11 @@ async function boot(): Promise<void> {
         mobileEl.className = "wait";
       } else if (hasMain === false) {
         // 카메라는 있으나 Main 없음 → 분석 대상 없음 경고.
-        mobileEl.textContent = `카메라 ${camCount}대 · Main 없음`;
+        mobileEl.textContent = t("sync_no_main", { n: camCount });
         mobileEl.className = "wait";
       } else {
         mobileEl.textContent =
-          camCount > 1 ? `${t("sync_mobile_connected")} · ${camCount}대` : t("sync_mobile_connected");
+          camCount > 1 ? t("sync_mobile_connected_n", { n: camCount }) : t("sync_mobile_connected");
         mobileEl.className = "ok";
       }
     }
@@ -909,6 +910,9 @@ async function boot(): Promise<void> {
     const calBtn = $opt("btnCalibrate") as HTMLButtonElement | null;
     if (calBtn) calBtn.disabled = !connected;
   };
+  // 패드를 연결하기 전에는 소스가 없어 onStatus 가 한 번도 안 온다 — 그 사이 index.html 의
+  // 한국어 초기값("○ 대기")이 그대로 보이므로, 처음부터 현재 언어로 그려 둔다.
+  setStatus(false);
 
   const attach = (src: FrameSource): void => {
     source?.stop();
@@ -1248,7 +1252,7 @@ async function boot(): Promise<void> {
       revokePressureGif();
       clearReviewPanes();
       syncRecordPending = false;
-      setSyncStatus("시뮬레이션 녹화 중…", "wait");
+      setSyncStatus(t("sim_recording"), "wait");
       setSessionPhase("recording");
       if (gaitSync.connected && gaitSync.peers.mobile) {
         syncRecordPending = true;
@@ -1305,7 +1309,7 @@ async function boot(): Promise<void> {
     sessionOverlay.classList.add("show");
     const titleEl = $("sessionOverlayTitle");
     const subEl = $("sessionOverlaySub");
-    titleEl.textContent = "측정 준비 중";
+    titleEl.textContent = t("zero_cal_title");
     // 타이머로 진행률/완료를 구동한다(백그라운드 탭에서 rAF 가 멈춰도 항상 종료됨).
     await new Promise<void>((resolve) => {
       let done = false;
@@ -1313,13 +1317,13 @@ async function boot(): Promise<void> {
         if (done) return;
         done = true;
         window.clearInterval(iv);
-        subEl.textContent = "매트 위 모든 물체를 제거해주세요 · 영점 보정 100%";
+        subEl.textContent = t("zero_cal_sub", { pct: 100 });
         resolve();
       };
       const iv = window.setInterval(() => {
         const elapsed = (performance.now() - startAt) / 1000;
         const pct = Math.min(100, Math.round((elapsed / seconds) * 100));
-        subEl.textContent = `매트 위 모든 물체를 제거해주세요 · 영점 보정 ${pct}%`;
+        subEl.textContent = t("zero_cal_sub", { pct });
         if (elapsed >= seconds) finish();
       }, 100);
       window.setTimeout(finish, seconds * 1000 + 60);
@@ -1762,7 +1766,7 @@ async function boot(): Promise<void> {
   });
 
   if (promoCase) {
-    setSyncStatus(`프로모 로딩… (${promoCaseId})`, "wait");
+    setSyncStatus(t("promo_loading", { id: promoCaseId }), "wait");
     void (async () => {
       try {
         const artifacts = promoArtifactUrls(promoCase);
@@ -1788,11 +1792,11 @@ async function boot(): Promise<void> {
 
         // Warm the results sidebar list (API may use localhost; failure is non-fatal).
         void resultsPanel?.refresh();
-        setSyncStatus(`프로모 준비됨 · ${promoCaseId}`, "ok");
+        setSyncStatus(t("promo_ready", { id: promoCaseId }), "ok");
       } catch (err) {
         console.error("[promo] load failed", err);
         setSyncStatus(
-          `프로모 로드 실패: ${err instanceof Error ? err.message : String(err)}`,
+          t("promo_failed", { msg: err instanceof Error ? err.message : String(err) }),
           "bad",
         );
       }
@@ -1830,7 +1834,7 @@ function updateStats(
   setOpt("padSumContact", `${f1(frame.stats.contactAreaCm2)} cm²`);
   const stateEl = document.getElementById("padSumState");
   if (stateEl) {
-    stateEl.textContent = calibrated ? "보정됨 (kPa)" : "상대값 (미보정)";
+    stateEl.textContent = calibrated ? t("pad_state_calibrated") : t("pad_state_relative");
     stateEl.className = calibrated ? "ok" : "warn";
   }
 }

@@ -2,6 +2,9 @@
  * Compact play/pause + playback-rate controls for workspace review videos.
  */
 
+import { t } from "../i18n/index.js";
+
+
 export class WorkspaceVideoControls {
   private readonly video: HTMLVideoElement;
   private readonly playBtn: HTMLButtonElement;
@@ -60,7 +63,7 @@ export class WorkspaceVideoControls {
     this.playBtn.disabled = !hasSrc;
     const playing = hasSrc && !this.video.paused && !this.video.ended;
     this.playBtn.textContent = playing ? "⏸" : "▶";
-    this.playBtn.title = playing ? "정지" : "재생";
+    this.playBtn.title = playing ? t("btn_pause") : t("btn_play");
   }
 }
 

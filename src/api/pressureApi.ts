@@ -81,7 +81,7 @@ export async function uploadPressureCsv(
     } catch {
       /* ignore */
     }
-    throw new Error(`업로드 실패: ${detail}`);
+    throw new Error(detail);
   }
   const json = (await res.json()) as { record: PressureRecord };
   return json.record;
@@ -90,7 +90,7 @@ export async function uploadPressureCsv(
 /** 저장된 압력 기록 목록 (백엔드에서 최신순 정렬). */
 export async function listPressureRecords(apiBaseUrl: string): Promise<PressureRecord[]> {
   const res = await fetch(joinApiUrl(apiBaseUrl, "/api/pressure/records"));
-  if (!res.ok) throw new Error(`목록 조회 실패: HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`records HTTP ${res.status}`);
   const json = (await res.json()) as { records: PressureRecord[] };
   return json.records || [];
 }

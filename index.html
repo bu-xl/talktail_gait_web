@@ -991,7 +991,7 @@
           </div>
           <div class="row">
             <span data-i18n="stat_calibration">보정</span>
-            <b id="statCal" class="warn">미보정</b>
+            <b id="statCal" class="warn" data-i18n="cal_uncalibrated">미보정</b>
           </div>
         </div>
         <div class="controls">
@@ -1050,8 +1050,8 @@
 
       <!-- 세션 종료 시 저장된 압력판 CSV 목록 (반려견 정보로 업로드됨) -->
       <div class="results-head" style="margin-top:8px;">
-        <div class="section" style="margin:0;">저장된 CSV</div>
-        <button type="button" id="btnPressureRefresh">새로고침</button>
+        <div class="section" style="margin:0;" data-i18n="section_saved_csv">저장된 CSV</div>
+        <button type="button" id="btnPressureRefresh" data-i18n="btn_results_refresh">새로고침</button>
       </div>
       <ul id="pressureRecList" class="pressure-rec-list"></ul>
 
@@ -1183,7 +1183,7 @@
           <video id="wsPressureVideo" muted loop playsinline></video>
         </div>
         <div class="ws-media-controls" data-video="wsPressureVideo">
-          <button type="button" class="ws-play" title="재생" disabled>▶</button>
+          <button type="button" class="ws-play" title="재생" data-i18n-title="btn_play" disabled>▶</button>
           <select class="ws-speed" aria-label="배속" disabled>
             <option value="0.25">0.25×</option>
             <option value="0.5">0.5×</option>
@@ -1194,10 +1194,10 @@
         </div>
         <!-- 압력패드 아래 간이 측정 요약 (숨김 요청으로 주석 처리)
         <div class="pad-summary" id="padSummary">
-          <div class="pad-metric"><span>상태</span><b id="padSumState" class="warn">–</b></div>
-          <div class="pad-metric"><span>최고 압력</span><b id="padSumPeak">–</b></div>
-          <div class="pad-metric"><span>평균 압력</span><b id="padSumAvg">–</b></div>
-          <div class="pad-metric"><span>접촉 면적</span><b id="padSumContact">–</b></div>
+          <div class="pad-metric"><span data-i18n="pad_sum_state">상태</span><b id="padSumState" class="warn">–</b></div>
+          <div class="pad-metric"><span data-i18n="pad_sum_peak">최고 압력</span><b id="padSumPeak">–</b></div>
+          <div class="pad-metric"><span data-i18n="pad_sum_avg">평균 압력</span><b id="padSumAvg">–</b></div>
+          <div class="pad-metric"><span data-i18n="pad_sum_contact">접촉 면적</span><b id="padSumContact">–</b></div>
         </div>
         -->
       </section>
@@ -1210,7 +1210,7 @@
             <video id="wsOriginVideo" muted loop playsinline></video>
           </div>
           <div class="ws-media-controls" data-video="wsOriginVideo">
-            <button type="button" class="ws-play" title="재생" disabled>▶</button>
+            <button type="button" class="ws-play" title="재생" data-i18n-title="btn_play" disabled>▶</button>
             <select class="ws-speed" aria-label="배속" disabled>
               <option value="0.25">0.25×</option>
               <option value="0.5">0.5×</option>
@@ -1226,7 +1226,7 @@
             <video id="wsAnalysisVideo" muted loop playsinline></video>
           </div>
           <div class="ws-media-controls" data-video="wsAnalysisVideo">
-            <button type="button" class="ws-play" title="재생" disabled>▶</button>
+            <button type="button" class="ws-play" title="재생" data-i18n-title="btn_play" disabled>▶</button>
             <select class="ws-speed" aria-label="배속" disabled>
               <option value="0.25">0.25×</option>
               <option value="0.5">0.5×</option>
@@ -1246,7 +1246,7 @@
             <video id="wsMaxMinVideo" muted loop playsinline></video>
           </div>
           <div class="ws-media-controls" data-video="wsMaxMinVideo">
-            <button type="button" class="ws-play" title="재생" disabled>▶</button>
+            <button type="button" class="ws-play" title="재생" data-i18n-title="btn_play" disabled>▶</button>
             <select class="ws-speed" aria-label="배속" disabled>
               <option value="0.25">0.25×</option>
               <option value="0.5">0.5×</option>
@@ -1433,7 +1433,7 @@
                 <video id="rpOriginVideo" muted loop playsinline></video>
               </div>
               <div class="ws-media-controls" data-video="rpOriginVideo">
-                <button type="button" class="ws-play" title="재생" disabled>▶</button>
+                <button type="button" class="ws-play" title="재생" data-i18n-title="btn_play" disabled>▶</button>
                 <select class="ws-speed" aria-label="배속" disabled>
                   <option value="0.25">0.25×</option>
                   <option value="0.5">0.5×</option>
@@ -1449,7 +1449,7 @@
                 <video id="rpAnalysisVideo" muted loop playsinline></video>
               </div>
               <div class="ws-media-controls" data-video="rpAnalysisVideo">
-                <button type="button" class="ws-play" title="재생" disabled>▶</button>
+                <button type="button" class="ws-play" title="재생" data-i18n-title="btn_play" disabled>▶</button>
                 <select class="ws-speed" aria-label="배속" disabled>
                   <option value="0.25">0.25×</option>
                   <option value="0.5">0.5×</option>
@@ -1467,7 +1467,7 @@
                 <video id="rpAngleVideo" muted loop playsinline></video>
               </div>
               <div class="ws-media-controls" data-video="rpAngleVideo">
-                <button type="button" class="ws-play" title="재생" disabled>▶</button>
+                <button type="button" class="ws-play" title="재생" data-i18n-title="btn_play" disabled>▶</button>
                 <select class="ws-speed" aria-label="배속" disabled>
                   <option value="0.25">0.25×</option>
                   <option value="0.5">0.5×</option>

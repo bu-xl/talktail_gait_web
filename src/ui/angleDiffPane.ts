@@ -1,8 +1,15 @@
 /**
  * Pane 3-2: joint angle min/max (angle_diff JSON from ai-server result_angle_diff).
  * Carousel: one chain level per slide; each slide shows front + rear sections
- * with 왼쪽 / 오른쪽. Auto-advances every 4s (toggleable).
+ * with left / right. Auto-advances every 4s (toggleable).
+ *
+ * 라벨은 모두 i18n 을 거친다. 언어를 바꾸면 마지막 리포트로 통째로 다시 그린다 —
+ * 슬라이드 제목·좌우 라벨이 DOM 에 텍스트로 박혀 있어 `applyDocumentI18n` 이
+ * 닿지 못하기 때문이다.
  */
+
+import { onLangChange, t } from "../i18n/index.js";
+import type { LocaleKey } from "../i18n/locales.js";
 
 export type AngleDiffJoint = {
   limb: string;
@@ -31,14 +38,14 @@ const AUTO_MS = 4000;
 const SLIDES: ReadonlyArray<{
   frontKey: string;
   rearKey: string;
-  frontTitle: string;
-  rearTitle: string;
+  frontTitleKey: LocaleKey;
+  rearTitleKey: LocaleKey;
 }> = [
-  { frontKey: "shoulder", rearKey: "hip", frontTitle: "어깨", rearTitle: "고관절" },
-  { frontKey: "elbow", rearKey: "knee", frontTitle: "팔꿈치", rearTitle: "무릎" },
-  { frontKey: "carpus", rearKey: "tarsus", frontTitle: "앞발목", rearTitle: "뒷발목" },
+  { frontKey: "shoulder", rearKey: "hip", frontTitleKey: "ad_shoulder", rearTitleKey: "ad_hip" },
+  { frontKey: "elbow", rearKey: "knee", frontTitleKey: "ad_elbow", rearTitleKey: "ad_knee" },
+  { frontKey: "carpus", rearKey: "tarsus", frontTitleKey: "ad_carpus", rearTitleKey: "ad_tarsus" },
   // JSON uses front_paw / rear_paw (kind=segment_ground), not "paw"
-  { frontKey: "front_paw", rearKey: "rear_paw", frontTitle: "앞발", rearTitle: "뒷발" },
+  { frontKey: "front_paw", rearKey: "rear_paw", frontTitleKey: "ad_front_paw", rearTitleKey: "ad_rear_paw" },
 ];
 
 function fmtDeg(n: number | undefined | null): string {
@@ -73,6 +80,9 @@ function hideLegacyImage(): void {
 }
 
 let autoTimer: number | null = null;
+/** 언어 전환 시 다시 그리기 위해 마지막 리포트를 들고 있는다. */
+let lastReport: AngleDiffReport | null = null;
+let langHookInstalled = false;
 
 function stopAutoplay(): void {
   if (autoTimer != null) {
@@ -83,6 +93,7 @@ function stopAutoplay(): void {
 
 export function clearAngleDiffPane(): void {
   stopAutoplay();
+  lastReport = null;
   const body = bodyOf("wsBody32");
   const root = document.getElementById("wsAngleDiff");
   if (root) {
@@ -146,8 +157,8 @@ function buildSection(
 
   const row = document.createElement("div");
   row.className = "ad-side-row";
-  row.appendChild(buildSideCard("왼쪽", `${side}_left`, left));
-  row.appendChild(buildSideCard("오른쪽", `${side}_right`, right));
+  row.appendChild(buildSideCard(t("ad_left"), `${side}_left`, left));
+  row.appendChild(buildSideCard(t("ad_right"), `${side}_right`, right));
   section.appendChild(row);
 
   return section;
@@ -155,6 +166,13 @@ function buildSection(
 
 export function renderAngleDiff(report: AngleDiffReport): void {
   stopAutoplay();
+  lastReport = report;
+  if (!langHookInstalled) {
+    langHookInstalled = true;
+    onLangChange(() => {
+      if (lastReport) renderAngleDiff(lastReport);
+    });
+  }
   hideLegacyImage();
   const body = bodyOf("wsBody32");
   const root = ensureRoot();
@@ -176,11 +194,11 @@ export function renderAngleDiff(report: AngleDiffReport): void {
   for (const slide of SLIDES) {
     const page = document.createElement("div");
     page.className = "ad-page";
-    page.setAttribute("data-slide", slide.frontTitle);
+    page.setAttribute("data-slide", t(slide.frontTitleKey));
 
     page.appendChild(
       buildSection(
-        slide.frontTitle,
+        t(slide.frontTitleKey),
         findJoint(byKey, "front_left", slide.frontKey),
         findJoint(byKey, "front_right", slide.frontKey),
         "front",
@@ -188,7 +206,7 @@ export function renderAngleDiff(report: AngleDiffReport): void {
     );
     page.appendChild(
       buildSection(
-        slide.rearTitle,
+        t(slide.rearTitleKey),
         findJoint(byKey, "rear_left", slide.rearKey),
         findJoint(byKey, "rear_right", slide.rearKey),
         "rear",
@@ -210,13 +228,13 @@ export function renderAngleDiff(report: AngleDiffReport): void {
   const prev = document.createElement("button");
   prev.type = "button";
   prev.className = "ad-nav-btn";
-  prev.setAttribute("aria-label", "이전");
+  prev.setAttribute("aria-label", t("ad_prev"));
   prev.textContent = "‹";
 
   const next = document.createElement("button");
   next.type = "button";
   next.className = "ad-nav-btn";
-  next.setAttribute("aria-label", "다음");
+  next.setAttribute("aria-label", t("ad_next"));
   next.textContent = "›";
 
   const dots = document.createElement("div");
@@ -226,7 +244,7 @@ export function renderAngleDiff(report: AngleDiffReport): void {
     const d = document.createElement("button");
     d.type = "button";
     d.className = "ad-dot";
-    d.setAttribute("aria-label", SLIDES[i].frontTitle);
+    d.setAttribute("aria-label", t(SLIDES[i].frontTitleKey));
     dots.appendChild(d);
     dotBtns.push(d);
   }
@@ -236,8 +254,8 @@ export function renderAngleDiff(report: AngleDiffReport): void {
   const autoBtn = document.createElement("button");
   autoBtn.type = "button";
   autoBtn.className = "ad-autoplay is-playing";
-  autoBtn.setAttribute("aria-label", "자동 슬라이드 정지");
-  autoBtn.title = "자동 슬라이드 정지";
+  autoBtn.setAttribute("aria-label", t("ad_autoplay_stop"));
+  autoBtn.title = t("ad_autoplay_stop");
   autoBtn.textContent = "⏸";
 
   // Spacer keeps center controls visually centered while autoplay sits on the right.
@@ -256,9 +274,10 @@ export function renderAngleDiff(report: AngleDiffReport): void {
 
   const syncAutoBtn = (): void => {
     autoBtn.classList.toggle("is-playing", autoplayOn);
+    const label = autoplayOn ? t("ad_autoplay_stop") : t("ad_autoplay_start");
     autoBtn.textContent = autoplayOn ? "⏸" : "▶";
-    autoBtn.setAttribute("aria-label", autoplayOn ? "자동 슬라이드 정지" : "자동 슬라이드 시작");
-    autoBtn.title = autoplayOn ? "자동 슬라이드 정지" : "자동 슬라이드 시작";
+    autoBtn.setAttribute("aria-label", label);
+    autoBtn.title = label;
   };
 
   const setIndex = (i: number): void => {

@@ -3,6 +3,7 @@
  * Media stays black until an explicit load; 3-2 uses angle_diff JSON (see angleDiffPane).
  */
 
+import { t } from "../i18n/index.js";
 import { clearAngleDiffPane } from "./angleDiffPane";
 
 function bodyOf(id: string): HTMLElement {
@@ -20,7 +21,7 @@ function syncVideoBar(video: HTMLVideoElement, enabled: boolean): void {
     playBtn.disabled = !enabled;
     const playing = enabled && !video.paused && !video.ended;
     playBtn.textContent = playing ? "⏸" : "▶";
-    playBtn.title = playing ? "정지" : "재생";
+    playBtn.title = playing ? t("btn_pause") : t("btn_play");
   }
   if (speed) {
     speed.disabled = !enabled;

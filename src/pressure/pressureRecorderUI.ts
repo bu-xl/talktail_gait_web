@@ -9,6 +9,7 @@
  * 별도의 압력판 전용 녹화 UI 는 없다 — 업로드는 세션 종료 훅에서만 일어난다.
  */
 
+import { onLangChange, t } from "../i18n/index.js";
 import {
   listPressureRecords,
   pressureCsvUrl,
@@ -78,7 +79,7 @@ export function createPressureCsvController(deps: PressureCsvDeps): PressureCsvC
     if (!records.length) {
       const li = document.createElement("li");
       li.className = "pressure-rec-empty";
-      li.textContent = "저장된 기록이 없습니다.";
+      li.textContent = t("csv_list_empty");
       listEl.appendChild(li);
       return;
     }
@@ -93,7 +94,7 @@ export function createPressureCsvController(deps: PressureCsvDeps): PressureCsvC
       const breed = r.dog.breed || "–";
       const title = document.createElement("div");
       title.className = "pressure-rec-title";
-      title.textContent = r.dog.name || "(이름 없음)";
+      title.textContent = r.dog.name || t("csv_no_name");
       const sub = document.createElement("div");
       sub.className = "pressure-rec-sub";
       sub.textContent = `${breed} · ${weight} · ${dur} · ${fmtDate(r.createdAt)}`;
@@ -103,12 +104,12 @@ export function createPressureCsvController(deps: PressureCsvDeps): PressureCsvC
       const actions = document.createElement("div");
       actions.className = "pressure-rec-actions";
       const viewLink = document.createElement("a");
-      viewLink.textContent = "보기";
+      viewLink.textContent = t("btn_view");
       viewLink.href = pressureCsvUrl(deps.apiBase, r, false);
       viewLink.target = "_blank";
       viewLink.rel = "noopener";
       const dlLink = document.createElement("a");
-      dlLink.textContent = "다운로드";
+      dlLink.textContent = t("btn_download");
       dlLink.href = pressureCsvUrl(deps.apiBase, r, true);
       actions.appendChild(viewLink);
       actions.appendChild(dlLink);
@@ -119,10 +120,17 @@ export function createPressureCsvController(deps: PressureCsvDeps): PressureCsvC
     }
   };
 
+  /** 언어 전환 시 다시 그리기 위한 캐시 — 서버를 다시 부르지 않는다. */
+  let lastRecords: PressureRecord[] | null = null;
+  onLangChange(() => {
+    if (lastRecords) renderList(lastRecords);
+  });
+
   const refresh = async (): Promise<void> => {
     if (!listEl) return;
     try {
-      renderList(await listPressureRecords(deps.apiBase));
+      lastRecords = await listPressureRecords(deps.apiBase);
+      renderList(lastRecords);
     } catch (err) {
       listEl.innerHTML = "";
       const li = document.createElement("li");
@@ -158,13 +166,13 @@ export function createPressureCsvController(deps: PressureCsvDeps): PressureCsvC
     };
 
     busy = true;
-    setStatus(`CSV 업로드 중… (${frames} 프레임)`, "warn");
+    setStatus(t("csv_uploading", { n: frames }), "warn");
     try {
       const record = await uploadPressureCsv(deps.apiBase, { csv, dog, recording, sessionId });
-      setStatus(`CSV 저장 완료: ${record.csv.filename}`, "ok");
+      setStatus(t("csv_upload_done", { name: record.csv.filename }), "ok");
       await refresh();
     } catch (err) {
-      setStatus(`CSV 저장 실패: ${err instanceof Error ? err.message : String(err)}`, "bad");
+      setStatus(t("csv_upload_failed", { msg: err instanceof Error ? err.message : String(err) }), "bad");
     } finally {
       busy = false;
     }
