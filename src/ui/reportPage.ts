@@ -14,8 +14,10 @@ import {
   type ResultDetail,
   type ResultSession,
 } from "../api/resultsApi.js";
+import { hasDogInfo } from "../api/analyzeApi.js";
 import { onLangChange, t } from "../i18n/index.js";
 import { LOCALES, type Lang, type LocaleKey } from "../i18n/locales.js";
+import { openDogInfoModal } from "./dogInfoModal.js";
 
 type Step = "dates" | "sessions" | "detail";
 type ReportLang = "ko" | "en";
@@ -51,6 +53,7 @@ export class ReportPage {
   private readonly langHintEl: HTMLElement;
   private readonly reviewOverlay: HTMLElement;
   private readonly reviewCloseBtn: HTMLButtonElement;
+  private readonly reviewInfoBtn: HTMLButtonElement | null;
   private readonly reviewTitleEl: HTMLElement;
   private readonly reviewSubEl: HTMLElement;
 
@@ -87,6 +90,7 @@ export class ReportPage {
     this.langHintEl = root.querySelector("#rpLangHint") as HTMLElement;
     this.reviewOverlay = document.getElementById("rpReviewOverlay") as HTMLElement;
     this.reviewCloseBtn = document.getElementById("rpReviewClose") as HTMLButtonElement;
+    this.reviewInfoBtn = document.getElementById("rpReviewInfo") as HTMLButtonElement | null;
     this.reviewTitleEl = document.getElementById("rpReviewTitle") as HTMLElement;
     this.reviewSubEl = document.getElementById("rpReviewSub") as HTMLElement;
 
@@ -96,6 +100,7 @@ export class ReportPage {
     this.langEnBtn.addEventListener("click", () => this.setReportLang("en"));
     this.viewMediaBtn.addEventListener("click", () => this.openReview());
     this.reviewCloseBtn.addEventListener("click", () => this.closeReview());
+    this.reviewInfoBtn?.addEventListener("click", () => this.showDogInfo());
     this.reviewOverlay.addEventListener("click", (e) => {
       if (e.target === this.reviewOverlay) this.closeReview();
     });
@@ -560,8 +565,33 @@ export class ReportPage {
       detail.report.stride?.available ? detail.report.stride.url : null,
     );
 
+    // 저장된 반려견 정보가 있을 때만 "정보" 버튼을 띄운다(레이아웃은 그대로 둔다).
+    if (this.reviewInfoBtn) {
+      this.reviewInfoBtn.textContent = t("btn_dog_info");
+      this.reviewInfoBtn.classList.toggle("hidden", !hasDogInfo(this.dogInfoOf(detail)));
+    }
+
     this.reviewOverlay.classList.add("open");
     this.reviewOverlay.setAttribute("aria-hidden", "false");
+  }
+
+  /** 세션 상세의 반려견 정보(이름·견종·몸무게·신장). */
+  private dogInfoOf(detail: ResultDetail | null) {
+    const dog = detail?.session?.dog;
+    return {
+      name: dog?.name ?? null,
+      breed: dog?.breed ?? null,
+      weightKg: dog?.weightKg ?? null,
+      heightCm: dog?.heightCm ?? null,
+    };
+  }
+
+  private showDogInfo(): void {
+    const detail = this.lastDetail;
+    const when = [this.selectedDate?.displayDate, this.selectedSession?.displayTime]
+      .filter(Boolean)
+      .join(" · ");
+    openDogInfoModal({ ...this.dogInfoOf(detail), subtitle: when || null });
   }
 
   private closeReview(): void {

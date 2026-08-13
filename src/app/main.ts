@@ -64,8 +64,11 @@ import {
   pollJobUntilDone,
   type SyncPeers,
 } from "../transport/gaitSocket.js";
+import { hasDogInfo, type ManualDogInfo } from "../api/analyzeApi.js";
 import { ResultsPanel } from "../ui/resultsPanel.js";
 import { ReportPage } from "../ui/reportPage.js";
+import { UploadPage } from "../ui/uploadPage.js";
+import { openDogInfoModal } from "../ui/dogInfoModal.js";
 import {
   clearReviewPanes,
   setAnalysisVideo,
@@ -346,9 +349,12 @@ function wireDogInfoToggle(): void {
   sync();
 }
 
-type AppModule = "measure" | "report";
+type AppModule = "measure" | "report" | "upload";
 
-function wireAppHeader(opts: { onModuleChange: (mod: AppModule) => void }): void {
+const APP_MODULES: readonly AppModule[] = ["measure", "report", "upload"];
+
+/** 헤더 nav 를 연결하고, 코드에서 모듈을 바꿀 수 있는 함수를 돌려준다. */
+function wireAppHeader(opts: { onModuleChange: (mod: AppModule) => void }): (mod: AppModule) => void {
   const setActive = (mod: AppModule): void => {
     document.body.dataset.module = mod;
     document.querySelectorAll<HTMLButtonElement>("#appHeader .ah-nav button[data-module]").forEach((btn) => {
@@ -364,11 +370,13 @@ function wireAppHeader(opts: { onModuleChange: (mod: AppModule) => void }): void
     el.addEventListener("click", (ev) => {
       const target = ev.currentTarget as HTMLElement;
       const mod = (target.dataset.module || target.dataset.nav) as AppModule | undefined;
-      if (mod !== "measure" && mod !== "report") return;
+      if (!mod || !APP_MODULES.includes(mod)) return;
       if (target.tagName === "A") ev.preventDefault();
       setActive(mod);
     });
   });
+
+  return setActive;
 }
 
 async function boot(): Promise<void> {
@@ -464,15 +472,40 @@ async function boot(): Promise<void> {
   reportPage?.setApiBase(apiBase);
   clearReviewPanes();
 
-  wireAppHeader({
-    onModuleChange: (mod) => {
-      if (mod === "report") reportPage?.show();
-      else reportPage?.hide();
-    },
-  });
-
   const sessionBtn = $("btnSession") as HTMLButtonElement;
   const sessionOverlay = $("sessionOverlay");
+
+  /**
+   * 화면에 떠 있는 결과의 반려견 정보. 촬영 세션은 우측 레일 입력에서, 직접 분석은
+   * 업로드 폼에서 온다 — 결과 섹션의 "정보" 버튼이 이 값을 보여 준다.
+   */
+  let lastDogInfo: ManualDogInfo | null = null;
+  const stageInfoBtn = $opt("btnStageInfo") as HTMLButtonElement | null;
+
+  /** 결과를 보고 있고 보여 줄 정보가 있을 때만 "정보" 버튼을 띄운다. */
+  const syncStageInfoBtn = (): void => {
+    const show = sessionPhase === "review" && hasDogInfo(lastDogInfo);
+    stageInfoBtn?.classList.toggle("hidden", !show);
+  };
+  stageInfoBtn?.addEventListener("click", () => openDogInfoModal(lastDogInfo));
+
+  /** 우측 레일 "반려견" 입력값 — 촬영 세션의 결과에 붙일 정보. */
+  const readSideDogInfo = (): ManualDogInfo => {
+    const text = (id: string): string | null =>
+      ($opt(id) as HTMLInputElement | null)?.value.trim() || null;
+    const num = (id: string): number | null => {
+      const raw = text(id);
+      if (!raw) return null;
+      const n = Number(raw);
+      return Number.isFinite(n) ? n : null;
+    };
+    return {
+      name: text("dogName"),
+      breed: text("dogBreed"),
+      weightKg: num("dogWeightInfo"),
+      heightCm: num("dogHeight"),
+    };
+  };
 
   const revokePressureGif = (): void => {
     if (pressureGifObjectUrl) {
@@ -507,6 +540,7 @@ async function boot(): Promise<void> {
       sessionBtn.classList.add("primary");
       sessionBtn.disabled = false;
     }
+    syncStageInfoBtn();
   };
 
   const buildPressureGifUrl = (): string | null => {
@@ -616,8 +650,75 @@ async function boot(): Promise<void> {
     };
 
     setSyncStatus(t("sync_analyze_done"), "ok");
+    syncStageInfoBtn();
     void resultsPanel?.refresh();
   };
+
+  /**
+   * 직접 분석 — 업로드가 접수되면 측정 화면으로 넘어가 기존 "분석 중" 오버레이로 기다린다.
+   * 이 잡은 WS 방에 속하지 않으므로(촬영 세션이 아니다) 완료는 잡 폴링으로만 받는다.
+   */
+  const startManualAnalysis = (jobId: string, dog: ManualDogInfo): void => {
+    lastDogInfo = dog;
+    clinicSessionActive = false;
+    syncSessionId = null;
+    syncRecordPending = false;
+    syncPlaybackActive = false;
+    syncDock.stop();
+    syncDock.hide();
+    clearReviewPanes();
+    revokePressureGif();
+    setModule("measure");
+    pendingAnalyzeJob = jobId;
+    setSessionPhase("analyzing");
+    setSyncStatus(t("sync_analyzing"), "wait");
+    cameraPlayer.setLoading(true, t("sync_analyzing"));
+
+    void pollJobUntilDone(apiBase, jobId)
+      .then((job) => {
+        if (pendingAnalyzeJob !== jobId) return;
+        pendingAnalyzeJob = null;
+        cameraPlayer.setLoading(false);
+        if (job.status === "completed" && job.resultUrl) {
+          enterReview({
+            analysisUrl: absolutizeResultUrl(apiBase, job.resultUrl),
+            originalUrl: job.originalUrl ?? null,
+            artifacts: job.artifacts ?? null,
+            date: job.date ?? null,
+            time: job.time ?? null,
+            stem: job.stem ?? null,
+            sessionPath: job.sessionPath ?? null,
+          });
+          return;
+        }
+        setSessionPhase("idle");
+        setSyncStatus(`${t("sync_analyze_failed")}: ${job.error ?? "unknown"}`, "bad");
+      })
+      .catch((err) => {
+        if (pendingAnalyzeJob !== jobId) return;
+        pendingAnalyzeJob = null;
+        cameraPlayer.setLoading(false);
+        setSessionPhase("idle");
+        setSyncStatus(err instanceof Error ? err.message : String(err), "bad");
+      });
+  };
+
+  const uploadPageEl = $opt("uploadPage");
+  const uploadPage = uploadPageEl
+    ? new UploadPage(uploadPageEl, {
+        apiBase,
+        onSubmitted: (job, dog) => startManualAnalysis(job.jobId, dog),
+      })
+    : null;
+
+  const setModule = wireAppHeader({
+    onModuleChange: (mod) => {
+      if (mod === "report") reportPage?.show();
+      else reportPage?.hide();
+      if (mod === "upload") uploadPage?.show();
+      else uploadPage?.hide();
+    },
+  });
 
   const updateSyncUi = (peers?: SyncPeers, hubConnected?: boolean): void => {
     const mobileEl = $opt("syncStatus");
@@ -982,6 +1083,8 @@ async function boot(): Promise<void> {
     syncDock.stop();
     syncDock.hide();
     syncPlaybackActive = false;
+    // 이번 세션 결과에 붙일 반려견 정보 — CSV 업로드와 같은 입력란에서 읽는다.
+    lastDogInfo = readSideDogInfo();
     const t0 =
       wallAnchorMs != null ? performance.now() + (wallAnchorMs - Date.now()) : performance.now();
     recorder.start(t0);

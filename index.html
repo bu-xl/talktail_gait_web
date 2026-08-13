@@ -97,7 +97,9 @@
         flex: 1; min-height: 0; display: flex; position: relative;
       }
       body[data-module="report"] #appBody,
-      body[data-module="report"] #btnSideToggle { display: none !important; }
+      body[data-module="report"] #btnSideToggle,
+      body[data-module="upload"] #appBody,
+      body[data-module="upload"] #btnSideToggle { display: none !important; }
 
       /* —— Report page —— */
       #reportPage {
@@ -243,6 +245,105 @@
       #rpDetailLoading { text-align: center; color: var(--muted); padding: 24px; }
       #rpDetailBody { min-width: 0; }
       .rp-detail-main { min-width: 0; }
+
+      /* —— 직접 분석 (CSV + 영상 직접 업로드) —— */
+      #uploadPage {
+        flex: 1; min-height: 0; display: none; flex-direction: column;
+        background: var(--bg); overflow: hidden;
+      }
+      body[data-module="upload"] #uploadPage { display: flex; }
+      .up-scroll { flex: 1; min-height: 0; overflow: auto; padding: 20px 24px 40px; }
+      .up-shell { max-width: 880px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+      .up-drops { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+      @media (max-width: 760px) { .up-drops { grid-template-columns: 1fr; } }
+      .up-drop {
+        display: flex; flex-direction: column; align-items: center; gap: 6px;
+        padding: 22px 18px; text-align: center; cursor: pointer;
+        background: var(--surface); border: 1px dashed var(--border-strong); border-radius: 12px;
+        transition: border-color .15s ease, background .15s ease;
+      }
+      .up-drop:hover, .up-drop.is-drag { border-color: var(--primary); background: var(--primary-light); }
+      .up-drop.has-file { border-style: solid; border-color: var(--primary); background: var(--surface); }
+      .up-drop-icon { font-size: 22px; line-height: 1; }
+      .up-drop-title { font-size: 14px; font-weight: 700; }
+      .up-drop-hint { font-size: 12px; color: var(--muted); line-height: 1.45; }
+      .up-drop-name {
+        font-size: 12px; font-weight: 600; color: var(--primary-pressed);
+        max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        min-height: 1.2em;
+      }
+      .up-drop button { margin-top: 4px; padding: 6px 14px; font-size: 12px; }
+      .up-card {
+        background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+        padding: 16px 18px; display: flex; flex-direction: column; gap: 12px;
+      }
+      .up-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+      .up-card-head .section { margin: 0; }
+      .up-card-hint { font-size: 12px; color: var(--muted); }
+      .up-dog-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+      @media (max-width: 760px) { .up-dog-grid { grid-template-columns: repeat(2, 1fr); } }
+      .up-dog-grid .field-col { display: flex; flex-direction: column; gap: 4px; }
+      .up-dog-grid label { font-size: 12px; color: var(--muted); }
+      .up-dog-grid input {
+        width: 100%; background: var(--bg); color: var(--fg); border: 1px solid var(--border);
+        border-radius: 6px; padding: 8px 10px; font: inherit; font-feature-settings: 'tnum' 1;
+      }
+      .up-dog-grid input:focus {
+        outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light);
+      }
+      .up-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+      #upAnalyze {
+        background: var(--primary); border-color: var(--primary); color: #fff;
+        font-size: 15px; font-weight: 700; padding: 12px 28px; border-radius: 8px;
+      }
+      #upAnalyze:hover:not(:disabled) { background: var(--primary-hover); border-color: var(--primary-hover); }
+      #upAnalyze:disabled { opacity: .4; cursor: not-allowed; }
+      .up-status { font-size: 13px; color: var(--muted); min-height: 1.2em; }
+      .up-status.ok { color: var(--success); }
+      .up-status.wait { color: var(--warning); }
+      .up-status.bad { color: var(--danger); }
+
+      /* —— 결과 섹션의 "정보" 버튼 + 반려견 정보 모달 —— */
+      #btnStageInfo {
+        position: absolute; top: 16px; right: 44px; z-index: 35;
+        padding: 6px 12px; font-size: 12px; font-weight: 600;
+        background: var(--surface); border: 1px solid var(--border-strong); border-radius: 999px;
+        box-shadow: 0 2px 8px rgba(31, 35, 41, 0.08);
+      }
+      #btnStageInfo.hidden, #rpReviewInfo.hidden { display: none !important; }
+      #rpReviewInfo {
+        background: transparent; color: #e8f4f2; border-color: rgba(232,244,242,.35);
+      }
+      .rp-review-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+      #dogInfoModal {
+        display: none; position: fixed; inset: 0; z-index: 1100;
+        align-items: center; justify-content: center; background: rgba(15, 18, 24, 0.45);
+      }
+      #dogInfoModal.open { display: flex; }
+      #dogInfoModal .dim-shell {
+        width: min(380px, calc(100vw - 32px));
+        background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+        box-shadow: 0 16px 48px rgba(15, 18, 24, 0.18); overflow: hidden;
+      }
+      #dogInfoModal .dim-head { padding: 16px 18px 12px; border-bottom: 1px solid var(--divider); }
+      #dogInfoModalTitle { margin: 0; font-size: 15px; font-weight: 700; }
+      #dogInfoModalSub { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+      #dogInfoModalSub[hidden] { display: none; }
+      #dogInfoModalBody { padding: 6px 18px 12px; }
+      #dogInfoModal .dim-row {
+        display: flex; align-items: center; justify-content: space-between; gap: 12px;
+        padding: 10px 0; border-bottom: 1px solid var(--divider);
+      }
+      #dogInfoModal .dim-row:last-child { border-bottom: 0; }
+      #dogInfoModal .dim-row > span { font-size: 13px; color: var(--muted); }
+      #dogInfoModal .dim-row > b { font-size: 14px; font-weight: 700; font-feature-settings: 'tnum' 1; }
+      #dogInfoModal .dim-row > b.is-empty { color: var(--muted); font-weight: 600; }
+      #dogInfoModal .dim-empty { margin: 12px 0; font-size: 13px; color: var(--muted); text-align: center; }
+      #dogInfoModal .dim-foot {
+        display: flex; justify-content: flex-end; padding: 12px 18px; border-top: 1px solid var(--divider);
+      }
+      #dogInfoModal .dim-foot button { min-width: 72px; }
 
       /* —— Right control rail (collapsible) —— */
       #side {
@@ -872,6 +973,7 @@
         </div>
         <nav class="ah-nav" aria-label="Modules">
           <button type="button" class="active" data-module="measure" aria-current="page" data-i18n="nav_measure">측정</button>
+          <button type="button" data-module="upload" data-i18n="nav_upload">직접 분석</button>
           <button type="button" data-module="report" data-i18n="nav_report">리포트</button>
         </nav>
       </div>
@@ -1060,6 +1162,9 @@
     <button type="button" id="btnSideToggle" aria-expanded="false" aria-controls="side" title="패널 열기/접기">‹</button>
 
     <main id="stage" class="workspace">
+      <!-- 결과 섹션 우측 상단 · 입력한 반려견 정보 보기 -->
+      <button type="button" id="btnStageInfo" class="hidden" data-i18n="btn_dog_info">ⓘ 정보</button>
+
       <div id="sessionOverlay" aria-live="polite">
         <div class="session-overlay-card">
           <div class="so-pulse" aria-hidden="true"></div>
@@ -1087,13 +1192,14 @@
             <option value="2">2×</option>
           </select>
         </div>
-        <!-- 압력패드 아래 간이 측정 요약 -->
+        <!-- 압력패드 아래 간이 측정 요약 (숨김 요청으로 주석 처리)
         <div class="pad-summary" id="padSummary">
           <div class="pad-metric"><span>상태</span><b id="padSumState" class="warn">–</b></div>
           <div class="pad-metric"><span>최고 압력</span><b id="padSumPeak">–</b></div>
           <div class="pad-metric"><span>평균 압력</span><b id="padSumAvg">–</b></div>
           <div class="pad-metric"><span>접촉 면적</span><b id="padSumContact">–</b></div>
         </div>
+        -->
       </section>
 
       <!-- 2 · capture (top) + skeleton analysis (bottom) -->
@@ -1197,6 +1303,69 @@
     </main>
     </div><!-- #appBody -->
 
+    <section id="uploadPage" hidden aria-label="Direct analysis">
+      <div class="rp-toolbar">
+        <div class="rp-toolbar-text">
+          <h1 id="upTitle" data-i18n="upload_page_title">직접 분석</h1>
+          <p id="upSub" data-i18n="upload_page_sub">
+            이미 가지고 있는 압력 CSV와 촬영 영상을 올려 측정과 똑같은 분석을 실행합니다.
+          </p>
+        </div>
+      </div>
+      <div class="up-scroll">
+        <div class="up-shell">
+          <div class="up-drops">
+            <div class="up-drop" id="upCsvBox">
+              <span class="up-drop-icon" aria-hidden="true">📄</span>
+              <span class="up-drop-title" data-i18n="upload_csv_title">압력 CSV</span>
+              <span class="up-drop-hint" data-i18n="upload_csv_hint">측정 세션에서 저장한 형식의 CSV 파일 (.csv)</span>
+              <span class="up-drop-name" id="upCsvName"></span>
+              <button type="button" id="upCsvPick" data-i18n="upload_pick_file">파일 선택</button>
+              <input id="upCsvInput" type="file" accept=".csv,text/csv" />
+            </div>
+            <div class="up-drop" id="upVideoBox">
+              <span class="up-drop-icon" aria-hidden="true">🎞️</span>
+              <span class="up-drop-title" data-i18n="upload_video_title">촬영 영상</span>
+              <span class="up-drop-hint" data-i18n="upload_video_hint">측면에서 촬영한 보행 영상 (mp4 · mov · webm)</span>
+              <span class="up-drop-name" id="upVideoName"></span>
+              <button type="button" id="upVideoPick" data-i18n="upload_pick_file">파일 선택</button>
+              <input id="upVideoInput" type="file" accept="video/*,.mp4,.mov,.m4v,.avi,.webm" />
+            </div>
+          </div>
+
+          <div class="up-card">
+            <div class="up-card-head">
+              <div class="section" data-i18n="upload_dog_section">반려견 정보 (선택)</div>
+              <span class="up-card-hint" data-i18n="upload_dog_hint">입력하지 않아도 분석할 수 있습니다.</span>
+            </div>
+            <div class="up-dog-grid">
+              <div class="field-col">
+                <label for="upDogName" data-i18n="dog_name">이름</label>
+                <input id="upDogName" type="text" placeholder="예: 바둑이" autocomplete="off" />
+              </div>
+              <div class="field-col">
+                <label for="upDogBreed" data-i18n="dog_breed">견종</label>
+                <input id="upDogBreed" type="text" placeholder="예: 진돗개" autocomplete="off" />
+              </div>
+              <div class="field-col">
+                <label for="upDogWeight" data-i18n="dog_weight">몸무게</label>
+                <input id="upDogWeight" type="number" placeholder="kg" min="0" step="0.1" />
+              </div>
+              <div class="field-col">
+                <label for="upDogHeight" data-i18n="dog_height">신장</label>
+                <input id="upDogHeight" type="number" placeholder="cm" min="0" step="0.1" />
+              </div>
+            </div>
+          </div>
+
+          <div class="up-actions">
+            <button type="button" id="upAnalyze" data-i18n="btn_upload_analyze" disabled>분석하기</button>
+            <span id="upStatus" class="up-status"></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section id="reportPage" hidden aria-label="Reports">
       <div class="rp-toolbar">
         <div class="rp-toolbar-text">
@@ -1244,7 +1413,10 @@
             <h2 id="rpReviewTitle" data-i18n="report_review_title">저장된 세션 다시보기</h2>
             <p id="rpReviewSub" data-i18n="report_review_sub">메인과 같은 5개 패널</p>
           </div>
-          <button type="button" id="rpReviewClose" data-i18n="report_review_close">닫기</button>
+          <div class="rp-review-actions">
+            <button type="button" id="rpReviewInfo" data-i18n="btn_dog_info">ⓘ 정보</button>
+            <button type="button" id="rpReviewClose" data-i18n="report_review_close">닫기</button>
+          </div>
         </div>
         <div id="rpReviewStage">
           <section class="ws-pane ws-pane-1">
@@ -1312,6 +1484,19 @@
               </div>
             </div>
           </section>
+        </div>
+      </div>
+    </div>
+
+    <div id="dogInfoModal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="dogInfoModalTitle">
+      <div class="dim-shell">
+        <div class="dim-head">
+          <h2 id="dogInfoModalTitle" data-i18n="dog_info_title">반려견 정보</h2>
+          <p id="dogInfoModalSub" hidden></p>
+        </div>
+        <div id="dogInfoModalBody"></div>
+        <div class="dim-foot">
+          <button type="button" id="dogInfoModalClose" data-i18n="dog_info_close">닫기</button>
         </div>
       </div>
     </div>
