@@ -623,6 +623,41 @@
       body.session-recording #sessionOverlay .so-pulse { background: #cf222e; }
       body.session-analyzing #sessionOverlay .so-pulse { background: var(--primary); }
 
+      /* Confirm analyze / cancel after stop */
+      #confirmAnalyzeModal {
+        display: none; position: fixed; inset: 0; z-index: 1100;
+        align-items: center; justify-content: center;
+        background: rgba(15, 18, 24, 0.5);
+      }
+      #confirmAnalyzeModal.open { display: flex; }
+      #confirmAnalyzeModal .dialog {
+        width: min(400px, calc(100vw - 32px));
+        background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+        box-shadow: 0 16px 48px rgba(15, 18, 24, 0.2);
+        overflow: hidden;
+      }
+      #confirmAnalyzeModal .dialog-head {
+        padding: 18px 18px 10px; border-bottom: 1px solid var(--divider);
+      }
+      #confirmAnalyzeModal .dialog-head h2 {
+        margin: 0 0 8px; font-size: 16px; font-weight: 650;
+      }
+      #confirmAnalyzeModal .dialog-head p {
+        margin: 0; font-size: 13px; color: var(--muted); line-height: 1.45;
+      }
+      #confirmAnalyzeModal .dialog-foot {
+        display: flex; gap: 8px; justify-content: flex-end;
+        padding: 12px 18px;
+      }
+      #confirmAnalyzeModal .dialog-foot button { min-width: 88px; }
+      #confirmAnalyzeModal .dialog-foot button.primary {
+        background: var(--primary); border-color: var(--primary); color: #fff;
+      }
+      #confirmAnalyzeModal .dialog-foot button.primary:hover {
+        background: var(--primary-hover); border-color: var(--primary-hover);
+      }
+      #confirmAnalyzeModal .dialog-foot button:disabled { opacity: .45; cursor: not-allowed; }
+
       #btnSession {
         grid-column: span 2; font-weight: 700; font-size: 15px; padding: 12px 10px;
       }
@@ -1519,6 +1554,18 @@
           <button type="button" id="portRefresh" data-i18n="port_modal_refresh">Refresh</button>
           <button type="button" id="portCancel" data-i18n="port_modal_cancel">Cancel</button>
           <button type="button" class="primary" id="portConfirm" data-i18n="port_modal_connect" disabled>Connect</button>
+        </div>
+      </div>
+    </div>
+    <div id="confirmAnalyzeModal" role="dialog" aria-modal="true" aria-labelledby="confirmAnalyzeTitle">
+      <div class="dialog">
+        <div class="dialog-head">
+          <h2 id="confirmAnalyzeTitle" data-i18n="confirm_analyze_title">이 촬영을 분석할까요?</h2>
+          <p id="confirmAnalyzeHint" data-i18n="confirm_analyze_hint">분석을 누르면 AI 서버로 전송됩니다. 취소하면 저장된 데이터가 삭제됩니다.</p>
+        </div>
+        <div class="dialog-foot">
+          <button type="button" id="confirmCancelBtn" data-i18n="confirm_analyze_no">취소</button>
+          <button type="button" class="primary" id="confirmAnalyzeBtn" data-i18n="confirm_analyze_yes">분석</button>
         </div>
       </div>
     </div>

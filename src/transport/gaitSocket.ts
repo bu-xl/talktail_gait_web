@@ -179,6 +179,7 @@ export function absolutizeResultUrl(apiBaseUrl: string, resultUrl: string): stri
 type JobPoll = {
   id: string;
   status: "processing" | "completed" | "failed";
+  awaitingConfirm?: boolean;
   resultUrl: string | null;
   originalUrl?: string | null;
   artifacts?: Record<string, { kind?: string; filename?: string; url?: string | null; available?: boolean }> | null;
@@ -206,5 +207,27 @@ export async function pollJobUntilDone(
     const job = (await res.json()) as JobPoll;
     if (job.status === "completed" || job.status === "failed") return job;
     await new Promise((r) => setTimeout(r, intervalMs));
+  }
+}
+
+/** 웹 확인 모달 — 저장된 Main 영상을 AI 로 전송. */
+export async function confirmAnalyzeJob(apiBaseUrl: string, jobId: string): Promise<void> {
+  const res = await fetch(joinApiUrl(apiBaseUrl, `/api/analyze/${encodeURIComponent(jobId)}/confirm`), {
+    method: "POST",
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`분석 시작 실패 (${res.status}): ${text.slice(0, 200)}`);
+  }
+}
+
+/** 웹 확인 모달 — AI 미전송 + 원본 데이터 삭제. */
+export async function cancelAnalyzeJob(apiBaseUrl: string, jobId: string): Promise<void> {
+  const res = await fetch(joinApiUrl(apiBaseUrl, `/api/analyze/${encodeURIComponent(jobId)}`), {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`취소 실패 (${res.status}): ${text.slice(0, 200)}`);
   }
 }
