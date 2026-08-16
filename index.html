@@ -99,7 +99,9 @@
       body[data-module="report"] #appBody,
       body[data-module="report"] #btnSideToggle,
       body[data-module="upload"] #appBody,
-      body[data-module="upload"] #btnSideToggle { display: none !important; }
+      body[data-module="upload"] #btnSideToggle,
+      body[data-module="files"] #appBody,
+      body[data-module="files"] #btnSideToggle { display: none !important; }
 
       /* —— Report page —— */
       #reportPage {
@@ -302,6 +304,59 @@
       .up-status.ok { color: var(--success); }
       .up-status.wait { color: var(--warning); }
       .up-status.bad { color: var(--danger); }
+
+      /* —— 파일 다운 (디스크 CSV · 원본 영상) —— */
+      #filesPage {
+        flex: 1; min-height: 0; display: none; flex-direction: column;
+        background: var(--bg); overflow: hidden;
+      }
+      body[data-module="files"] #filesPage { display: flex; }
+      .fd-toolbar-extra {
+        display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end;
+      }
+      #fdSearch {
+        width: min(280px, 42vw); background: var(--bg); color: var(--fg);
+        border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px;
+        font: inherit; font-size: 13px;
+      }
+      #fdSearch:focus {
+        outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light);
+      }
+      .fd-status { margin: 0; padding: 0 24px; font-size: 13px; color: var(--muted); min-height: 1.2em; }
+      .fd-status.is-bad { color: var(--danger); }
+      .fd-scroll { flex: 1; min-height: 0; overflow: auto; padding: 16px 24px 40px; }
+      .fd-cols {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start;
+      }
+      @media (max-width: 860px) { .fd-cols { grid-template-columns: 1fr; } }
+      .fd-col {
+        background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+        min-height: 220px; display: flex; flex-direction: column; overflow: hidden;
+      }
+      .fd-col-head {
+        display: flex; align-items: baseline; justify-content: space-between;
+        gap: 10px; padding: 14px 16px 10px; border-bottom: 1px solid var(--divider);
+      }
+      .fd-col-head .section { margin: 0; }
+      .fd-col-count { font-size: 12px; color: var(--muted); font-feature-settings: 'tnum' 1; }
+      .fd-list { list-style: none; margin: 0; padding: 6px 0; }
+      .fd-empty { margin: 0; padding: 28px 16px; font-size: 13px; color: var(--muted); text-align: center; }
+      .fd-row {
+        display: flex; align-items: center; gap: 12px;
+        padding: 10px 16px; border-bottom: 1px solid var(--divider);
+      }
+      .fd-row:last-child { border-bottom: none; }
+      .fd-row:hover { background: var(--surface-hover); }
+      .fd-row-meta { min-width: 0; flex: 1; }
+      .fd-row-name {
+        font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .fd-row-sub { font-size: 11px; color: var(--muted); margin-top: 2px; font-feature-settings: 'tnum' 1; }
+      .fd-download {
+        flex-shrink: 0; font-size: 12px; font-weight: 700; color: var(--primary-pressed);
+        text-decoration: none; padding: 8px 10px; border-radius: 8px;
+      }
+      .fd-download:hover { background: var(--primary-light); }
 
       /* —— 결과 섹션의 "정보" 버튼 + 반려견 정보 모달 —— */
       #btnStageInfo {
@@ -1013,6 +1068,7 @@
         </div>
         <nav class="ah-nav" aria-label="Modules">
           <button type="button" class="active" data-module="measure" aria-current="page" data-i18n="nav_measure">측정</button>
+          <button type="button" data-module="files" data-i18n="nav_files">파일 다운</button>
           <button type="button" data-module="upload" data-i18n="nav_upload">직접 분석</button>
           <button type="button" data-module="report" data-i18n="nav_report">리포트</button>
         </nav>
@@ -1342,6 +1398,40 @@
       </div>
     </main>
     </div><!-- #appBody -->
+
+    <section id="filesPage" hidden aria-label="Stored files">
+      <div class="rp-toolbar">
+        <div class="rp-toolbar-text">
+          <h1 id="fdTitle" data-i18n="files_page_title">파일 다운</h1>
+          <p id="fdSub" data-i18n="files_page_sub">서버에 저장된 압력 CSV와 원본 영상을 내려받습니다.</p>
+        </div>
+        <div class="fd-toolbar-extra">
+          <input id="fdSearch" type="search" autocomplete="off" data-i18n-title="files_search_placeholder" placeholder="파일 이름 검색" />
+          <button type="button" id="fdRefresh" data-i18n="btn_results_refresh">새로고침</button>
+        </div>
+      </div>
+      <p id="fdStatus" class="fd-status"></p>
+      <div class="fd-scroll">
+        <div class="fd-cols">
+          <section class="fd-col" aria-labelledby="fdCsvHeading">
+            <div class="fd-col-head">
+              <div class="section" id="fdCsvHeading" data-i18n="files_csv_heading">압력 CSV</div>
+              <span id="fdCsvCount" class="fd-col-count"></span>
+            </div>
+            <p id="fdCsvEmpty" class="fd-empty" data-i18n="files_empty_csv">저장된 CSV가 없습니다.</p>
+            <ul id="fdCsvList" class="fd-list"></ul>
+          </section>
+          <section class="fd-col" aria-labelledby="fdVideoHeading">
+            <div class="fd-col-head">
+              <div class="section" id="fdVideoHeading" data-i18n="files_video_heading">원본 영상</div>
+              <span id="fdVideoCount" class="fd-col-count"></span>
+            </div>
+            <p id="fdVideoEmpty" class="fd-empty" data-i18n="files_empty_video">저장된 영상이 없습니다.</p>
+            <ul id="fdVideoList" class="fd-list"></ul>
+          </section>
+        </div>
+      </div>
+    </section>
 
     <section id="uploadPage" hidden aria-label="Direct analysis">
       <div class="rp-toolbar">

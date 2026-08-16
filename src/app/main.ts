@@ -70,6 +70,7 @@ import { hasDogInfo, type ManualDogInfo } from "../api/analyzeApi.js";
 import { ResultsPanel } from "../ui/resultsPanel.js";
 import { ReportPage } from "../ui/reportPage.js";
 import { UploadPage } from "../ui/uploadPage.js";
+import { FilesPage } from "../ui/filesPage.js";
 import { openDogInfoModal } from "../ui/dogInfoModal.js";
 import {
   clearReviewPanes,
@@ -352,9 +353,9 @@ function wireDogInfoToggle(): void {
   sync();
 }
 
-type AppModule = "measure" | "report" | "upload";
+type AppModule = "measure" | "report" | "upload" | "files";
 
-const APP_MODULES: readonly AppModule[] = ["measure", "report", "upload"];
+const APP_MODULES: readonly AppModule[] = ["measure", "report", "upload", "files"];
 
 /** 헤더 nav 를 연결하고, 코드에서 모듈을 바꿀 수 있는 함수를 돌려준다. */
 function wireAppHeader(opts: { onModuleChange: (mod: AppModule) => void }): (mod: AppModule) => void {
@@ -444,6 +445,9 @@ async function boot(): Promise<void> {
   const reportPageEl = $opt("reportPage");
   const reportPage = reportPageEl ? new ReportPage(reportPageEl) : null;
   reportPage?.setApiBase(apiBase);
+  const filesPageEl = $opt("filesPage");
+  const filesPage = filesPageEl ? new FilesPage(filesPageEl) : null;
+  filesPage?.setApiBase(apiBase);
   clearReviewPanes();
 
   const sessionBtn = $("btnSession") as HTMLButtonElement;
@@ -838,6 +842,8 @@ async function boot(): Promise<void> {
       else reportPage?.hide();
       if (mod === "upload") uploadPage?.show();
       else uploadPage?.hide();
+      if (mod === "files") filesPage?.show();
+      else filesPage?.hide();
     },
   });
 
