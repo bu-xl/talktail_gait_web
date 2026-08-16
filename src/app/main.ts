@@ -426,46 +426,16 @@ async function boot(): Promise<void> {
   let clinicSessionActive = false;
   let simulateTimer: number | null = null;
   let confirmBusy = false;
+  /** 재촬영한 job 의 analyze_done 은 웹 리뷰 칸을 채우지 않는다. */
+  let ignoreDoneJobId: string | null = null;
+  /** 업로드보다 재촬영을 먼저 누른 경우, job 이 생기면 그때 AI 를 건너뛴다. */
+  let retakeRequested = false;
 
   const clearSimulateTimer = (): void => {
     if (simulateTimer != null) {
       window.clearTimeout(simulateTimer);
       simulateTimer = null;
     }
-  };
-
-  const scheduleSimulateReview = (): void => {
-    if (!isSimulateAi()) return;
-    clearSimulateTimer();
-    setSyncStatus(t("sim_preparing"), "wait");
-    simulateTimer = window.setTimeout(() => {
-      simulateTimer = null;
-      if (sessionPhase !== "analyzing") return;
-      const analysis = placeholderUrl("analysis.mp4");
-      const origin = placeholderUrl("origin.mp4");
-      const angle = placeholderUrl("max-min.mp4");
-      const stride = placeholderUrl("shadow.png");
-      enterReview({
-        analysisUrl: analysis,
-        originalUrl: origin,
-        artifacts: {
-          video: { kind: "video", available: true, url: analysis, filename: "analysis.mp4" },
-          angle_pawy: { kind: "angle_pawy", available: true, url: angle, filename: "max-min.mp4" },
-          stride: { kind: "stride", available: true, url: stride, filename: "shadow.png" },
-          cyclogram: { kind: "cyclogram", available: true, url: analysis, filename: "analysis.mp4" },
-          derived: { kind: "derived", available: false, url: null },
-        },
-        date: "sim",
-        time: "000000",
-        stem: "simulated-session",
-        sessionPath: "sim/000000",
-      });
-      // 패드 프레임이 없으면 1번도 placeholder GIF
-      if (!$opt("wsBody1")?.classList.contains("has-media")) {
-        setPressureGif(placeholderUrl("foot.gif"));
-      }
-      setSyncStatus(t("sim_done"), "ok");
-    }, 2500);
   };
 
   const resultsPanelEl = $opt("resultsPanel");
@@ -526,13 +496,20 @@ async function boot(): Promise<void> {
     document.body.classList.remove("modal-open");
   };
 
-  const showConfirmModal = (): void => {
+  const syncConfirmModal = (): void => {
     $("confirmAnalyzeTitle").textContent = t("confirm_analyze_title");
-    $("confirmAnalyzeHint").textContent = t("confirm_analyze_hint");
     confirmAnalyzeBtn.textContent = t("confirm_analyze_yes");
     confirmCancelBtn.textContent = t("confirm_analyze_no");
-    confirmAnalyzeBtn.disabled = false;
-    confirmCancelBtn.disabled = false;
+    const uploaded = Boolean(pendingAnalyzeJob);
+    $("confirmAnalyzeHint").textContent = uploaded
+      ? t("confirm_analyze_hint")
+      : t("confirm_analyze_waiting_upload");
+    confirmAnalyzeBtn.disabled = confirmBusy || !uploaded;
+    confirmCancelBtn.disabled = confirmBusy;
+  };
+
+  const showConfirmModal = (): void => {
+    syncConfirmModal();
     confirmModal.classList.add("open");
     document.body.classList.add("modal-open");
   };
@@ -584,6 +561,8 @@ async function boot(): Promise<void> {
 
   const beginJobPolling = (jobId: string): void => {
     pendingAnalyzeJob = jobId;
+    clearReviewPanes();
+    revokePressureGif();
     setSyncStatus(t("sync_analyzing"), "wait");
     setSessionPhase("analyzing");
     cameraPlayer.setLoading(true, t("sync_analyzing"));
@@ -604,45 +583,30 @@ async function boot(): Promise<void> {
           cameraPlayer.setLoading(false);
         } else {
           cameraPlayer.setLoading(false);
-          if (isSimulateAi()) {
-            setSessionPhase("analyzing");
-            scheduleSimulateReview();
-          } else {
-            setSessionPhase("idle");
-            setSyncStatus(`${t("sync_analyze_failed")}: ${job.error ?? "unknown"}`, "bad");
-          }
+          setSessionPhase("idle");
+          setSyncStatus(`${t("sync_analyze_failed")}: ${job.error ?? "unknown"}`, "bad");
         }
       })
       .catch((err) => {
         if (pendingAnalyzeJob !== jobId) return;
         pendingAnalyzeJob = null;
         cameraPlayer.setLoading(false);
-        if (isSimulateAi()) {
-          setSessionPhase("analyzing");
-          scheduleSimulateReview();
-        } else {
-          setSessionPhase("idle");
-          setSyncStatus(err instanceof Error ? err.message : String(err), "bad");
-        }
+        setSessionPhase("idle");
+        setSyncStatus(err instanceof Error ? err.message : String(err), "bad");
       });
   };
 
   const onConfirmAnalyze = (): void => {
     if (confirmBusy) return;
     const jobId = pendingAnalyzeJob;
-    if (isSimulateAi()) {
-      hideConfirmModal();
-      setSessionPhase("analyzing");
-      scheduleSimulateReview();
-      return;
-    }
     if (!jobId) {
       setSyncStatus(t("confirm_analyze_waiting_upload"), "warn");
+      syncConfirmModal();
       return;
     }
     confirmBusy = true;
-    confirmAnalyzeBtn.disabled = true;
-    confirmCancelBtn.disabled = true;
+    retakeRequested = false;
+    syncConfirmModal();
     void confirmAnalyzeJob(apiBase, jobId)
       .then(() => {
         hideConfirmModal();
@@ -650,45 +614,48 @@ async function boot(): Promise<void> {
       })
       .catch((err) => {
         setSyncStatus(err instanceof Error ? err.message : String(err), "bad");
-        confirmAnalyzeBtn.disabled = false;
-        confirmCancelBtn.disabled = false;
         setSessionPhase("confirm");
       })
       .finally(() => {
         confirmBusy = false;
+        if (sessionPhase === "confirm") syncConfirmModal();
       });
+  };
+
+  const finishRetakeUi = (): void => {
+    pendingAnalyzeJob = null;
+    clinicSessionActive = false;
+    cameraPlayer.setLoading(false);
+    hideConfirmModal();
+    clearReviewPanes();
+    revokePressureGif();
+    setSessionPhase("idle");
+    setSyncStatus(t("confirm_analyze_cancelled"), "ok");
+    updateSyncUi(gaitSync.peers, gaitSync.connected);
+  };
+
+  const skipAiForJob = (jobId: string): Promise<void> => {
+    ignoreDoneJobId = jobId;
+    return cancelAnalyzeJob(apiBase, jobId).then(() => undefined);
   };
 
   const onCancelAnalyze = (): void => {
     if (confirmBusy) return;
     const jobId = pendingAnalyzeJob;
     confirmBusy = true;
-    confirmAnalyzeBtn.disabled = true;
-    confirmCancelBtn.disabled = true;
-    const finishCancel = (): void => {
-      pendingAnalyzeJob = null;
-      clinicSessionActive = false;
-      cameraPlayer.setLoading(false);
-      hideConfirmModal();
-      setSessionPhase("idle");
-      setSyncStatus(t("confirm_analyze_cancelled"), "ok");
-      updateSyncUi(gaitSync.peers, gaitSync.connected);
-    };
-    if (isSimulateAi() || !jobId) {
-      finishCancel();
+    retakeRequested = true;
+    syncConfirmModal();
+    if (!jobId) {
+      finishRetakeUi();
       confirmBusy = false;
       return;
     }
-    void cancelAnalyzeJob(apiBase, jobId)
-      .then(() => {
-        finishCancel();
-      })
+    void skipAiForJob(jobId)
       .catch((err) => {
         setSyncStatus(err instanceof Error ? err.message : String(err), "bad");
-        // 취소 API 실패해도 UI 는 정리 — 재시도로 고아 파일이 남을 수 있음
-        finishCancel();
       })
       .finally(() => {
+        finishRetakeUi();
         confirmBusy = false;
       });
   };
@@ -1304,18 +1271,33 @@ async function boot(): Promise<void> {
       if (recorder.isRecording) stopLocalRecording();
       syncSessionId = null;
       if (clinicSessionActive || sessionPhase === "recording") {
-        setSessionPhase("saving");
-        setSyncStatus(t("session_saving_sub"), "wait");
+        setSessionPhase("confirm");
+        setSyncStatus(t("confirm_analyze_waiting_upload"), "wait");
       }
     }
     if (msg.type === "upload_started") {
       pendingAnalyzeJob = msg.jobId;
-      setSyncStatus(t("sync_uploading"), "wait");
       cameraPlayer.setLoading(false);
-      // 저장 완료 → 분석 여부 확인 모달 (AI 는 confirm 후에만)
+      if (retakeRequested) {
+        retakeRequested = false;
+        void skipAiForJob(msg.jobId)
+          .catch((err) => {
+            setSyncStatus(err instanceof Error ? err.message : String(err), "bad");
+          })
+          .finally(() => {
+            finishRetakeUi();
+          });
+        return;
+      }
+      setSyncStatus(t("confirm_analyze_hint"), "wait");
       setSessionPhase("confirm");
+      syncConfirmModal();
     }
     if (msg.type === "analyze_done") {
+      if (msg.jobId && msg.jobId === ignoreDoneJobId) {
+        ignoreDoneJobId = null;
+        return;
+      }
       pendingAnalyzeJob = null;
       cameraPlayer.setLoading(false);
       enterReview({
@@ -1338,8 +1320,8 @@ async function boot(): Promise<void> {
         setSessionPhase("idle");
         setSyncStatus(t("confirm_analyze_cancelled"), "ok");
       } else if (isSimulateAi()) {
-        setSessionPhase("analyzing");
-        scheduleSimulateReview();
+        setSessionPhase("idle");
+        setSyncStatus(`${t("sync_analyze_failed")}: ${msg.error}`, "bad");
       } else if (sessionPhase === "confirm") {
         // 업로드 이후 확인 대기 중이면 모달을 유지하고 상태만 알림
         setSyncStatus(`${t("sync_analyze_failed")}: ${msg.error}`, "bad");
@@ -1403,6 +1385,9 @@ async function boot(): Promise<void> {
       return;
     }
     clinicSessionActive = true;
+    retakeRequested = false;
+    ignoreDoneJobId = null;
+    pendingAnalyzeJob = null;
     revokePressureGif();
     clearReviewPanes();
     syncRecordPending = true;
@@ -1420,13 +1405,10 @@ async function boot(): Promise<void> {
     syncSessionId = null;
     syncRecordPending = false;
     pendingAnalyzeJob = null;
-    setSessionPhase("saving");
-    setSyncStatus(t("session_saving_sub"), "wait");
+    retakeRequested = false;
+    setSessionPhase("confirm");
+    setSyncStatus(t("confirm_analyze_waiting_upload"), "wait");
     updateSyncUi(gaitSync.peers, gaitSync.connected);
-    // Simulate: 업로드 없이 바로 확인 모달
-    if (isSimulateAi()) {
-      setSessionPhase("confirm");
-    }
   };
 
   /**

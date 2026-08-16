@@ -221,7 +221,7 @@ export async function confirmAnalyzeJob(apiBaseUrl: string, jobId: string): Prom
   }
 }
 
-/** 웹 확인 모달 — AI 미전송 + 원본 데이터 삭제. */
+/** 웹 확인 모달 "재촬영" — AI 미전송. 앱은 원본 URL 로 결과 화면에 간다. */
 export async function cancelAnalyzeJob(apiBaseUrl: string, jobId: string): Promise<void> {
   const res = await fetch(joinApiUrl(apiBaseUrl, `/api/analyze/${encodeURIComponent(jobId)}`), {
     method: "DELETE",

@@ -649,7 +649,7 @@
         display: flex; gap: 8px; justify-content: flex-end;
         padding: 12px 18px;
       }
-      #confirmAnalyzeModal .dialog-foot button { min-width: 88px; }
+      #confirmAnalyzeModal .dialog-foot button { min-width: 104px; }
       #confirmAnalyzeModal .dialog-foot button.primary {
         background: var(--primary); border-color: var(--primary); color: #fff;
       }
@@ -1561,11 +1561,11 @@
       <div class="dialog">
         <div class="dialog-head">
           <h2 id="confirmAnalyzeTitle" data-i18n="confirm_analyze_title">이 촬영을 분석할까요?</h2>
-          <p id="confirmAnalyzeHint" data-i18n="confirm_analyze_hint">분석을 누르면 AI 서버로 전송됩니다. 취소하면 저장된 데이터가 삭제됩니다.</p>
+          <p id="confirmAnalyzeHint" data-i18n="confirm_analyze_hint">분석하기를 누르면 AI 서버로 보냅니다. 재촬영을 누르면 분석을 건너뜁니다.</p>
         </div>
         <div class="dialog-foot">
-          <button type="button" id="confirmCancelBtn" data-i18n="confirm_analyze_no">취소</button>
-          <button type="button" class="primary" id="confirmAnalyzeBtn" data-i18n="confirm_analyze_yes">분석</button>
+          <button type="button" id="confirmCancelBtn" data-i18n="confirm_analyze_no">재촬영</button>
+          <button type="button" class="primary" id="confirmAnalyzeBtn" data-i18n="confirm_analyze_yes">분석하기</button>
         </div>
       </div>
     </div>
