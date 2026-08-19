@@ -66,7 +66,8 @@ import {
   cancelAnalyzeJob,
   type SyncPeers,
 } from "../transport/gaitSocket.js";
-import { hasDogInfo, type ManualDogInfo } from "../api/analyzeApi.js";
+import { hasDogInfo, type ManualAnalyzeJob, type ManualDogInfo } from "../api/analyzeApi.js";
+import { showToast, updateQueueToast } from "../ui/toast.js";
 import { ResultsPanel } from "../ui/resultsPanel.js";
 import { ReportPage } from "../ui/reportPage.js";
 import { UploadPage } from "../ui/uploadPage.js";
@@ -82,6 +83,7 @@ import {
 } from "../ui/reviewPanes.js";
 import { loadAngleDiffPane } from "../ui/angleDiffPane.js";
 import { SyncPlaybackDock } from "../ui/syncPlaybackDock.js";
+import { MEASURE_PANES, ReviewSyncController } from "../player/reviewSync.js";
 import { wireWorkspaceVideoControls } from "../ui/workspaceVideoControls.js";
 
 /** Promo filming cases. Open with `?promo=ami` (local dashboard_analysis) or `?promo=165529`. */
@@ -413,6 +415,9 @@ async function boot(): Promise<void> {
   const renderFps = new FpsMeter();
   const inputHz = new RateMeter(1000);
   const recorder = new SessionRecorder();
+  // One transport for the five review panes; the per-pane bars are hidden.
+  const stageEl = document.getElementById("stage");
+  const reviewSync = stageEl ? new ReviewSyncController(stageEl, MEASURE_PANES) : null;
   const syncDock = new SyncPlaybackDock();
   const cameraPlayer = syncDock.getPlayer();
   let syncSessionId: string | null = null;
@@ -451,6 +456,8 @@ async function boot(): Promise<void> {
   clearReviewPanes();
 
   const sessionBtn = $("btnSession") as HTMLButtonElement;
+  /** 레일이 접혀 있을 때 측정 화면에 뜨는 시작/종료 미러 버튼 — 상태는 sessionBtn 을 따라간다. */
+  const sessionFloatBtn = $opt("btnSessionFloat") as HTMLButtonElement | null;
   const sessionOverlay = $("sessionOverlay");
   const confirmModal = $("confirmAnalyzeModal");
   const confirmAnalyzeBtn = $("confirmAnalyzeBtn") as HTMLButtonElement;
@@ -560,23 +567,83 @@ async function boot(): Promise<void> {
       sessionBtn.classList.add("primary");
       sessionBtn.disabled = false;
     }
+    if (sessionFloatBtn) {
+      sessionFloatBtn.textContent = sessionBtn.textContent;
+      sessionFloatBtn.disabled = sessionBtn.disabled;
+      sessionFloatBtn.classList.toggle("is-stop", sessionBtn.classList.contains("is-stop"));
+    }
     syncStageInfoBtn();
   };
 
-  const beginJobPolling = (jobId: string): void => {
-    pendingAnalyzeJob = jobId;
-    clearReviewPanes();
-    revokePressureGif();
-    setSyncStatus(t("sync_analyzing"), "wait");
-    setSessionPhase("analyzing");
-    cameraPlayer.setLoading(true, t("sync_analyzing"));
-    void pollJobUntilDone(apiBase, jobId)
+  /** 완료를 기다리는 분석 잡들 — WS `analyze_done` 을 놓쳤을 때의 백그라운드 폴링 폴백. */
+  const watchedJobs = new Set<string>();
+
+  type DoneBundle = {
+    jobId: string | null;
+    resultUrl: string;
+    originalUrl?: string | null;
+    artifacts?: SessionArtifacts | null;
+    date?: string | null;
+    time?: string | null;
+    stem?: string | null;
+    sessionPath?: string | null;
+  };
+
+  /**
+   * 분석 완료 공통 처리 — 화면이 한가하면 바로 결과를 펼치고,
+   * 다음 촬영/확인이 진행 중이면 화면을 뺏지 않고 토스트로만 알린다(클릭 시 열람).
+   */
+  const handleAnalyzeDone = (done: DoneBundle): void => {
+    if (done.jobId) watchedJobs.delete(done.jobId);
+    const review = {
+      analysisUrl: absolutizeResultUrl(apiBase, done.resultUrl),
+      originalUrl: done.originalUrl ?? null,
+      artifacts: done.artifacts ?? null,
+      date: done.date ?? null,
+      time: done.time ?? null,
+      stem: done.stem ?? null,
+      sessionPath: done.sessionPath ?? null,
+    };
+    const openWhenSafe = (): void => {
+      if (sessionPhase === "recording" || sessionPhase === "saving" || sessionPhase === "confirm") {
+        // 촬영 흐름을 끊지 않는다 — 토스트를 다시 걸어 두고 나중에 연다.
+        showToast({
+          kind: "ok",
+          title: t("toast_done_title"),
+          message: t("toast_done_view"),
+          durationMs: 12000,
+          onClick: openWhenSafe,
+        });
+        return;
+      }
+      enterReview(review);
+    };
+    if (sessionPhase === "idle" || sessionPhase === "review") {
+      enterReview(review);
+      showToast({ kind: "ok", title: t("toast_done_title") });
+    } else {
+      showToast({
+        kind: "ok",
+        title: t("toast_done_title"),
+        message: t("toast_done_view"),
+        durationMs: 12000,
+        onClick: openWhenSafe,
+      });
+    }
+  };
+
+  /** UI 를 막지 않는 잡 완료 감시. WS 가 먼저 처리하면 이 폴링은 조용히 물러난다. */
+  const watchJob = (jobId: string): void => {
+    if (watchedJobs.has(jobId)) return;
+    watchedJobs.add(jobId);
+    void pollJobUntilDone(apiBase, jobId, 5000, 60 * 60 * 1000)
       .then((job) => {
-        if (pendingAnalyzeJob !== jobId) return;
-        pendingAnalyzeJob = null;
+        if (!watchedJobs.has(jobId)) return;
+        watchedJobs.delete(jobId);
         if (job.status === "completed" && job.resultUrl) {
-          enterReview({
-            analysisUrl: absolutizeResultUrl(apiBase, job.resultUrl),
+          handleAnalyzeDone({
+            jobId,
+            resultUrl: job.resultUrl,
             originalUrl: job.originalUrl ?? null,
             artifacts: job.artifacts ?? null,
             date: job.date ?? null,
@@ -584,19 +651,14 @@ async function boot(): Promise<void> {
             stem: job.stem ?? null,
             sessionPath: job.sessionPath ?? null,
           });
-          cameraPlayer.setLoading(false);
-        } else {
-          cameraPlayer.setLoading(false);
-          setSessionPhase("idle");
+        } else if (job.status === "failed") {
+          showToast({ kind: "bad", title: t("toast_failed_title"), message: job.error ?? undefined });
           setSyncStatus(`${t("sync_analyze_failed")}: ${job.error ?? "unknown"}`, "bad");
         }
+        // cancelled 등 다른 종결 상태는 취소 흐름이 이미 안내했다.
       })
-      .catch((err) => {
-        if (pendingAnalyzeJob !== jobId) return;
-        pendingAnalyzeJob = null;
-        cameraPlayer.setLoading(false);
-        setSessionPhase("idle");
-        setSyncStatus(err instanceof Error ? err.message : String(err), "bad");
+      .catch(() => {
+        watchedJobs.delete(jobId);
       });
   };
 
@@ -612,9 +674,20 @@ async function boot(): Promise<void> {
     retakeRequested = false;
     syncConfirmModal();
     void confirmAnalyzeJob(apiBase, jobId)
-      .then(() => {
+      .then((resp) => {
+        // 분석은 큐에서 돌아간다 — 웹은 기다리지 않고 곧장 다음 촬영을 받을 수 있다.
         hideConfirmModal();
-        beginJobPolling(jobId);
+        pendingAnalyzeJob = null;
+        clinicSessionActive = false;
+        setSessionPhase("idle");
+        setSyncStatus(t("sync_analyzing"), "wait");
+        const behind = (resp?.queuePosition ?? 0) > 0;
+        showToast({
+          kind: "info",
+          title: t("toast_enqueued_title"),
+          message: behind ? t("toast_enqueued_next") : t("toast_enqueued_now"),
+        });
+        watchJob(jobId);
       })
       .catch((err) => {
         setSyncStatus(err instanceof Error ? err.message : String(err), "bad");
@@ -765,6 +838,9 @@ async function boot(): Promise<void> {
       if (gifUrl) setPressureGif(gifUrl);
     }
 
+    // Sources are assigned; pick the master and drive all panes as one.
+    reviewSync?.refresh();
+
     lastReportBundle = {
       originalUrl: originalUrl ?? null,
       artifacts: artifacts ?? null,
@@ -780,10 +856,11 @@ async function boot(): Promise<void> {
   };
 
   /**
-   * 직접 분석 — 업로드가 접수되면 측정 화면으로 넘어가 기존 "분석 중" 오버레이로 기다린다.
-   * 이 잡은 WS 방에 속하지 않으므로(촬영 세션이 아니다) 완료는 잡 폴링으로만 받는다.
+   * 직접 분석 — 업로드가 접수되면 측정 화면으로 옮기고 **큐 토스트로** 진행을 알린다.
+   * 화면을 막지 않으므로 분석이 도는 동안에도 촬영 세션을 시작할 수 있다.
+   * 이 잡은 WS 방에 속하지 않으므로(촬영 세션이 아니다) 완료는 백그라운드 잡 폴링으로 받는다.
    */
-  const startManualAnalysis = (jobId: string, dog: ManualDogInfo): void => {
+  const startManualAnalysis = (job: ManualAnalyzeJob, dog: ManualDogInfo): void => {
     lastDogInfo = dog;
     clinicSessionActive = false;
     syncSessionId = null;
@@ -794,45 +871,21 @@ async function boot(): Promise<void> {
     clearReviewPanes();
     revokePressureGif();
     setModule("measure");
-    pendingAnalyzeJob = jobId;
-    setSessionPhase("analyzing");
     setSyncStatus(t("sync_analyzing"), "wait");
-    cameraPlayer.setLoading(true, t("sync_analyzing"));
-
-    void pollJobUntilDone(apiBase, jobId)
-      .then((job) => {
-        if (pendingAnalyzeJob !== jobId) return;
-        pendingAnalyzeJob = null;
-        cameraPlayer.setLoading(false);
-        if (job.status === "completed" && job.resultUrl) {
-          enterReview({
-            analysisUrl: absolutizeResultUrl(apiBase, job.resultUrl),
-            originalUrl: job.originalUrl ?? null,
-            artifacts: job.artifacts ?? null,
-            date: job.date ?? null,
-            time: job.time ?? null,
-            stem: job.stem ?? null,
-            sessionPath: job.sessionPath ?? null,
-          });
-          return;
-        }
-        setSessionPhase("idle");
-        setSyncStatus(`${t("sync_analyze_failed")}: ${job.error ?? "unknown"}`, "bad");
-      })
-      .catch((err) => {
-        if (pendingAnalyzeJob !== jobId) return;
-        pendingAnalyzeJob = null;
-        cameraPlayer.setLoading(false);
-        setSessionPhase("idle");
-        setSyncStatus(err instanceof Error ? err.message : String(err), "bad");
-      });
+    const behind = (job.queuePosition ?? 0) > 0;
+    showToast({
+      kind: "info",
+      title: t("toast_enqueued_title"),
+      message: behind ? t("toast_enqueued_next") : t("toast_enqueued_now"),
+    });
+    watchJob(job.jobId);
   };
 
   const uploadPageEl = $opt("uploadPage");
   const uploadPage = uploadPageEl
     ? new UploadPage(uploadPageEl, {
         apiBase,
-        onSubmitted: (job, dog) => startManualAnalysis(job.jobId, dog),
+        onSubmitted: (job, dog) => startManualAnalysis(job, dog),
       })
     : null;
 
@@ -1304,10 +1357,13 @@ async function boot(): Promise<void> {
         ignoreDoneJobId = null;
         return;
       }
-      pendingAnalyzeJob = null;
+      // 큐 도입 후에는 이전 잡의 완료가 **다음 촬영 도중** 도착할 수 있다.
+      // 지금 확인을 기다리는 잡(pendingAnalyzeJob)이 아니면 건드리지 않는다.
+      if (msg.jobId && msg.jobId === pendingAnalyzeJob) pendingAnalyzeJob = null;
       cameraPlayer.setLoading(false);
-      enterReview({
-        analysisUrl: absolutizeResultUrl(apiBase, msg.resultUrl),
+      handleAnalyzeDone({
+        jobId: msg.jobId ?? null,
+        resultUrl: msg.resultUrl,
         originalUrl: msg.originalUrl ?? null,
         artifacts: msg.artifacts ?? null,
         date: msg.date ?? null,
@@ -1317,26 +1373,27 @@ async function boot(): Promise<void> {
       });
     }
     if (msg.type === "analyze_failed") {
+      if (msg.jobId) watchedJobs.delete(msg.jobId);
       cameraPlayer.setLoading(false);
-      const cancelled = String(msg.error || "").toLowerCase().includes("cancel");
-      if (cancelled) {
-        pendingAnalyzeJob = null;
+      showToast({ kind: "bad", title: t("toast_failed_title"), message: msg.error });
+      setSyncStatus(`${t("sync_analyze_failed")}: ${msg.error}`, "bad");
+      if (msg.jobId && msg.jobId === pendingAnalyzeJob) pendingAnalyzeJob = null;
+      // 진행 중인 촬영/확인 UI 는 유지한다 — 이전 잡의 실패가 다음 촬영을 끊지 않게.
+      if (sessionPhase === "analyzing") {
         clinicSessionActive = false;
-        hideConfirmModal();
         setSessionPhase("idle");
-        setSyncStatus(t("confirm_analyze_cancelled"), "ok");
-      } else if (isSimulateAi()) {
-        setSessionPhase("idle");
-        setSyncStatus(`${t("sync_analyze_failed")}: ${msg.error}`, "bad");
-      } else if (sessionPhase === "confirm") {
-        // 업로드 이후 확인 대기 중이면 모달을 유지하고 상태만 알림
-        setSyncStatus(`${t("sync_analyze_failed")}: ${msg.error}`, "bad");
-      } else {
-        clinicSessionActive = false;
-        pendingAnalyzeJob = null;
-        setSessionPhase("idle");
-        setSyncStatus(`${t("sync_analyze_failed")}: ${msg.error}`, "bad");
       }
+    }
+    if (msg.type === "analyze_cancelled") {
+      watchedJobs.delete(msg.jobId);
+      if (pendingAnalyzeJob && msg.jobId === pendingAnalyzeJob) {
+        // 다른 곳(또는 경합)에서 취소됨 — 확인 모달을 접고 대기 상태로.
+        finishRetakeUi();
+      }
+      showToast({ kind: "warn", title: t("toast_cancelled_title"), message: t("toast_cancelled_msg") });
+    }
+    if (msg.type === "analysis_queue") {
+      updateQueueToast(msg);
     }
     if (msg.type === "error") {
       syncRecordPending = false;
@@ -1458,7 +1515,7 @@ async function boot(): Promise<void> {
     pipeline.finishBaseline();
   };
 
-  sessionBtn.addEventListener("click", () => {
+  const onSessionButtonClick = (): void => {
     if (sessionPhase === "recording") {
       stopClinicSession();
       return;
@@ -1472,11 +1529,15 @@ async function boot(): Promise<void> {
     }
     // 시작 → 1초 영점 보정 후 기존 세션 시작 흐름 진행.
     sessionBtn.disabled = true;
+    if (sessionFloatBtn) sessionFloatBtn.disabled = true;
     void runZeroCalibration().finally(() => {
       sessionBtn.disabled = false;
+      if (sessionFloatBtn) sessionFloatBtn.disabled = false;
       startClinicSession();
     });
-  });
+  };
+  sessionBtn.addEventListener("click", onSessionButtonClick);
+  sessionFloatBtn?.addEventListener("click", onSessionButtonClick);
 
   onClick("btnRecord", () => {
     /* Pad-only / legacy control — clinic flow prefers #btnSession (Start/Stop). */

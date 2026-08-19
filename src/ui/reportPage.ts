@@ -18,6 +18,9 @@ import { hasDogInfo } from "../api/analyzeApi.js";
 import { onLangChange, t } from "../i18n/index.js";
 import { LOCALES, type Lang, type LocaleKey } from "../i18n/locales.js";
 import { openDogInfoModal } from "./dogInfoModal.js";
+import { ResultPlayerOverlay, playerBlockedReason } from "../player/mount.js";
+import { REPORT_PANES, ReviewSyncController } from "../player/reviewSync.js";
+import type { ResultPlayerInputs } from "../player/mount.js";
 import {
   clearAngleDiffPane,
   loadAngleDiffPane,
@@ -69,6 +72,9 @@ export class ReportPage {
   private caveatsOpen = false;
   private lastPreview: DerivedPreview | null = null;
   private lastDetail: ResultDetail | null = null;
+  private readonly playerOverlay = new ResultPlayerOverlay();
+  private reviewSync: ReviewSyncController | null = null;
+  private syncPlayerBtn: HTMLButtonElement | null = null;
   private lastCyclogramUrl: string | null = null;
   private reportLang: ReportLang = "ko";
   private visible = false;
@@ -99,6 +105,10 @@ export class ReportPage {
     this.reviewTitleEl = document.getElementById("rpReviewTitle") as HTMLElement;
     this.reviewSubEl = document.getElementById("rpReviewSub") as HTMLElement;
 
+    this.syncPlayerBtn = this.buildSyncPlayerButton();
+    // Starts labelled and disabled: no session is loaded yet.
+    this.refreshSyncPlayerButton();
+
     this.backBtn.addEventListener("click", () => void this.goBack());
     this.refreshBtn.addEventListener("click", () => void this.refresh());
     this.langKoBtn.addEventListener("click", () => this.setReportLang("ko"));
@@ -109,7 +119,13 @@ export class ReportPage {
     this.reviewOverlay.addEventListener("click", (e) => {
       if (e.target === this.reviewOverlay) this.closeReview();
     });
-    this.bindReviewControls();
+    // One transport for all five panes. The per-pane play/speed bars are what
+    // let the four videos drift apart, so the controller hides them.
+    this.reviewSync = new ReviewSyncController(
+      this.reviewOverlay,
+      REPORT_PANES,
+      document.getElementById("rpReviewShell") ?? this.reviewOverlay,
+    );
 
     onLangChange(() => {
       if (!this.visible) return;
@@ -160,12 +176,16 @@ export class ReportPage {
   }
 
   private async goBack(): Promise<void> {
+    // Leaving the session must not strand a full-screen player over the list.
+    this.playerOverlay.close();
     if (this.step === "detail") {
       this.closeReview();
       this.clearCyclogramVideo();
       this.detailEl.classList.add("hidden");
       this.listEl.classList.remove("hidden");
       this.lastDetail = null;
+    this.refreshSyncPlayerButton();
+      this.refreshSyncPlayerButton();
       this.lastPreview = null;
       if (this.selectedDate) {
         this.step = "sessions";
@@ -231,6 +251,78 @@ export class ReportPage {
     this.reviewCloseBtn.textContent = t("report_review_close");
     this.langKoBtn.classList.toggle("active", this.reportLang === "ko");
     this.langEnBtn.classList.toggle("active", this.reportLang === "en");
+    this.refreshSyncPlayerButton();
+  }
+
+  /**
+   * Entry point to the sync player, built next to "view media" rather than
+   * added to index.html so the report markup stays as it is.
+   */
+  private buildSyncPlayerButton(): HTMLButtonElement | null {
+    const host = this.viewMediaBtn.parentElement;
+    if (!host) return null;
+
+    if (!document.getElementById("rpSyncPlayerStyle")) {
+      const style = document.createElement("style");
+      style.id = "rpSyncPlayerStyle";
+      style.textContent = `
+#rpSyncPlayer{background:#f0663f;color:#fff;border-color:#f0663f}
+#rpSyncPlayer:hover:not(:disabled){filter:brightness(1.06)}
+#rpSyncPlayer:disabled{opacity:.45;cursor:not-allowed}
+#rpViewMedia{margin-left:auto}
+#rpSyncPlayer{margin-left:8px}`;
+      document.head.appendChild(style);
+    }
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.id = "rpSyncPlayer";
+    btn.addEventListener("click", () => this.openSyncPlayer());
+    host.insertBefore(btn, this.viewMediaBtn.nextSibling);
+    return btn;
+  }
+
+  /** Inputs the player needs, taken from the loaded session detail. */
+  private syncPlayerInputs(): ResultPlayerInputs | null {
+    const detail = this.lastDetail;
+    if (!detail) return null;
+    return {
+      videoUrl: detail.video?.url ?? null,
+      pressureCsvUrl: detail.csv?.url ?? null,
+      keypointsUrl: detail.report?.keypoints?.url ?? null,
+      title: detail.session.displayTime,
+      subtitle: detail.displayDate,
+    };
+  }
+
+  /**
+   * Say which artifact is missing rather than opening onto empty panels.
+   */
+  private refreshSyncPlayerButton(): void {
+    const btn = this.syncPlayerBtn;
+    if (!btn) return;
+    btn.textContent = t("gp_open");
+
+    const inputs = this.syncPlayerInputs();
+    if (!inputs) {
+      btn.disabled = true;
+      btn.title = "";
+      return;
+    }
+    const blocked = playerBlockedReason(inputs);
+    btn.disabled = blocked !== null;
+    btn.title = blocked ?? t("gp_open_hint");
+  }
+
+  private openSyncPlayer(): void {
+    const inputs = this.syncPlayerInputs();
+    if (!inputs) return;
+    try {
+      this.playerOverlay.open(inputs);
+    } catch (err) {
+      const btn = this.syncPlayerBtn;
+      if (btn) btn.title = err instanceof Error ? err.message : String(err);
+    }
   }
 
   private setReportLang(lang: ReportLang): void {
@@ -300,6 +392,7 @@ export class ReportPage {
     this.caveatsOpen = false;
     this.reportLang = "ko";
     this.lastDetail = null;
+    this.refreshSyncPlayerButton();
     this.lastPreview = null;
     this.listEl.classList.add("hidden");
     this.emptyEl.classList.add("hidden");
@@ -311,6 +404,7 @@ export class ReportPage {
     try {
       const detail = await getResultDetail(this.apiBase, date.date, session.stem);
       this.lastDetail = detail;
+      this.refreshSyncPlayerButton();
       this.lastPreview = detail.report.derived.preview ?? null;
       this.updateChrome();
       const cyclogramUrl =
@@ -495,27 +589,6 @@ export class ReportPage {
     }
   }
 
-  private bindReviewControls(): void {
-    this.reviewOverlay.querySelectorAll<HTMLElement>(".ws-media-controls").forEach((bar) => {
-      const id = bar.getAttribute("data-video");
-      if (!id) return;
-      const video = document.getElementById(id) as HTMLVideoElement | null;
-      if (!video) return;
-      const playBtn = bar.querySelector(".ws-play") as HTMLButtonElement | null;
-      const speed = bar.querySelector(".ws-speed") as HTMLSelectElement | null;
-      playBtn?.addEventListener("click", () => {
-        if (video.paused) void video.play().catch(() => undefined);
-        else video.pause();
-        syncReviewBar(video);
-      });
-      speed?.addEventListener("change", () => {
-        video.playbackRate = Number(speed.value) || 1;
-      });
-      video.addEventListener("play", () => syncReviewBar(video));
-      video.addEventListener("pause", () => syncReviewBar(video));
-    });
-  }
-
   private openReview(): void {
     const detail = this.lastDetail;
     if (!detail) return;
@@ -582,6 +655,9 @@ export class ReportPage {
 
     this.reviewOverlay.classList.add("open");
     this.reviewOverlay.setAttribute("aria-hidden", "false");
+    // Sources were just assigned; re-pick the master and drive them as one.
+    this.reviewSync?.refresh();
+
   }
 
   /** 세션 상세의 반려견 정보(이름·견종·몸무게·신장). */
@@ -605,6 +681,7 @@ export class ReportPage {
 
   private closeReview(): void {
     if (!this.reviewOverlay.classList.contains("open")) return;
+    this.reviewSync?.refresh();
     this.reviewOverlay.classList.remove("open");
     this.reviewOverlay.setAttribute("aria-hidden", "true");
     for (const id of ["rpOriginVideo", "rpAnalysisVideo", "rpAngleVideo", "rpPressureVideo"]) {
@@ -809,5 +886,6 @@ function setReviewMedia(
   body.classList.add("has-media");
   body.classList.remove("is-empty");
   syncReviewBar(media);
-  void media.play().then(() => syncReviewBar(media)).catch(() => syncReviewBar(media));
+  // Deliberately does NOT auto-play. Each pane starting itself is what put the
+  // four videos on four clocks; ReviewSyncController starts them together.
 }

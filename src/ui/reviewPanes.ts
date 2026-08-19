@@ -85,19 +85,8 @@ function setPaneMedia(bodyId: string, media: HTMLImageElement | HTMLVideoElement
   body.classList.add("has-media");
   body.classList.remove("is-empty");
 
-  if (media.paused) {
-    void media.play().then(() => syncVideoBar(media, true)).catch((error: unknown) => {
-      if (
-        typeof DOMException !== "undefined" &&
-        error instanceof DOMException &&
-        error.name === "AbortError"
-      ) {
-        syncVideoBar(media, true);
-        return;
-      }
-      syncVideoBar(media, true);
-    });
-  }
+  // Deliberately does NOT auto-play. Each pane starting itself is what put the
+  // panes on separate clocks; ReviewSyncController starts them together.
 }
 
 function isVideoUrl(url: string): boolean {

@@ -26,6 +26,8 @@ export type ManualAnalyzeJob = {
   status: string;
   sessionId: string | null;
   originalUrl: string | null;
+  /** 분석 큐 대기 순번. 0 = 바로 시작. */
+  queuePosition?: number;
 };
 
 /** 강아지 정보 4종 중 하나라도 값이 있으면 true. */

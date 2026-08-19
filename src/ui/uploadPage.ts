@@ -7,15 +7,13 @@
  * 기존 "분석 중" 오버레이가 그대로 맡는다.
  */
 
-import { uploadManualAnalysis, type ManualDogInfo } from "../api/analyzeApi.js";
+import { uploadManualAnalysis, type ManualAnalyzeJob, type ManualDogInfo } from "../api/analyzeApi.js";
 import { onLangChange, t } from "../i18n/index.js";
-
-type SubmitResult = { jobId: string };
 
 export type UploadPageOptions = {
   apiBase: string;
   /** 업로드 접수 직후 호출 — 측정 화면으로 넘겨 분석 대기 상태로 만든다. */
-  onSubmitted: (job: SubmitResult, dog: ManualDogInfo) => void;
+  onSubmitted: (job: ManualAnalyzeJob, dog: ManualDogInfo) => void;
 };
 
 type Slot = "csv" | "video";
@@ -148,7 +146,7 @@ export class UploadPage {
     try {
       const job = await uploadManualAnalysis(this.opts.apiBase, { csv, video, dog });
       this.setStatus(t("upload_started"), "ok");
-      this.opts.onSubmitted({ jobId: job.jobId }, dog);
+      this.opts.onSubmitted(job, dog);
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
       this.setStatus(`${t("upload_failed")}: ${detail}`, "bad");

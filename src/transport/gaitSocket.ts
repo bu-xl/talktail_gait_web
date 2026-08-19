@@ -45,9 +45,35 @@ export type SyncMessage =
       serverNow: number;
     }
   | { type: "analyze_failed"; jobId?: string; error: string; sessionId?: string | null }
+  | { type: "analyze_cancelled"; jobId: string; sessionId: string | null; serverNow: number }
+  | ({ type: "analysis_queue" } & AnalysisQueueSnapshot)
   | { type: "error"; message: string }
   | { type: "pong"; serverTs: number; clientTs: number | null }
   | { type: "replaced"; reason: string };
+
+/** 서버 전역 분석 대기열 스냅샷 — 상태가 바뀔 때마다 브로드캐스트된다. */
+export type AnalysisQueueSnapshot = {
+  running: {
+    jobId: string;
+    label: string;
+    sessionId?: string | null;
+    startedAt: number;
+    elapsedMs?: number;
+    expectedEndAt: number;
+  } | null;
+  queued: Array<{
+    jobId: string;
+    label: string;
+    sessionId?: string | null;
+    position: number;
+    enqueuedAt?: number;
+    expectedStartAt?: number;
+    expectedEndAt: number;
+  }>;
+  queuedCount: number;
+  avgDurationMs: number;
+  serverNow: number;
+};
 
 type Handler = (msg: SyncMessage) => void;
 type ConnectionHandler = (connected: boolean) => void;
@@ -178,7 +204,8 @@ export function absolutizeResultUrl(apiBaseUrl: string, resultUrl: string): stri
 
 type JobPoll = {
   id: string;
-  status: "processing" | "completed" | "failed";
+  /** processing | completed | failed | cancelled | stored */
+  status: string;
   awaitingConfirm?: boolean;
   resultUrl: string | null;
   originalUrl?: string | null;
@@ -205,13 +232,20 @@ export async function pollJobUntilDone(
     const res = await fetch(joinApiUrl(apiBaseUrl, `/api/jobs/${encodeURIComponent(jobId)}`));
     if (!res.ok) throw new Error(`job poll HTTP ${res.status}`);
     const job = (await res.json()) as JobPoll;
-    if (job.status === "completed" || job.status === "failed") return job;
+    // cancelled/stored 등 어떤 종결 상태든 그대로 돌려준다(취소된 잡을 영원히 기다리지 않게).
+    if (job.status !== "processing") return job;
     await new Promise((r) => setTimeout(r, intervalMs));
   }
 }
 
-/** 웹 확인 모달 — 저장된 Main 영상을 AI 로 전송. */
-export async function confirmAnalyzeJob(apiBaseUrl: string, jobId: string): Promise<void> {
+/**
+ * 웹 확인 모달 "분석" — 저장된 Main 영상을 분석 큐에 세운다.
+ * @returns queuePosition 0 = 바로 시작, 1+ = 앞에 그만큼 대기.
+ */
+export async function confirmAnalyzeJob(
+  apiBaseUrl: string,
+  jobId: string,
+): Promise<{ jobId?: string; status?: string; queuePosition?: number }> {
   const res = await fetch(joinApiUrl(apiBaseUrl, `/api/analyze/${encodeURIComponent(jobId)}/confirm`), {
     method: "POST",
   });
@@ -219,9 +253,14 @@ export async function confirmAnalyzeJob(apiBaseUrl: string, jobId: string): Prom
     const text = await res.text();
     throw new Error(`분석 시작 실패 (${res.status}): ${text.slice(0, 200)}`);
   }
+  try {
+    return (await res.json()) as { jobId?: string; status?: string; queuePosition?: number };
+  } catch {
+    return {};
+  }
 }
 
-/** 웹 확인 모달 "재촬영" — AI 미전송. 앱은 원본 URL 로 결과 화면에 간다. */
+/** 웹 확인 모달 "취소(재촬영)" — AI 미전송. 서버가 `analyze_cancelled` 를 방에 뿌려 앱이 촬영 대기로 돌아간다. */
 export async function cancelAnalyzeJob(apiBaseUrl: string, jobId: string): Promise<void> {
   const res = await fetch(joinApiUrl(apiBaseUrl, `/api/analyze/${encodeURIComponent(jobId)}`), {
     method: "DELETE",
