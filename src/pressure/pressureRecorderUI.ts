@@ -32,6 +32,13 @@ export interface PressureCsvDeps {
   cols: number;
   /** 동기 촬영 세션 id (영상과 CSV 를 back 에서 한 세션으로 묶기 위함). */
   sessionId?: () => string | null;
+  /**
+   * CSV 첫 행(`time=0`)의 절대 시각(t_server_ns). 영상 프레임과 매칭하는 기준점.
+   * 시계 동기화 전에 녹화했으면 null — 그 CSV 는 영상과 정확히 맞출 수 없다.
+   */
+  startAtServerNs?: () => bigint | null;
+  clockOffsetNs?: () => bigint | null;
+  clockRttP50Ns?: () => bigint | null;
 }
 
 export interface PressureCsvController {
@@ -164,11 +171,29 @@ export function createPressureCsvController(deps: PressureCsvDeps): PressureCsvC
       cols: deps.cols,
       startedAt: new Date().toISOString(),
     };
+    // 나노초는 문자열로만 다룬다 — Number 로 바꾸면 2^53 을 넘어 자릿수가 잘린다.
+    const startAtServerNs = deps.startAtServerNs?.() ?? null;
+    const timebase = {
+      startAtServerNs: startAtServerNs?.toString() ?? null,
+      clockOffsetNs: deps.clockOffsetNs?.()?.toString() ?? null,
+      clockRttP50Ns: deps.clockRttP50Ns?.()?.toString() ?? null,
+    };
+    if (startAtServerNs === null) {
+      console.warn(
+        "[pressure] 시계 동기화 없이 녹화된 CSV 입니다 — 영상과 프레임 단위로 매칭할 수 없습니다.",
+      );
+    }
 
     busy = true;
     setStatus(t("csv_uploading", { n: frames }), "warn");
     try {
-      const record = await uploadPressureCsv(deps.apiBase, { csv, dog, recording, sessionId });
+      const record = await uploadPressureCsv(deps.apiBase, {
+        csv,
+        dog,
+        recording,
+        sessionId,
+        timebase,
+      });
       setStatus(t("csv_upload_done", { name: record.csv.filename }), "ok");
       await refresh();
     } catch (err) {

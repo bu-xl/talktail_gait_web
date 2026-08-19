@@ -15,6 +15,7 @@
 
 import { loadConfig } from "../core/config.js";
 import { configureSync, isSyncEnabled, resolveApiBase, resolveRoomId, resolveWsUrl } from "../config/sync.js";
+import { clockSync } from "../transport/clockSync.js";
 import { GRID_COLS, GRID_ROWS, aspectHeight } from "../core/constants.js";
 import { framesToCanineGaitCsv } from "../core/csvExport.js";
 import {
@@ -399,6 +400,39 @@ async function boot(): Promise<void> {
   const config = await fetchConfig();
   configureSync(config.sync);
   const apiBase = resolveApiBase();
+
+  /**
+   * 이번 녹화의 첫 프레임(time=0)에 해당하는 서버 시각(ns).
+   * 이 값이 있어야 CSV 를 영상 프레임과 짝지을 수 있다. 동기화 전이면 null.
+   */
+  let recordingStartServerNs: bigint | null = null;
+
+  // 서버와 시계를 맞춘다 — 매트를 카메라와 같은 시간축에 올리는 유일한 방법이다.
+  // 실패해도 앱은 계속 동작한다(그 세션의 CSV 만 영상과 매칭이 안 될 뿐).
+  void clockSync
+    .sync(apiBase)
+    .then((r) => {
+      const ms = (v: bigint): string => (Number(v) / 1e6).toFixed(2);
+      if (!r.ok) {
+        console.warn(
+          `[clock] 네트워크 지연이 큽니다 (왕복 p50 ${ms(r.rttP50Ns)}ms). ` +
+            "이 상태로 촬영하면 영상과의 정합이 어긋납니다.",
+        );
+      } else {
+        console.info(`[clock] 동기화 완료 · 왕복 p50 ${ms(r.rttP50Ns)}ms`);
+      }
+      clockSync.startAutoResync({
+        onDrift: (delta) =>
+          console.warn(`[clock] offset 드리프트 ${(Number(delta) / 1e6).toFixed(2)}ms`),
+        onError: (err) => console.warn("[clock] 재동기화 실패", err),
+      });
+    })
+    .catch((err) => {
+      console.warn(
+        "[clock] 시계 동기화 실패 — 이 세션의 CSV 는 영상과 매칭되지 않습니다.",
+        err,
+      );
+    });
   const canvas = $("heatmap") as HTMLCanvasElement;
   // Derive the backing-store height from the width so it always matches the true
   // physical aspect (1 : 2.3014); the renderer reads this back from config.
@@ -1260,6 +1294,10 @@ async function boot(): Promise<void> {
     cols: GRID_COLS,
     // 동기 촬영 세션과 같은 sessionId 로 묶어 back 이 영상+CSV 를 한 세션으로 연결하게 한다.
     sessionId: () => syncSessionId,
+    // CSV 첫 행(time=0)의 절대 시각 — 영상 프레임과 매칭하는 기준점.
+    startAtServerNs: () => recordingStartServerNs,
+    clockOffsetNs: () => clockSync.offset,
+    clockRttP50Ns: () => clockSync.result?.rttP50Ns ?? null,
   });
 
   const startLocalRecording = (wallAnchorMs?: number): void => {
@@ -1268,8 +1306,36 @@ async function boot(): Promise<void> {
     syncPlaybackActive = false;
     // 이번 세션 결과에 붙일 반려견 정보 — CSV 업로드와 같은 입력란에서 읽는다.
     lastDogInfo = readSideDogInfo();
-    const t0 =
-      wallAnchorMs != null ? performance.now() + (wallAnchorMs - Date.now()) : performance.now();
+
+    /**
+     * ★ 녹화 시작점(performance.now 축).
+     *
+     * 예전에는 `performance.now() + (wallAnchorMs - Date.now())` 로 서버가 준
+     * recordAt 을 **로컬 벽시계**로 환산했다. 이 PC 의 벽시계가 서버와 얼마나
+     * 어긋나 있는지는 아무도 모르고, 세션 중 NTP 보정이 들어오면 그 자리에서 점프한다.
+     * 그래서 압력 샘플이 영상 프레임과 짝지어지지 않았다.
+     *
+     * 이제는 클럭 오프셋(= /api/time/sync 로 실측한 값)으로 환산한다.
+     * 동기화 전이면 예전 방식으로 물러서되, 그 사실을 기록해 둔다 —
+     * 그 세션의 CSV 는 영상과 매칭할 수 없기 때문이다.
+     */
+    let t0: number;
+    if (wallAnchorMs == null) {
+      t0 = performance.now();
+    } else if (clockSync.synced) {
+      // recordAt 은 서버 벽시계 ms → 서버 ns → 기기(performance.now) ns → ms
+      const deviceNs = clockSync.toDeviceNs(BigInt(Math.round(wallAnchorMs)) * 1_000_000n);
+      t0 = Number(deviceNs) / 1e6;
+    } else {
+      t0 = performance.now() + (wallAnchorMs - Date.now());
+      console.warn(
+        "[clock] 시계 동기화 전이라 벽시계로 녹화 시작점을 잡았습니다 — " +
+          "이 세션의 CSV 는 영상과 정확히 매칭되지 않습니다.",
+      );
+    }
+
+    // CSV 업로드에 실을 절대 시각. 첫 프레임(time=0)에 해당하는 t_server_ns.
+    recordingStartServerNs = clockSync.perfMsToServerNs(t0);
     recorder.start(t0);
     setExportsEnabled(false);
     cachedTrack = null;
