@@ -465,6 +465,16 @@ function injectStyle(): void {
   font-variant-numeric:tabular-nums;min-width:96px;text-align:right}
 .rs-status{font-size:11px;color:var(--muted,#7c828b);min-width:120px}
 .rs-status.is-warn{color:var(--warning,#e8c76a)}
+/* 완료된 분석은 보호자 앞에서 손가락으로 조작한다. 이 화면에서만 조작부를 키워
+   터치 목표를 넉넉하게 잡는다(측정 화면은 마우스 위주라 그대로 둔다). */
+body[data-module="review"] .rs-transport{gap:12px;padding:10px 14px}
+body[data-module="review"] .rs-transport button,
+body[data-module="review"] .rs-transport select{height:44px;min-width:52px;
+  padding:0 14px;font-size:16px;border-radius:10px}
+body[data-module="review"] .rs-play{font-size:18px}
+body[data-module="review"] .rs-scrub{height:32px}
+body[data-module="review"] .rs-scrub::-webkit-slider-thumb{width:26px;height:26px}
+body[data-module="review"] .rs-time{font-size:14px;min-width:112px}
 `;
   document.head.appendChild(style);
 }

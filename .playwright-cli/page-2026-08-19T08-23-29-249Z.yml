@@ -1,0 +1,173 @@
+- generic [ref=f4e1]:
+  - banner [ref=f4e2]:
+    - generic [ref=f4e3]:
+      - link "Talktail" [ref=f4e4] [cursor=pointer]:
+        - /url: "#measure"
+        - img "Talktail" [ref=f4e5]
+      - generic "Talktail Gait": TalktailGait
+      - navigation "Modules" [ref=f4e6]:
+        - button "측정" [active] [ref=f4e7] [cursor=pointer]
+        - button "파일 다운" [ref=f4e8] [cursor=pointer]
+        - button "직접 분석" [ref=f4e9] [cursor=pointer]
+        - button "리포트" [ref=f4e10] [cursor=pointer]
+        - button "완료된 분석" [ref=f4e11] [cursor=pointer]
+  - generic [ref=f4e12]:
+    - complementary [ref=f4e13]:
+      - generic [ref=f4e14]: 패드 연결
+      - generic [ref=f4e15]:
+        - generic [ref=f4e16]:
+          - generic [ref=f4e17]:
+            - generic [ref=f4e18]: 연결
+            - generic [ref=f4e19]: ○ 대기
+          - generic [ref=f4e20]:
+            - generic [ref=f4e21]: 보정
+            - generic [ref=f4e22]: 미보정
+        - generic [ref=f4e23]:
+          - button "패드 연결" [ref=f4e24] [cursor=pointer]
+          - button "보정" [disabled] [ref=f4e25]
+        - paragraph [ref=f4e26]: USB로 압력 패드를 연결한 뒤 버튼을 누르세요. 연결 후 보정을 권장합니다.
+      - generic [ref=f4e27]:
+        - generic [ref=f4e28]: 언어
+        - combobox "Language" [ref=f4e29] [cursor=pointer]:
+          - option "한국어" [selected]
+          - option "English"
+      - generic [ref=f4e30]:
+        - generic [ref=f4e31]: 반려견
+        - button "접기" [expanded] [ref=f4e32] [cursor=pointer]
+      - generic [ref=f4e33]:
+        - generic [ref=f4e34]:
+          - generic [ref=f4e35]: 이름
+          - textbox "이름" [ref=f4e36]:
+            - /placeholder: "예: 바둑이"
+        - generic [ref=f4e37]:
+          - generic [ref=f4e38]: 신장
+          - spinbutton "신장" [ref=f4e39]
+        - generic [ref=f4e40]:
+          - generic [ref=f4e41]: 몸무게
+          - spinbutton "몸무게" [ref=f4e42]
+        - generic [ref=f4e43]:
+          - generic [ref=f4e44]: 견종
+          - textbox "견종" [ref=f4e45]:
+            - /placeholder: "예: 진돗개"
+      - generic [ref=f4e46]: 세션
+      - button "시작" [disabled] [ref=f4e48]
+      - generic [ref=f4e50]:
+        - generic [ref=f4e51]: 저장된 CSV
+        - button "새로고침" [ref=f4e52] [cursor=pointer]
+      - list:
+        - listitem [ref=f4e144]:
+          - generic [ref=f4e145]:
+            - generic [ref=f4e146]: 숫자표기
+            - generic [ref=f4e147]: – · – · – · 2026-08-19 14:39
+          - generic [ref=f4e148]:
+            - link "보기" [ref=f4e149] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/pressure/records/7daa8d5f-d38b-4481-9843-99bcd875751e/csv
+            - link "다운로드" [ref=f4e150] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/pressure/records/7daa8d5f-d38b-4481-9843-99bcd875751e/csv?download=1
+        - listitem [ref=f4e151]:
+          - generic [ref=f4e152]:
+            - generic [ref=f4e153]: 누락
+            - generic [ref=f4e154]: – · – · – · 2026-08-19 14:39
+          - generic [ref=f4e155]:
+            - link "보기" [ref=f4e156] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/pressure/records/a4a69d8a-3918-470a-8eab-eb1b769739d2/csv
+            - link "다운로드" [ref=f4e157] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/pressure/records/a4a69d8a-3918-470a-8eab-eb1b769739d2/csv?download=1
+        - listitem [ref=f4e158]:
+          - generic [ref=f4e159]:
+            - generic [ref=f4e160]: 정상
+            - generic [ref=f4e161]: – · – · – · 2026-08-19 14:39
+          - generic [ref=f4e162]:
+            - link "보기" [ref=f4e163] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/pressure/records/ec23c5e9-2001-4806-bd2d-2644bcd0912d/csv
+            - link "다운로드" [ref=f4e164] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/pressure/records/ec23c5e9-2001-4806-bd2d-2644bcd0912d/csv?download=1
+        - listitem [ref=f4e165]:
+          - generic [ref=f4e166]:
+            - generic [ref=f4e167]: (이름 없음)
+            - generic [ref=f4e168]: – · – · 9.1s · 2026-08-19 14:39
+          - generic [ref=f4e169]:
+            - link "보기" [ref=f4e170] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/pressure/records/0ab11305-6544-4f91-925a-d6af49d61b24/csv
+            - link "다운로드" [ref=f4e171] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/pressure/records/0ab11305-6544-4f91-925a-d6af49d61b24/csv?download=1
+        - listitem [ref=f4e172]:
+          - generic [ref=f4e173]:
+            - generic [ref=f4e174]: 검증견
+            - generic [ref=f4e175]: – · – · – · 2026-08-19 14:39
+          - generic [ref=f4e176]:
+            - link "보기" [ref=f4e177] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/pressure/records/3458a856-caaa-49b6-9ca5-ea58d769cb08/csv
+            - link "다운로드" [ref=f4e178] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/pressure/records/3458a856-caaa-49b6-9ca5-ea58d769cb08/csv?download=1
+      - generic [ref=f4e53]:
+        - generic [ref=f4e54]:
+          - generic [ref=f4e55]: 최대 압력
+          - generic [ref=f4e56]: –
+        - generic [ref=f4e57]:
+          - generic [ref=f4e58]: 평균 압력
+          - generic [ref=f4e59]: –
+        - generic [ref=f4e60]:
+          - generic [ref=f4e61]: 접촉 면적
+          - generic [ref=f4e62]: –
+        - generic [ref=f4e63]:
+          - generic [ref=f4e64]: 30–50 면적
+          - generic [ref=f4e65]: –
+        - generic [ref=f4e66]:
+          - generic [ref=f4e67]: ">50 면적"
+          - generic [ref=f4e68]: –
+        - generic [ref=f4e69]:
+          - generic [ref=f4e70]: 입력 Hz
+          - generic [ref=f4e71]: –
+        - generic [ref=f4e72]:
+          - generic [ref=f4e73]: 렌더 FPS
+          - generic [ref=f4e74]: –
+        - generic [ref=f4e75]:
+          - generic [ref=f4e76]: 녹화
+          - generic [ref=f4e77]: –
+    - button "›" [expanded] [ref=f4e78] [cursor=pointer]
+    - main [ref=f4e79]:
+      - region "Section 1" [ref=f4e80]:
+        - generic [ref=f4e81]: 1 · 압력패드
+      - region "Section 2" [ref=f4e84]:
+        - generic [ref=f4e85]:
+          - generic [ref=f4e86]: 2-1 · 촬영 영상
+          - generic [ref=f4e87]: origin
+        - generic [ref=f4e88]:
+          - generic [ref=f4e89]: 2-2 · 스켈레톤 분석
+          - generic [ref=f4e90]: analysis
+      - region "Section 3" [ref=f4e91]:
+        - generic [ref=f4e92]:
+          - generic [ref=f4e93]: 3-1 · 각도 분석
+          - generic [ref=f4e94]: max-min
+        - generic [ref=f4e95]:
+          - generic [ref=f4e96]: 3-2 · 각도 분석
+          - generic [ref=f4e97]: angle-diff
+      - generic [ref=f4e101]:
+        - generic [ref=f4e102]: 휴대폰 카메라
+        - generic [ref=f4e103]:
+          - generic: 휴대 앱 연결됨 — 영상 수신 중…
+          - generic [ref=f4e105]:
+            - button "▶" [disabled] [ref=f4e106]
+            - slider [ref=f4e107]: "0"
+            - generic [ref=f4e108]: 0:00 / 0:00
+            - combobox "Speed" [ref=f4e109]:
+              - option "0.2×"
+              - option "0.25×"
+              - option "0.5×"
+              - option "1×" [selected]
+              - option "1.5×"
+              - option "2×"
+            - slider "Zoom" [ref=f4e110]: "100"
+      - generic [ref=f4e111]:
+        - button "▶" [disabled] [ref=f4e112]
+        - slider [disabled] [ref=f4e113]: "0"
+        - generic [ref=f4e114]: 0:00.0 / 0:00.0
+        - combobox [disabled] [ref=f4e115]:
+          - option "0.25×"
+          - option "0.5×"
+          - option "1×" [selected]
+          - option "1.5×"
+          - option "2×"
+          - option "4×"
+  - alert [ref=f4e179]: 강아지 이름과 몸무게를 입력해야 측정을 시작할 수 있습니다.

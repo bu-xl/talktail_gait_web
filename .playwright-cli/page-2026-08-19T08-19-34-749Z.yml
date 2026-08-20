@@ -1,0 +1,218 @@
+- generic [ref=f1e1]:
+  - banner [ref=f1e2]:
+    - generic [ref=f1e3]:
+      - link "Talktail" [ref=f1e4] [cursor=pointer]:
+        - /url: "#measure"
+        - img "Talktail" [ref=f1e5]
+      - generic "Talktail Gait": TalktailGait
+      - navigation "Modules" [ref=f1e6]:
+        - button "측정" [ref=f1e7] [cursor=pointer]
+        - button "파일 다운" [ref=f1e8] [cursor=pointer]
+        - button "직접 분석" [ref=f1e9] [cursor=pointer]
+        - button "리포트" [ref=f1e10] [cursor=pointer]
+        - button "완료된 분석" [active] [ref=f1e11] [cursor=pointer]
+  - generic [ref=f1e12]:
+    - complementary [ref=f1e13]:
+      - generic [ref=f1e359]:
+        - generic [ref=f1e360]:
+          - generic [ref=f1e361]: 최근 완료 분석
+          - generic [ref=f1e362]: 열람 전용
+        - paragraph [ref=f1e363]: 측정을 제어하지 않습니다. 완료된 결과만 불러옵니다.
+        - generic [ref=f1e364]:
+          - button "이름 미기록 2026-08-19 16:48:28" [ref=f1e681] [cursor=pointer]:
+            - generic [ref=f1e682]: 이름 미기록
+            - generic [ref=f1e683]: 2026-08-19 16:48:28
+          - button "이름 미기록 2026-08-19 16:48:02" [ref=f1e684] [cursor=pointer]:
+            - generic [ref=f1e685]: 이름 미기록
+            - generic [ref=f1e686]: 2026-08-19 16:48:02
+          - button "이름 미기록 2026-08-19 16:22:18" [ref=f1e687] [cursor=pointer]:
+            - generic [ref=f1e688]: 이름 미기록
+            - generic [ref=f1e689]: 2026-08-19 16:22:18
+          - button "이름 미기록 2026-08-19 16:19:25" [ref=f1e690] [cursor=pointer]:
+            - generic [ref=f1e691]: 이름 미기록
+            - generic [ref=f1e692]: 2026-08-19 16:19:25
+          - button "이름 미기록 2026-08-19 16:06:40" [ref=f1e693] [cursor=pointer]:
+            - generic [ref=f1e694]: 이름 미기록
+            - generic [ref=f1e695]: 2026-08-19 16:06:40
+        - generic [ref=f1e380]:
+          - generic [ref=f1e381]: 병력 · 메모
+          - textbox [ref=f1e382]
+          - paragraph [ref=f1e383]: 라벨링에 쓰입니다. 저장하면 다른 노트북에서도 보입니다.
+          - button "저장" [ref=f1e385] [cursor=pointer]
+    - button "›" [expanded] [ref=f1e113] [cursor=pointer]
+    - main [ref=f1e114]:
+      - region "Section 1" [ref=f1e115]:
+        - generic [ref=f1e116]: 1 · 압력패드
+      - region "Section 2" [ref=f1e119]:
+        - generic [ref=f1e120]: 2-1 · 촬영 영상
+        - generic [ref=f1e123]: 2-2 · 스켈레톤 분석
+      - region "Section 3" [ref=f1e126]:
+        - generic [ref=f1e127]:
+          - generic [ref=f1e128]: 3-1 · 각도 분석
+          - generic [ref=f1e129]: max-min
+        - generic [ref=f1e130]:
+          - generic [ref=f1e131]: 3-2 · 각도 분석
+          - generic [ref=f1e542]:
+            - generic [ref=f1e544]:
+              - generic [ref=f1e545]:
+                - generic [ref=f1e546]:
+                  - generic [ref=f1e547]: 어깨
+                  - generic [ref=f1e548]:
+                    - generic [ref=f1e549]:
+                      - generic [ref=f1e550]: 왼쪽
+                      - generic [ref=f1e551]:
+                        - generic [ref=f1e552]: –
+                        - generic [ref=f1e553]: –
+                        - generic [ref=f1e554]: –
+                    - generic [ref=f1e555]:
+                      - generic [ref=f1e556]: 오른쪽
+                      - generic [ref=f1e557]:
+                        - generic [ref=f1e558]: –
+                        - generic [ref=f1e559]: –
+                        - generic [ref=f1e560]: –
+                - generic [ref=f1e561]:
+                  - generic [ref=f1e562]: 고관절
+                  - generic [ref=f1e563]:
+                    - generic [ref=f1e564]:
+                      - generic [ref=f1e565]: 왼쪽
+                      - generic [ref=f1e566]:
+                        - generic [ref=f1e567]: –
+                        - generic [ref=f1e568]: –
+                        - generic [ref=f1e569]: –
+                    - generic [ref=f1e570]:
+                      - generic [ref=f1e571]: 오른쪽
+                      - generic [ref=f1e572]:
+                        - generic [ref=f1e573]: –
+                        - generic [ref=f1e574]: –
+                        - generic [ref=f1e575]: –
+              - generic [ref=f1e576]:
+                - generic [ref=f1e577]:
+                  - generic [ref=f1e578]: 팔꿈치
+                  - generic [ref=f1e579]:
+                    - generic [ref=f1e580]:
+                      - generic [ref=f1e581]: 왼쪽
+                      - generic [ref=f1e582]:
+                        - generic [ref=f1e583]: –
+                        - generic [ref=f1e584]: –
+                        - generic [ref=f1e585]: –
+                    - generic [ref=f1e586]:
+                      - generic [ref=f1e587]: 오른쪽
+                      - generic [ref=f1e588]:
+                        - generic [ref=f1e589]: –
+                        - generic [ref=f1e590]: –
+                        - generic [ref=f1e591]: –
+                - generic [ref=f1e592]:
+                  - generic [ref=f1e593]: 무릎
+                  - generic [ref=f1e594]:
+                    - generic [ref=f1e595]:
+                      - generic [ref=f1e596]: 왼쪽
+                      - generic [ref=f1e597]:
+                        - generic [ref=f1e598]: –
+                        - generic [ref=f1e599]: –
+                        - generic [ref=f1e600]: –
+                    - generic [ref=f1e601]:
+                      - generic [ref=f1e602]: 오른쪽
+                      - generic [ref=f1e603]:
+                        - generic [ref=f1e604]: –
+                        - generic [ref=f1e605]: –
+                        - generic [ref=f1e606]: –
+              - generic [ref=f1e607]:
+                - generic [ref=f1e608]:
+                  - generic [ref=f1e609]: 앞발목
+                  - generic [ref=f1e610]:
+                    - generic [ref=f1e611]:
+                      - generic [ref=f1e612]: 왼쪽
+                      - generic [ref=f1e613]:
+                        - generic [ref=f1e614]: –
+                        - generic [ref=f1e615]: –
+                        - generic [ref=f1e616]: –
+                    - generic [ref=f1e617]:
+                      - generic [ref=f1e618]: 오른쪽
+                      - generic [ref=f1e619]:
+                        - generic [ref=f1e620]: –
+                        - generic [ref=f1e621]: –
+                        - generic [ref=f1e622]: –
+                - generic [ref=f1e623]:
+                  - generic [ref=f1e624]: 뒷발목
+                  - generic [ref=f1e625]:
+                    - generic [ref=f1e626]:
+                      - generic [ref=f1e627]: 왼쪽
+                      - generic [ref=f1e628]:
+                        - generic [ref=f1e629]: –
+                        - generic [ref=f1e630]: –
+                        - generic [ref=f1e631]: –
+                    - generic [ref=f1e632]:
+                      - generic [ref=f1e633]: 오른쪽
+                      - generic [ref=f1e634]:
+                        - generic [ref=f1e635]: –
+                        - generic [ref=f1e636]: –
+                        - generic [ref=f1e637]: –
+              - generic [ref=f1e638]:
+                - generic [ref=f1e639]:
+                  - generic [ref=f1e640]: 앞발
+                  - generic [ref=f1e641]:
+                    - generic [ref=f1e642]:
+                      - generic [ref=f1e643]: 왼쪽
+                      - generic [ref=f1e644]:
+                        - generic [ref=f1e645]: –
+                        - generic [ref=f1e646]: –
+                        - generic [ref=f1e647]: –
+                    - generic [ref=f1e648]:
+                      - generic [ref=f1e649]: 오른쪽
+                      - generic [ref=f1e650]:
+                        - generic [ref=f1e651]: –
+                        - generic [ref=f1e652]: –
+                        - generic [ref=f1e653]: –
+                - generic [ref=f1e654]:
+                  - generic [ref=f1e655]: 뒷발
+                  - generic [ref=f1e656]:
+                    - generic [ref=f1e657]:
+                      - generic [ref=f1e658]: 왼쪽
+                      - generic [ref=f1e659]:
+                        - generic [ref=f1e660]: –
+                        - generic [ref=f1e661]: –
+                        - generic [ref=f1e662]: –
+                    - generic [ref=f1e663]:
+                      - generic [ref=f1e664]: 오른쪽
+                      - generic [ref=f1e665]:
+                        - generic [ref=f1e666]: –
+                        - generic [ref=f1e667]: –
+                        - generic [ref=f1e668]: –
+            - generic [ref=f1e669]:
+              - generic [ref=f1e671]:
+                - button "이전" [ref=f1e672] [cursor=pointer]: ‹
+                - generic [ref=f1e673]:
+                  - button "어깨" [ref=f1e674] [cursor=pointer]
+                  - button "팔꿈치" [ref=f1e675] [cursor=pointer]
+                  - button "앞발목" [ref=f1e676] [cursor=pointer]
+                  - button "앞발" [ref=f1e677] [cursor=pointer]
+                - button "다음" [ref=f1e678] [cursor=pointer]: ›
+              - button "자동 슬라이드 정지" [ref=f1e679] [cursor=pointer]: ⏸
+      - generic [ref=f1e136]:
+        - generic [ref=f1e137]: 휴대폰 카메라
+        - generic [ref=f1e138]:
+          - generic: 휴대폰 카메라 대기 중…
+          - generic [ref=f1e140]:
+            - button "▶" [disabled] [ref=f1e141]
+            - slider [ref=f1e142]: "0"
+            - generic [ref=f1e143]: 0:00 / 0:00
+            - combobox "Speed" [ref=f1e144]:
+              - option "0.2×"
+              - option "0.25×"
+              - option "0.5×"
+              - option "1×" [selected]
+              - option "1.5×"
+              - option "2×"
+            - slider "Zoom" [ref=f1e145]: "100"
+      - generic [ref=f1e146]:
+        - button "▶" [ref=f1e147] [cursor=pointer]
+        - slider [ref=f1e148]: "0"
+        - generic [ref=f1e149]: 0:00.0 / 0:01.4
+        - combobox [ref=f1e150] [cursor=pointer]:
+          - option "0.25×"
+          - option "0.5×"
+          - option "1×" [selected]
+          - option "1.5×"
+          - option "2×"
+          - option "4×"
+        - generic [ref=f1e680]: 동기화 오차 0ms

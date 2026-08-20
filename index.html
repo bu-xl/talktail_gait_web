@@ -880,6 +880,15 @@
       .dog-info .field-col input:disabled {
         opacity: .55; cursor: not-allowed; background: var(--divider, #f0f0f0);
       }
+      .capture-preset {
+        display: flex; flex-direction: column; gap: 4px; margin-top: 4px;
+      }
+      .capture-preset label { font-size: 12px; color: var(--muted); }
+      .capture-preset select {
+        width: 100%; box-sizing: border-box; background: var(--surface); color: var(--fg);
+        border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font: inherit;
+      }
+      .capture-preset .pad-hint { margin: 0; }
       /* Pad connection panel — top of side rail */
       #padConnectPanel {
         display: flex; flex-direction: column; gap: 10px;
@@ -1212,6 +1221,11 @@
       </div>
 
       <div class="section" data-i18n="section_session">세션</div>
+      <div class="capture-preset">
+        <label for="capturePreset" data-i18n="capture_preset">촬영 해상도</label>
+        <select id="capturePreset" aria-label="Capture quality"></select>
+        <p class="pad-hint" data-i18n="capture_preset_hint">연결된 모든 폰이 같은 해상도·프레임으로 촬영합니다.</p>
+      </div>
       <div class="controls">
         <button type="button" id="btnSession" class="primary" data-i18n="btn_session_start">시작</button>
       </div>

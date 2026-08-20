@@ -1,0 +1,86 @@
+- generic [ref=f1e1]:
+  - banner [ref=f1e2]:
+    - generic [ref=f1e3]:
+      - link "Talktail" [ref=f1e4] [cursor=pointer]:
+        - /url: "#measure"
+        - img "Talktail" [ref=f1e5]
+      - generic "Talktail Gait": TalktailGait
+      - navigation "Modules" [ref=f1e6]:
+        - button "측정" [ref=f1e7] [cursor=pointer]
+        - button "파일 다운" [ref=f1e8] [cursor=pointer]
+        - button "직접 분석" [ref=f1e9] [cursor=pointer]
+        - button "리포트" [ref=f1e10] [cursor=pointer]
+        - button "완료된 분석" [active] [ref=f1e11] [cursor=pointer]
+  - generic [ref=f1e12]:
+    - complementary [ref=f1e13]:
+      - generic [ref=f1e359]:
+        - generic [ref=f1e360]:
+          - generic [ref=f1e361]: 최근 완료 분석
+          - generic [ref=f1e362]: 열람 전용
+        - paragraph [ref=f1e363]: 측정을 제어하지 않습니다. 완료된 결과만 불러옵니다.
+        - generic [ref=f1e364]:
+          - button "이름 미기록 2026-08-19 16:48:28" [ref=f1e365] [cursor=pointer]:
+            - generic [ref=f1e366]: 이름 미기록
+            - generic [ref=f1e367]: 2026-08-19 16:48:28
+          - button "이름 미기록 2026-08-19 16:48:02" [ref=f1e368] [cursor=pointer]:
+            - generic [ref=f1e369]: 이름 미기록
+            - generic [ref=f1e370]: 2026-08-19 16:48:02
+          - button "이름 미기록 2026-08-19 16:22:18" [ref=f1e371] [cursor=pointer]:
+            - generic [ref=f1e372]: 이름 미기록
+            - generic [ref=f1e373]: 2026-08-19 16:22:18
+          - button "이름 미기록 2026-08-19 16:19:25" [ref=f1e374] [cursor=pointer]:
+            - generic [ref=f1e375]: 이름 미기록
+            - generic [ref=f1e376]: 2026-08-19 16:19:25
+          - button "이름 미기록 2026-08-19 16:06:40" [ref=f1e377] [cursor=pointer]:
+            - generic [ref=f1e378]: 이름 미기록
+            - generic [ref=f1e379]: 2026-08-19 16:06:40
+        - generic [ref=f1e380]:
+          - generic [ref=f1e381]: 병력 · 메모
+          - textbox [ref=f1e382]
+          - paragraph [ref=f1e383]: 라벨링에 쓰입니다. 저장하면 다른 노트북에서도 보입니다.
+          - button "저장" [ref=f1e385] [cursor=pointer]
+    - button "›" [expanded] [ref=f1e113] [cursor=pointer]
+    - main [ref=f1e114]:
+      - region "Section 1" [ref=f1e115]:
+        - generic [ref=f1e116]: 1 · 압력패드
+      - region "Section 2" [ref=f1e119]:
+        - generic [ref=f1e120]:
+          - generic [ref=f1e121]: 2-1 · 촬영 영상
+          - generic [ref=f1e122]: origin
+        - generic [ref=f1e123]:
+          - generic [ref=f1e124]: 2-2 · 스켈레톤 분석
+          - generic [ref=f1e125]: analysis
+      - region "Section 3" [ref=f1e126]:
+        - generic [ref=f1e127]:
+          - generic [ref=f1e128]: 3-1 · 각도 분석
+          - generic [ref=f1e129]: max-min
+        - generic [ref=f1e130]:
+          - generic [ref=f1e131]: 3-2 · 각도 분석
+          - generic [ref=f1e132]: angle-diff
+      - generic [ref=f1e136]:
+        - generic [ref=f1e137]: 휴대폰 카메라
+        - generic [ref=f1e138]:
+          - generic: 휴대폰 카메라 대기 중…
+          - generic [ref=f1e140]:
+            - button "▶" [disabled] [ref=f1e141]
+            - slider [ref=f1e142]: "0"
+            - generic [ref=f1e143]: 0:00 / 0:00
+            - combobox "Speed" [ref=f1e144]:
+              - option "0.2×"
+              - option "0.25×"
+              - option "0.5×"
+              - option "1×" [selected]
+              - option "1.5×"
+              - option "2×"
+            - slider "Zoom" [ref=f1e145]: "100"
+      - generic [ref=f1e146]:
+        - button "▶" [disabled] [ref=f1e147]
+        - slider [disabled] [ref=f1e148]: "0"
+        - generic [ref=f1e149]: 0:00.0 / 0:00.0
+        - combobox [disabled] [ref=f1e150]:
+          - option "0.25×"
+          - option "0.5×"
+          - option "1×" [selected]
+          - option "1.5×"
+          - option "2×"
+          - option "4×"

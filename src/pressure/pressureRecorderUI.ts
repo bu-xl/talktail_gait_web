@@ -32,6 +32,8 @@ export interface PressureCsvDeps {
   cols: number;
   /** 동기 촬영 세션 id (영상과 CSV 를 back 에서 한 세션으로 묶기 위함). */
   sessionId?: () => string | null;
+  /** 녹화 시작 시각 — CSV 파일명의 도장. 업로드 시각이 아니다. */
+  startedAt?: () => Date | string | null;
   /**
    * CSV 첫 행(`time=0`)의 절대 시각(t_server_ns). 영상 프레임과 매칭하는 기준점.
    * 시계 동기화 전에 녹화했으면 null — 그 CSV 는 영상과 정확히 맞출 수 없다.
@@ -163,13 +165,23 @@ export function createPressureCsvController(deps: PressureCsvDeps): PressureCsvC
     const dog = readDogInfo();
     // sessionId 는 record_stop 에서 null 로 지워지기 전에 지금 즉시 확보한다.
     const sessionId = deps.sessionId?.() ?? null;
+    const startedRaw = deps.startedAt?.() ?? null;
+    const startedAtDate =
+      startedRaw instanceof Date
+        ? startedRaw
+        : startedRaw
+          ? new Date(startedRaw)
+          : new Date();
+    const startedAt = Number.isNaN(startedAtDate.getTime())
+      ? new Date().toISOString()
+      : startedAtDate.toISOString();
     const recording = {
       frames,
       durationSec: deps.durationSec(),
       fps: deps.fps(),
       rows: deps.rows,
       cols: deps.cols,
-      startedAt: new Date().toISOString(),
+      startedAt,
     };
     // 나노초는 문자열로만 다룬다 — Number 로 바꾸면 2^53 을 넘어 자릿수가 잘린다.
     const startAtServerNs = deps.startAtServerNs?.() ?? null;

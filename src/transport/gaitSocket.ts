@@ -16,6 +16,15 @@ export type SyncPeers = {
   subCount?: number;
 };
 
+export type CaptureSettingsPayload = {
+  presetId: string;
+  videoQuality: string;
+  fps: number;
+  width: number;
+  height: number;
+  bitrate: number;
+};
+
 export type SyncMessage =
   | { type: "joined"; role: string; roomId: string; peers: SyncPeers; serverNow: number }
   | { type: "peer_update"; roomId: string; peers: SyncPeers }
@@ -26,8 +35,19 @@ export type SyncMessage =
       serverNow: number;
       recordAt: number;
       syncLeadMs: number;
+      captureSettings?: CaptureSettingsPayload | null;
     }
   | { type: "record_stop"; roomId: string; sessionId: string | null; from: string; serverNow: number }
+  | {
+      type: "capture_settings";
+      presetId: string;
+      videoQuality: string;
+      fps: number;
+      width: number;
+      height: number;
+      bitrate: number;
+      serverNow: number;
+    }
   | { type: "preview_frame"; mime: string; data: string; ts: number }
   | { type: "upload_started"; jobId: string; sessionId: string | null; roomId: string }
   | {
@@ -78,9 +98,18 @@ export type AnalysisQueueSnapshot = {
 type Handler = (msg: SyncMessage) => void;
 type ConnectionHandler = (connected: boolean) => void;
 
+/**
+ * `web` 은 제어판이다 — 촬영 시작·종료 권한이 있다.
+ * `viewer` 는 완료된 분석만 지켜보는 화면이다. 허브가 viewer 의 제어 메시지를
+ * 거부하므로, 열람용 노트북이 실수로 측정 중인 노트북의 세션을 건드릴 수 없다.
+ * 클라이언트가 안 보내기를 믿는 게 아니라 서버가 막는다.
+ */
+export type SyncRole = "web" | "viewer";
+
 export interface GaitSyncOptions {
   wsUrl: string;
   roomId: string;
+  role?: SyncRole;
 }
 
 export class GaitSyncSocket {
@@ -91,12 +120,18 @@ export class GaitSyncSocket {
   private closedByUser = false;
   private readonly wsUrl: string;
   private readonly roomId: string;
+  readonly role: SyncRole;
   peers: SyncPeers = { web: false, mobile: false };
   connected = false;
 
   constructor(opts: GaitSyncOptions) {
     this.wsUrl = opts.wsUrl;
     this.roomId = opts.roomId;
+    this.role = opts.role ?? "web";
+  }
+
+  get isViewer(): boolean {
+    return this.role === "viewer";
   }
 
   onMessage(handler: Handler): void {
@@ -132,14 +167,38 @@ export class GaitSyncSocket {
   }
 
   join(): void {
-    this.send({ type: "join", role: "web", roomId: this.roomId });
+    this.send({ type: "join", role: this.role, roomId: this.roomId });
   }
 
-  requestRecord(): void {
-    this.send({ type: "record_request" });
+  /**
+   * Ask every camera to start.
+   *
+   * The dog goes with the request because the phones upload the video but never
+   * learn whose walk it is; the hub stores this on the capture session and the
+   * backend uses it to name the file.
+   */
+  /** viewer 에서 호출되면 조용히 무시한다. 서버도 거부하지만 두 번 막는다. */
+  requestRecord(dog?: {
+    name?: string | null;
+    weightKg?: number | null;
+  } | null, captureSettings?: CaptureSettingsPayload | null): void {
+    if (this.isViewer) return;
+    this.send({
+      type: "record_request",
+      dog: dog && (dog.name || dog.weightKg != null)
+        ? { dogName: dog.name ?? null, dogWeightKg: dog.weightKg ?? null }
+        : null,
+      ...(captureSettings ? { captureSettings } : {}),
+    });
+  }
+
+  sendCaptureSettings(captureSettings: CaptureSettingsPayload): void {
+    if (this.isViewer) return;
+    this.send({ type: "capture_settings", ...captureSettings });
   }
 
   stopRecord(sessionId?: string | null): void {
+    if (this.isViewer) return;
     this.send({ type: "record_stop", sessionId: sessionId ?? null });
   }
 

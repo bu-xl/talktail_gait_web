@@ -1,0 +1,61 @@
+- generic [ref=f1e1]:
+  - banner [ref=f1e2]:
+    - generic [ref=f1e3]:
+      - link "Talktail" [ref=f1e4] [cursor=pointer]:
+        - /url: "#measure"
+        - img "Talktail" [ref=f1e5]
+      - generic "Talktail Gait": TalktailGait
+      - navigation "Modules" [ref=f1e6]:
+        - button "측정" [ref=f1e7] [cursor=pointer]
+        - button "파일 다운" [ref=f1e8] [cursor=pointer]
+        - button "직접 분석" [ref=f1e9] [cursor=pointer]
+        - button "리포트" [active] [ref=f1e10] [cursor=pointer]
+        - button "완료된 분석" [ref=f1e11] [cursor=pointer]
+  - text: origin analysis max-min angle-diff
+  - region "Reports" [ref=f1e310]:
+    - generic [ref=f1e311]:
+      - generic [ref=f1e312]:
+        - generic [ref=f1e313]: 결과
+        - heading "분석 목록" [level=1] [ref=f1e314]
+        - paragraph [ref=f1e315]: 날짜 선택
+      - button "새로고침" [ref=f1e317] [cursor=pointer]
+    - generic [ref=f1e319]:
+      - button "2026-08-19 260819" [ref=f1e320] [cursor=pointer]:
+        - generic [ref=f1e321]: 2026-08-19
+        - generic [ref=f1e322]: "260819"
+      - button "2026-08-18 260818" [ref=f1e323] [cursor=pointer]:
+        - generic [ref=f1e324]: 2026-08-18
+        - generic [ref=f1e325]: "260818"
+      - button "2026-08-16 260816" [ref=f1e326] [cursor=pointer]:
+        - generic [ref=f1e327]: 2026-08-16
+        - generic [ref=f1e328]: "260816"
+      - button "2026-08-15 260815" [ref=f1e329] [cursor=pointer]:
+        - generic [ref=f1e330]: 2026-08-15
+        - generic [ref=f1e331]: "260815"
+      - button "2026-08-14 260814" [ref=f1e332] [cursor=pointer]:
+        - generic [ref=f1e333]: 2026-08-14
+        - generic [ref=f1e334]: "260814"
+      - button "2026-08-13 260813" [ref=f1e335] [cursor=pointer]:
+        - generic [ref=f1e336]: 2026-08-13
+        - generic [ref=f1e337]: "260813"
+      - button "2026-08-12 260812" [ref=f1e338] [cursor=pointer]:
+        - generic [ref=f1e339]: 2026-08-12
+        - generic [ref=f1e340]: "260812"
+      - button "2026-08-11 260811" [ref=f1e341] [cursor=pointer]:
+        - generic [ref=f1e342]: 2026-08-11
+        - generic [ref=f1e343]: "260811"
+      - button "2026-08-10 260810" [ref=f1e344] [cursor=pointer]:
+        - generic [ref=f1e345]: 2026-08-10
+        - generic [ref=f1e346]: "260810"
+      - button "2026-08-07 260807" [ref=f1e347] [cursor=pointer]:
+        - generic [ref=f1e348]: 2026-08-07
+        - generic [ref=f1e349]: "260807"
+      - button "2026-08-06 260806" [ref=f1e350] [cursor=pointer]:
+        - generic [ref=f1e351]: 2026-08-06
+        - generic [ref=f1e352]: "260806"
+      - button "2026-08-03 260803" [ref=f1e353] [cursor=pointer]:
+        - generic [ref=f1e354]: 2026-08-03
+        - generic [ref=f1e355]: "260803"
+      - button "2026-06-30 260630" [ref=f1e356] [cursor=pointer]:
+        - generic [ref=f1e357]: 2026-06-30
+        - generic [ref=f1e358]: "260630"

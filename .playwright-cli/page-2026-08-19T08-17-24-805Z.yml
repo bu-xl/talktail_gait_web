@@ -1,0 +1,50 @@
+- generic [ref=f1e1]:
+  - banner [ref=f1e2]:
+    - generic [ref=f1e3]:
+      - link "Talktail" [ref=f1e4] [cursor=pointer]:
+        - /url: "#measure"
+        - img "Talktail" [ref=f1e5]
+      - generic "Talktail Gait": TalktailGait
+      - navigation "Modules" [ref=f1e6]:
+        - button "측정" [ref=f1e7] [cursor=pointer]
+        - button "파일 다운" [ref=f1e8] [cursor=pointer]
+        - button "직접 분석" [active] [ref=f1e9] [cursor=pointer]
+        - button "리포트" [ref=f1e10] [cursor=pointer]
+        - button "완료된 분석" [ref=f1e11] [cursor=pointer]
+  - text: origin analysis max-min angle-diff
+  - region "Direct analysis" [ref=f1e273]:
+    - generic [ref=f1e275]:
+      - heading "직접 분석" [level=1] [ref=f1e276]
+      - paragraph [ref=f1e277]: 이미 가지고 있는 압력 CSV와 촬영 영상을 올려 측정과 똑같은 분석을 실행합니다.
+    - generic [ref=f1e279]:
+      - generic [ref=f1e280]:
+        - generic [ref=f1e281] [cursor=pointer]:
+          - generic [ref=f1e282]: 📄
+          - generic [ref=f1e283]: 압력 CSV
+          - generic [ref=f1e284]: 측정 세션에서 저장한 형식의 CSV 파일 (.csv)
+          - button "파일 선택" [ref=f1e285]
+        - generic [ref=f1e286] [cursor=pointer]:
+          - generic [ref=f1e287]: 🎞️
+          - generic [ref=f1e288]: 촬영 영상
+          - generic [ref=f1e289]: 측면에서 촬영한 보행 영상 (mp4 · mov · webm)
+          - button "파일 선택" [ref=f1e290]
+      - generic [ref=f1e291]:
+        - generic [ref=f1e292]:
+          - generic [ref=f1e293]: 반려견 정보 (선택)
+          - generic [ref=f1e294]: 입력하지 않아도 분석할 수 있습니다.
+        - generic [ref=f1e295]:
+          - generic [ref=f1e296]:
+            - generic [ref=f1e297]: 이름
+            - textbox "이름" [ref=f1e298]:
+              - /placeholder: "예: 바둑이"
+          - generic [ref=f1e299]:
+            - generic [ref=f1e300]: 견종
+            - textbox "견종" [ref=f1e301]:
+              - /placeholder: "예: 진돗개"
+          - generic [ref=f1e302]:
+            - generic [ref=f1e303]: 몸무게
+            - spinbutton "몸무게" [ref=f1e304]
+          - generic [ref=f1e305]:
+            - generic [ref=f1e306]: 신장
+            - spinbutton "신장" [ref=f1e307]
+      - button "분석하기" [disabled] [ref=f1e309]

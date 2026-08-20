@@ -1,4 +1,5 @@
 import type { Lang } from "../i18n/locales.js";
+import { DEFAULT_CAPTURE_PRESET_ID, presetById } from "../capture/presets.js";
 
 export const SETTINGS_STORAGE_KEY = "gait-pressure-mat.settings.v1";
 
@@ -10,6 +11,7 @@ export interface UserSettings {
   showGrid: boolean;
   /** 0 = Soft, 1 = Crisp, 2 = Pixel */
   sharpIdx: number;
+  capturePresetId: string;
 }
 
 export const DEFAULT_USER_SETTINGS: UserSettings = {
@@ -19,6 +21,7 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   overlayEnabled: true,
   showGrid: false,
   sharpIdx: 0,
+  capturePresetId: DEFAULT_CAPTURE_PRESET_ID,
 };
 
 function clampSharpIdx(n: number): number {
@@ -38,6 +41,7 @@ function normalize(partial: unknown): UserSettings {
     overlayEnabled: p.overlayEnabled ?? DEFAULT_USER_SETTINGS.overlayEnabled,
     showGrid: p.showGrid ?? DEFAULT_USER_SETTINGS.showGrid,
     sharpIdx: clampSharpIdx(p.sharpIdx ?? DEFAULT_USER_SETTINGS.sharpIdx),
+    capturePresetId: presetById(p.capturePresetId).id,
   };
 }
 

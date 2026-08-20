@@ -1,0 +1,304 @@
+- generic [ref=f2e1]:
+  - banner [ref=f2e2]:
+    - generic [ref=f2e3]:
+      - link "Talktail" [ref=f2e4] [cursor=pointer]:
+        - /url: "#measure"
+        - img "Talktail" [ref=f2e5]
+      - generic "Talktail Gait": TalktailGait
+      - navigation "Modules" [ref=f2e6]:
+        - button "측정" [active] [ref=f2e7] [cursor=pointer]
+        - button "파일 다운" [ref=f2e8] [cursor=pointer]
+        - button "직접 분석" [ref=f2e9] [cursor=pointer]
+        - button "리포트" [ref=f2e10] [cursor=pointer]
+        - button "완료된 분석" [ref=f2e11] [cursor=pointer]
+  - generic [ref=f2e12]:
+    - complementary [ref=f2e13]:
+      - generic [ref=f2e237]: 패드 연결
+      - generic [ref=f2e238]:
+        - generic [ref=f2e239]:
+          - generic [ref=f2e240]:
+            - generic [ref=f2e241]: 연결
+            - generic [ref=f2e242]: ○ 대기
+          - generic [ref=f2e243]:
+            - generic [ref=f2e244]: 보정
+            - generic [ref=f2e245]: 미보정
+        - generic [ref=f2e246]:
+          - button "패드 연결" [ref=f2e247] [cursor=pointer]
+          - button "보정" [disabled] [ref=f2e248]
+        - paragraph [ref=f2e249]: USB로 압력 패드를 연결한 뒤 버튼을 누르세요. 연결 후 보정을 권장합니다.
+      - generic [ref=f2e250]:
+        - generic [ref=f2e251]: 언어
+        - combobox "Language" [ref=f2e252] [cursor=pointer]:
+          - option "한국어" [selected]
+          - option "English"
+      - generic [ref=f2e253]:
+        - generic [ref=f2e254]: 반려견
+        - button "접기" [expanded] [ref=f2e255] [cursor=pointer]
+      - generic [ref=f2e256]:
+        - generic [ref=f2e257]:
+          - generic [ref=f2e258]: 이름
+          - textbox "이름" [ref=f2e259]:
+            - /placeholder: "예: 바둑이"
+        - generic [ref=f2e260]:
+          - generic [ref=f2e261]: 신장
+          - spinbutton "신장" [ref=f2e262]
+        - generic [ref=f2e263]:
+          - generic [ref=f2e264]: 몸무게
+          - spinbutton "몸무게" [ref=f2e265]
+        - generic [ref=f2e266]:
+          - generic [ref=f2e267]: 견종
+          - textbox "견종" [ref=f2e268]:
+            - /placeholder: "예: 진돗개"
+      - generic [ref=f2e269]: 세션
+      - button "시작" [disabled] [ref=f2e271]
+      - generic [ref=f2e273]:
+        - generic [ref=f2e274]: 저장된 CSV
+        - button "새로고침" [ref=f2e275] [cursor=pointer]
+      - list:
+        - listitem [ref=f2e276]:
+          - generic [ref=f2e277]:
+            - generic [ref=f2e278]: 숫자표기
+            - generic [ref=f2e279]: – · – · – · 2026-08-19 14:39
+          - generic [ref=f2e280]:
+            - link "보기" [ref=f2e281] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/pressure/records/7daa8d5f-d38b-4481-9843-99bcd875751e/csv
+            - link "다운로드" [ref=f2e282] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/pressure/records/7daa8d5f-d38b-4481-9843-99bcd875751e/csv?download=1
+        - listitem [ref=f2e283]:
+          - generic [ref=f2e284]:
+            - generic [ref=f2e285]: 누락
+            - generic [ref=f2e286]: – · – · – · 2026-08-19 14:39
+          - generic [ref=f2e287]:
+            - link "보기" [ref=f2e288] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/pressure/records/a4a69d8a-3918-470a-8eab-eb1b769739d2/csv
+            - link "다운로드" [ref=f2e289] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/pressure/records/a4a69d8a-3918-470a-8eab-eb1b769739d2/csv?download=1
+        - listitem [ref=f2e290]:
+          - generic [ref=f2e291]:
+            - generic [ref=f2e292]: 정상
+            - generic [ref=f2e293]: – · – · – · 2026-08-19 14:39
+          - generic [ref=f2e294]:
+            - link "보기" [ref=f2e295] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/pressure/records/ec23c5e9-2001-4806-bd2d-2644bcd0912d/csv
+            - link "다운로드" [ref=f2e296] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/pressure/records/ec23c5e9-2001-4806-bd2d-2644bcd0912d/csv?download=1
+        - listitem [ref=f2e297]:
+          - generic [ref=f2e298]:
+            - generic [ref=f2e299]: (이름 없음)
+            - generic [ref=f2e300]: – · – · 9.1s · 2026-08-19 14:39
+          - generic [ref=f2e301]:
+            - link "보기" [ref=f2e302] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/pressure/records/0ab11305-6544-4f91-925a-d6af49d61b24/csv
+            - link "다운로드" [ref=f2e303] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/pressure/records/0ab11305-6544-4f91-925a-d6af49d61b24/csv?download=1
+        - listitem [ref=f2e304]:
+          - generic [ref=f2e305]:
+            - generic [ref=f2e306]: 검증견
+            - generic [ref=f2e307]: – · – · – · 2026-08-19 14:39
+          - generic [ref=f2e308]:
+            - link "보기" [ref=f2e309] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/pressure/records/3458a856-caaa-49b6-9ca5-ea58d769cb08/csv
+            - link "다운로드" [ref=f2e310] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/pressure/records/3458a856-caaa-49b6-9ca5-ea58d769cb08/csv?download=1
+      - generic [ref=f2e311]:
+        - generic [ref=f2e312]:
+          - generic [ref=f2e313]: 최대 압력
+          - generic [ref=f2e314]: –
+        - generic [ref=f2e315]:
+          - generic [ref=f2e316]: 평균 압력
+          - generic [ref=f2e317]: –
+        - generic [ref=f2e318]:
+          - generic [ref=f2e319]: 접촉 면적
+          - generic [ref=f2e320]: –
+        - generic [ref=f2e321]:
+          - generic [ref=f2e322]: 30–50 면적
+          - generic [ref=f2e323]: –
+        - generic [ref=f2e324]:
+          - generic [ref=f2e325]: ">50 면적"
+          - generic [ref=f2e326]: –
+        - generic [ref=f2e327]:
+          - generic [ref=f2e328]: 입력 Hz
+          - generic [ref=f2e329]: –
+        - generic [ref=f2e330]:
+          - generic [ref=f2e331]: 렌더 FPS
+          - generic [ref=f2e332]: –
+        - generic [ref=f2e333]:
+          - generic [ref=f2e334]: 녹화
+          - generic [ref=f2e335]: –
+    - button "›" [expanded] [ref=f2e26] [cursor=pointer]
+    - main [ref=f2e27]:
+      - region "Section 1" [ref=f2e28]:
+        - generic [ref=f2e29]: 1 · 압력패드
+      - region "Section 2" [ref=f2e32]:
+        - generic [ref=f2e33]: 2-1 · 촬영 영상
+        - generic [ref=f2e36]: 2-2 · 스켈레톤 분석
+      - region "Section 3" [ref=f2e39]:
+        - generic [ref=f2e40]:
+          - generic [ref=f2e41]: 3-1 · 각도 분석
+          - generic [ref=f2e42]: max-min
+        - generic [ref=f2e43]:
+          - generic [ref=f2e44]: 3-2 · 각도 분석
+          - generic [ref=f2e98]:
+            - generic [ref=f2e100]:
+              - generic [ref=f2e101]:
+                - generic [ref=f2e102]:
+                  - generic [ref=f2e103]: 어깨
+                  - generic [ref=f2e104]:
+                    - generic [ref=f2e105]:
+                      - generic [ref=f2e106]: 왼쪽
+                      - generic [ref=f2e107]:
+                        - generic [ref=f2e108]: –
+                        - generic [ref=f2e109]: –
+                        - generic [ref=f2e110]: –
+                    - generic [ref=f2e111]:
+                      - generic [ref=f2e112]: 오른쪽
+                      - generic [ref=f2e113]:
+                        - generic [ref=f2e114]: –
+                        - generic [ref=f2e115]: –
+                        - generic [ref=f2e116]: –
+                - generic [ref=f2e117]:
+                  - generic [ref=f2e118]: 고관절
+                  - generic [ref=f2e119]:
+                    - generic [ref=f2e120]:
+                      - generic [ref=f2e121]: 왼쪽
+                      - generic [ref=f2e122]:
+                        - generic [ref=f2e123]: –
+                        - generic [ref=f2e124]: –
+                        - generic [ref=f2e125]: –
+                    - generic [ref=f2e126]:
+                      - generic [ref=f2e127]: 오른쪽
+                      - generic [ref=f2e128]:
+                        - generic [ref=f2e129]: –
+                        - generic [ref=f2e130]: –
+                        - generic [ref=f2e131]: –
+              - generic [ref=f2e132]:
+                - generic [ref=f2e133]:
+                  - generic [ref=f2e134]: 팔꿈치
+                  - generic [ref=f2e135]:
+                    - generic [ref=f2e136]:
+                      - generic [ref=f2e137]: 왼쪽
+                      - generic [ref=f2e138]:
+                        - generic [ref=f2e139]: –
+                        - generic [ref=f2e140]: –
+                        - generic [ref=f2e141]: –
+                    - generic [ref=f2e142]:
+                      - generic [ref=f2e143]: 오른쪽
+                      - generic [ref=f2e144]:
+                        - generic [ref=f2e145]: –
+                        - generic [ref=f2e146]: –
+                        - generic [ref=f2e147]: –
+                - generic [ref=f2e148]:
+                  - generic [ref=f2e149]: 무릎
+                  - generic [ref=f2e150]:
+                    - generic [ref=f2e151]:
+                      - generic [ref=f2e152]: 왼쪽
+                      - generic [ref=f2e153]:
+                        - generic [ref=f2e154]: –
+                        - generic [ref=f2e155]: –
+                        - generic [ref=f2e156]: –
+                    - generic [ref=f2e157]:
+                      - generic [ref=f2e158]: 오른쪽
+                      - generic [ref=f2e159]:
+                        - generic [ref=f2e160]: –
+                        - generic [ref=f2e161]: –
+                        - generic [ref=f2e162]: –
+              - generic [ref=f2e163]:
+                - generic [ref=f2e164]:
+                  - generic [ref=f2e165]: 앞발목
+                  - generic [ref=f2e166]:
+                    - generic [ref=f2e167]:
+                      - generic [ref=f2e168]: 왼쪽
+                      - generic [ref=f2e169]:
+                        - generic [ref=f2e170]: –
+                        - generic [ref=f2e171]: –
+                        - generic [ref=f2e172]: –
+                    - generic [ref=f2e173]:
+                      - generic [ref=f2e174]: 오른쪽
+                      - generic [ref=f2e175]:
+                        - generic [ref=f2e176]: –
+                        - generic [ref=f2e177]: –
+                        - generic [ref=f2e178]: –
+                - generic [ref=f2e179]:
+                  - generic [ref=f2e180]: 뒷발목
+                  - generic [ref=f2e181]:
+                    - generic [ref=f2e182]:
+                      - generic [ref=f2e183]: 왼쪽
+                      - generic [ref=f2e184]:
+                        - generic [ref=f2e185]: –
+                        - generic [ref=f2e186]: –
+                        - generic [ref=f2e187]: –
+                    - generic [ref=f2e188]:
+                      - generic [ref=f2e189]: 오른쪽
+                      - generic [ref=f2e190]:
+                        - generic [ref=f2e191]: –
+                        - generic [ref=f2e192]: –
+                        - generic [ref=f2e193]: –
+              - generic [ref=f2e194]:
+                - generic [ref=f2e195]:
+                  - generic [ref=f2e196]: 앞발
+                  - generic [ref=f2e197]:
+                    - generic [ref=f2e198]:
+                      - generic [ref=f2e199]: 왼쪽
+                      - generic [ref=f2e200]:
+                        - generic [ref=f2e201]: –
+                        - generic [ref=f2e202]: –
+                        - generic [ref=f2e203]: –
+                    - generic [ref=f2e204]:
+                      - generic [ref=f2e205]: 오른쪽
+                      - generic [ref=f2e206]:
+                        - generic [ref=f2e207]: –
+                        - generic [ref=f2e208]: –
+                        - generic [ref=f2e209]: –
+                - generic [ref=f2e210]:
+                  - generic [ref=f2e211]: 뒷발
+                  - generic [ref=f2e212]:
+                    - generic [ref=f2e213]:
+                      - generic [ref=f2e214]: 왼쪽
+                      - generic [ref=f2e215]:
+                        - generic [ref=f2e216]: –
+                        - generic [ref=f2e217]: –
+                        - generic [ref=f2e218]: –
+                    - generic [ref=f2e219]:
+                      - generic [ref=f2e220]: 오른쪽
+                      - generic [ref=f2e221]:
+                        - generic [ref=f2e222]: –
+                        - generic [ref=f2e223]: –
+                        - generic [ref=f2e224]: –
+            - generic [ref=f2e225]:
+              - generic [ref=f2e227]:
+                - button "이전" [ref=f2e228] [cursor=pointer]: ‹
+                - generic [ref=f2e229]:
+                  - button "어깨" [ref=f2e230] [cursor=pointer]
+                  - button "팔꿈치" [ref=f2e231] [cursor=pointer]
+                  - button "앞발목" [ref=f2e232] [cursor=pointer]
+                  - button "앞발" [ref=f2e233] [cursor=pointer]
+                - button "다음" [ref=f2e234] [cursor=pointer]: ›
+              - button "자동 슬라이드 정지" [ref=f2e235] [cursor=pointer]: ⏸
+      - generic [ref=f2e49]:
+        - generic [ref=f2e50]: 휴대폰 카메라
+        - generic [ref=f2e51]:
+          - generic: 휴대 앱 연결됨 — 영상 수신 중…
+          - generic [ref=f2e53]:
+            - button "▶" [disabled] [ref=f2e54]
+            - slider [ref=f2e55]: "0"
+            - generic [ref=f2e56]: 0:00 / 0:00
+            - combobox "Speed" [ref=f2e57]:
+              - option "0.2×"
+              - option "0.25×"
+              - option "0.5×"
+              - option "1×" [selected]
+              - option "1.5×"
+              - option "2×"
+            - slider "Zoom" [ref=f2e58]: "100"
+      - generic [ref=f2e59]:
+        - button "▶" [ref=f2e60] [cursor=pointer]
+        - slider [ref=f2e61]: "0"
+        - generic [ref=f2e62]: 0:00.0 / 0:01.4
+        - combobox [ref=f2e63] [cursor=pointer]:
+          - option "0.25×"
+          - option "0.5×"
+          - option "1×" [selected]
+          - option "1.5×"
+          - option "2×"
+          - option "4×"
+        - generic [ref=f2e236]: 동기화 오차 0ms

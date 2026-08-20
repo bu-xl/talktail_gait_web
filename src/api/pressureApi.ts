@@ -6,6 +6,7 @@
  */
 
 import { joinApiUrl } from "../config/apiUrl.js";
+import { pressureCsvName } from "../core/sessionNaming.js";
 
 export type PressureDog = {
   name: string | null;
@@ -66,15 +67,22 @@ export async function uploadPressureCsv(
 ): Promise<PressureRecord> {
   const form = new FormData();
   const blob = new Blob([input.csv], { type: "text/csv;charset=utf-8" });
-  form.append("csv", blob, "pressure.csv");
-
   const { name, breed, weightKg, heightCm } = input.dog;
+  // The stored CSV carries the dog, so a file pulled off disk later still says
+  // whose walk it is. Falls back to the legacy name when the dog is unknown.
+  const rec = input.recording || {};
+  form.append(
+    "csv",
+    blob,
+    pressureCsvName({
+      dog: { name, weightKg },
+      when: rec.startedAt ? new Date(rec.startedAt) : undefined,
+    }),
+  );
   if (name) form.append("dogName", name);
   if (breed) form.append("dogBreed", breed);
   if (weightKg != null && Number.isFinite(weightKg)) form.append("dogWeightKg", String(weightKg));
   if (heightCm != null && Number.isFinite(heightCm)) form.append("dogHeightCm", String(heightCm));
-
-  const rec = input.recording || {};
   for (const key of ["frames", "durationSec", "fps", "rows", "cols"] as const) {
     const v = rec[key];
     if (v != null && Number.isFinite(v)) form.append(key, String(v));

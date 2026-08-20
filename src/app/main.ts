@@ -13,11 +13,18 @@
  *     a sliding-window RateMeter) and "Render FPS" (paint rate).
  */
 
-import { loadConfig } from "../core/config.js";
+import {
+  CAPTURE_PRESETS,
+  captureSettingsPayload,
+  presetById,
+  type CapturePreset,
+} from "../capture/presets.js";
 import { configureSync, isSyncEnabled, resolveApiBase, resolveRoomId, resolveWsUrl } from "../config/sync.js";
 import { clockSync } from "../transport/clockSync.js";
+import { loadConfig } from "../core/config.js";
 import { GRID_COLS, GRID_ROWS, aspectHeight } from "../core/constants.js";
 import { framesToCanineGaitCsv } from "../core/csvExport.js";
+import { dogPrefix, pressureCsvName, stampFrom } from "../core/sessionNaming.js";
 import {
   analyzeRecordedSession,
   GaitAnalysisError,
@@ -68,7 +75,17 @@ import {
   type SyncPeers,
 } from "../transport/gaitSocket.js";
 import { hasDogInfo, type ManualAnalyzeJob, type ManualDogInfo } from "../api/analyzeApi.js";
-import { showToast, updateQueueToast } from "../ui/toast.js";
+import {
+  dismissTopToast,
+  showBlockingTopToast,
+  showToast,
+  showTopToast,
+  updateQueueToast,
+} from "../ui/toast.js";
+import { CompletedPage } from "../ui/completedPage.js";
+import type { CompletedSessionRef } from "../ui/completedPage.js";
+import { getResultDetail, listResultDates, listResultSessions } from "../api/resultsApi.js";
+import { getSessionNotes, saveSessionNotes } from "../api/sessionNotesApi.js";
 import { ResultsPanel } from "../ui/resultsPanel.js";
 import { ReportPage } from "../ui/reportPage.js";
 import { UploadPage } from "../ui/uploadPage.js";
@@ -356,14 +373,54 @@ function wireDogInfoToggle(): void {
   sync();
 }
 
-type AppModule = "measure" | "report" | "upload" | "files";
+type AppModule = "measure" | "report" | "upload" | "files" | "review";
 
-const APP_MODULES: readonly AppModule[] = ["measure", "report", "upload", "files"];
+const APP_MODULES: readonly AppModule[] = ["measure", "report", "upload", "files", "review"];
+
+/**
+ * 헤더에 "완료된 분석" 버튼을 코드로 붙인다.
+ *
+ * index.html 을 건드리지 않는 이유는 이 화면이 측정 화면의 마크업을 그대로 재사용하기
+ * 때문이다. 레일만 갈아 끼우면 되므로 새 페이지 마크업이 필요 없다.
+ */
+function ensureCompletedNavButton(): void {
+  const nav = document.querySelector("#appHeader .ah-nav");
+  if (!nav || nav.querySelector('[data-module="review"]')) return;
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.dataset.module = "review";
+  btn.setAttribute("data-i18n", "nav_completed");
+  btn.textContent = t("nav_completed");
+  nav.appendChild(btn);
+}
 
 /** 헤더 nav 를 연결하고, 코드에서 모듈을 바꿀 수 있는 함수를 돌려준다. */
+const MODULE_STORAGE_KEY = "gait.activeModule";
+
+/**
+ * 새로고침해도 보던 화면에 머문다.
+ *
+ * 노트북 두 대를 역할별로 고정해 쓰기 때문이다. 열람용 노트북이 새로고침마다
+ * 측정 화면으로 돌아가면 매번 탭을 다시 눌러야 하고, 그 사이 측정용 제어가 붙는다.
+ */
+function loadActiveModule(): AppModule | null {
+  try {
+    const saved = localStorage.getItem(MODULE_STORAGE_KEY) as AppModule | null;
+    return saved && APP_MODULES.includes(saved) ? saved : null;
+  } catch {
+    return null;
+  }
+}
+
 function wireAppHeader(opts: { onModuleChange: (mod: AppModule) => void }): (mod: AppModule) => void {
+  ensureCompletedNavButton();
   const setActive = (mod: AppModule): void => {
     document.body.dataset.module = mod;
+    try {
+      localStorage.setItem(MODULE_STORAGE_KEY, mod);
+    } catch {
+      // 시크릿 모드 등 저장이 막힌 환경 — 이번 세션에서만 유지된다.
+    }
     document.querySelectorAll<HTMLButtonElement>("#appHeader .ah-nav button[data-module]").forEach((btn) => {
       const active = btn.dataset.module === mod;
       btn.classList.toggle("active", active);
@@ -406,6 +463,8 @@ async function boot(): Promise<void> {
    * 이 값이 있어야 CSV 를 영상 프레임과 짝지을 수 있다. 동기화 전이면 null.
    */
   let recordingStartServerNs: bigint | null = null;
+  /** 녹화 시작 시각 — CSV·영상 파일명 도장(업로드 시각 아님). */
+  let recordingStartedAt: Date | null = null;
 
   // 서버와 시계를 맞춘다 — 매트를 카메라와 같은 시간축에 올리는 유일한 방법이다.
   // 실패해도 앱은 계속 동작한다(그 세션의 CSV 만 영상과 매칭이 안 될 뿐).
@@ -601,12 +660,45 @@ async function boot(): Promise<void> {
       sessionBtn.classList.add("primary");
       sessionBtn.disabled = false;
     }
+    // 마지막에 한 번 더: 대기 상태의 활성화는 신원 입력이 결정한다.
+    applyDogIdentityGate();
     if (sessionFloatBtn) {
       sessionFloatBtn.textContent = sessionBtn.textContent;
       sessionFloatBtn.disabled = sessionBtn.disabled;
       sessionFloatBtn.classList.toggle("is-stop", sessionBtn.classList.contains("is-stop"));
     }
     syncStageInfoBtn();
+  };
+
+
+  /**
+   * 이름과 몸무게가 없으면 측정을 시작할 수 없다.
+   *
+   * 두 값은 나중에 붙이는 메타데이터가 아니라 **파일명에 들어간다**. 빠진 채로 찍으면
+   * 영상과 CSV 가 `main-260819-144204` 로 저장되어 나중에 누구의 보행인지 되찾을 수
+   * 없다. 그래서 시작 시점에 막는다.
+   */
+  const dogIdentityGate = (): { ok: boolean; reason: string } => {
+    const dog = readSideDogInfo();
+    const hasName = Boolean(dog.name && dog.name.trim());
+    const hasWeight = dog.weightKg != null && Number.isFinite(dog.weightKg) && dog.weightKg > 0;
+    if (hasName && hasWeight) return { ok: true, reason: "" };
+    if (!hasName && !hasWeight) return { ok: false, reason: t("session_need_dog_both") };
+    return { ok: false, reason: hasName ? t("session_need_dog_weight") : t("session_need_dog_name") };
+  };
+
+  const applyDogIdentityGate = (): void => {
+    const gate = dogIdentityGate();
+    // 촬영 중이거나 분석 중이면 그 상태의 버튼 규칙이 우선한다.
+    const idle = sessionPhase === "idle" || sessionPhase === "review";
+    if (idle) {
+      sessionBtn.disabled = !gate.ok;
+      if (sessionFloatBtn) sessionFloatBtn.disabled = !gate.ok;
+    }
+    // 측정 화면에서만 띄운다. 다른 탭에서는 시작 버튼 자체가 안 보인다.
+    const onMeasure = document.body.dataset.module === "measure";
+    if (idle && !gate.ok && onMeasure) showBlockingTopToast("dog-identity", gate.reason);
+    else dismissTopToast("dog-identity");
   };
 
   /** 완료를 기다리는 분석 잡들 — WS `analyze_done` 을 놓쳤을 때의 백그라운드 폴링 폴백. */
@@ -923,6 +1015,96 @@ async function boot(): Promise<void> {
       })
     : null;
 
+
+  // --- 완료된 분석 (열람 전용 노트북) -------------------------------------
+  //
+  // 측정용 소켓과 뷰어용 소켓을 하나만 살려 둔다. 이 화면에 들어오면 제어용
+  // 연결을 끊고 뷰어로 갈아탄다 — 허브가 뷰어의 제어 메시지를 거부하므로,
+  // 설명하는 사람이 옆 노트북의 촬영을 건드릴 수 없다.
+  let viewerSync: GaitSyncSocket | null = null;
+
+  const completedPage = new CompletedPage({
+    onPick: async (ref) => {
+      const detail = await getResultDetail(apiBase, ref.date, ref.session.stem);
+      clearReviewPanes();
+      if (detail.original?.url || detail.backOriginal?.url) {
+        setOriginVideo(detail.original?.url || detail.backOriginal?.url || null);
+      }
+      setAnalysisVideo(detail.video?.url ?? null);
+      setMaxMinVideo(detail.report?.angle_pawy?.url ?? null);
+      setPressureMedia(detail.report?.pressure?.url ?? null);
+      await loadAngleDiffPane(detail.report?.angle_diff?.url ?? null).catch(() => undefined);
+      reviewSync?.refresh();
+    },
+    loadHistory: (ref) => getSessionNotes(apiBase, ref.date, ref.session.stem),
+    saveHistory: (ref, text) => saveSessionNotes(apiBase, ref.date, ref.session.stem, text),
+  });
+  completedPage.setApiBase(apiBase);
+  onLangChange(() => completedPage.renderLabels());
+
+  /** 분석 완료 알림 — 관객이 있는 화면이라 위에서 크게 내려오게 띄운다. */
+  const announceAnalysisDone = (dogName: string | null | undefined): void => {
+    showTopToast({
+      message: dogName
+        ? t("cp_analysis_done", { name: dogName })
+        : t("cp_analysis_done_plain"),
+    });
+    completedPage.onAnalysisDone();
+  };
+
+  /**
+   * 완료 알림에 실을 이름 찾기.
+   *
+   * `analyze_done` 은 stem 만 준다. 서버 목록을 다시 읽어 그 stem 의 강아지 이름을
+   * 찾고, 못 찾으면 이름 없이 알린다 — 알림 자체를 삼키지는 않는다.
+   */
+  const announceFromLatest = async (stem: string | null): Promise<void> => {
+    let name: string | null = null;
+    try {
+      const dates = await listResultDates(apiBase);
+      for (const d of dates.slice(0, 2)) {
+        const page = await listResultSessions(apiBase, d.date);
+        const hit = stem
+          ? page.sessions.find((x) => x.stem === stem)
+          : page.sessions[0];
+        if (hit) {
+          name = hit.dog?.name?.trim() || null;
+          break;
+        }
+      }
+    } catch {
+      /* 이름을 못 찾아도 완료 사실은 알린다 */
+    }
+    announceAnalysisDone(name);
+  };
+
+  const enterViewerMode = (): void => {
+    gaitSync.disconnect();
+    if (!viewerSync) {
+      viewerSync = new GaitSyncSocket({
+        wsUrl: resolveWsUrl(),
+        roomId: resolveRoomId(),
+        role: "viewer",
+      });
+      viewerSync.onMessage((msg) => {
+        if (msg.type === "analyze_done") {
+          // 뷰어에는 잡 장부가 없다. 이름은 방금 끝난 세션에서 읽는 게 정확하므로
+          // 목록을 새로 받은 뒤 그 첫 항목의 강아지 이름으로 알린다.
+          void announceFromLatest(msg.stem ?? null);
+        } else if (msg.type === "analysis_queue") {
+          updateQueueToast(msg);
+        }
+      });
+    }
+    viewerSync.connect();
+    void completedPage.refresh();
+  };
+
+  const leaveViewerMode = (): void => {
+    viewerSync?.disconnect();
+    if (isSyncEnabled()) gaitSync.connect();
+  };
+
   const setModule = wireAppHeader({
     onModuleChange: (mod) => {
       if (mod === "report") reportPage?.show();
@@ -931,8 +1113,14 @@ async function boot(): Promise<void> {
       else uploadPage?.hide();
       if (mod === "files") filesPage?.show();
       else filesPage?.hide();
+      if (mod === "review") enterViewerMode();
+      else leaveViewerMode();
+      // 탭을 옮기면 안내 토스트를 다시 평가한다. 측정으로 돌아왔을 때 시작 버튼만
+      // 잠겨 있고 이유가 없으면 사용자는 무엇을 고쳐야 할지 알 수 없다.
+      applyDogIdentityGate();
     },
   });
+
 
   const updateSyncUi = (peers?: SyncPeers, hubConnected?: boolean): void => {
     const mobileEl = $opt("syncStatus");
@@ -1057,6 +1245,27 @@ async function boot(): Promise<void> {
     { labelKey: "btn_sharp_pixel", interpolation: "nearest", sigmaMin: 0, sigmaMax: 0 },
   ];
   let sharpIdx = userSettings.sharpIdx;
+  let selectedCapturePreset: CapturePreset = presetById(userSettings.capturePresetId);
+
+  const capturePresetSelect = $opt("capturePreset") as HTMLSelectElement | null;
+  let syncCapturePresetToPhones: () => void = () => {};
+  const wireCapturePresetSelect = (): void => {
+    if (!capturePresetSelect) return;
+    capturePresetSelect.innerHTML = "";
+    for (const preset of CAPTURE_PRESETS) {
+      const opt = document.createElement("option");
+      opt.value = preset.id;
+      opt.textContent = preset.label;
+      capturePresetSelect.appendChild(opt);
+    }
+    capturePresetSelect.value = selectedCapturePreset.id;
+    capturePresetSelect.onchange = () => {
+      selectedCapturePreset = presetById(capturePresetSelect.value);
+      persistSettings();
+      syncCapturePresetToPhones();
+    };
+  };
+  wireCapturePresetSelect();
 
   const applySharpMode = (idx: number): void => {
     sharpIdx = idx % sharpModes.length;
@@ -1077,6 +1286,7 @@ async function boot(): Promise<void> {
     overlayEnabled,
     showGrid: config.render.show_grid,
     sharpIdx,
+    capturePresetId: selectedCapturePreset.id,
   });
 
   const persistSettings = (): void => scheduleSaveSettings(collectSettings);
@@ -1294,6 +1504,7 @@ async function boot(): Promise<void> {
     cols: GRID_COLS,
     // 동기 촬영 세션과 같은 sessionId 로 묶어 back 이 영상+CSV 를 한 세션으로 연결하게 한다.
     sessionId: () => syncSessionId,
+    startedAt: () => recordingStartedAt,
     // CSV 첫 행(time=0)의 절대 시각 — 영상 프레임과 매칭하는 기준점.
     startAtServerNs: () => recordingStartServerNs,
     clockOffsetNs: () => clockSync.offset,
@@ -1336,6 +1547,7 @@ async function boot(): Promise<void> {
 
     // CSV 업로드에 실을 절대 시각. 첫 프레임(time=0)에 해당하는 t_server_ns.
     recordingStartServerNs = clockSync.perfMsToServerNs(t0);
+    recordingStartedAt = new Date();
     recorder.start(t0);
     setExportsEnabled(false);
     cachedTrack = null;
@@ -1365,8 +1577,13 @@ async function boot(): Promise<void> {
   };
 
   const gaitSync = new GaitSyncSocket({ wsUrl: resolveWsUrl(), roomId: resolveRoomId() });
+  syncCapturePresetToPhones = (): void => {
+    if (!isSyncEnabled() || !gaitSync.connected || gaitSync.isViewer) return;
+    gaitSync.sendCaptureSettings(captureSettingsPayload(selectedCapturePreset));
+  };
   gaitSync.onConnectionChange((connected) => {
     updateSyncUi(gaitSync.peers, connected);
+    if (connected) syncCapturePresetToPhones();
   });
   gaitSync.onMessage((msg) => {
     if (msg.type === "joined" || msg.type === "peer_update") {
@@ -1471,6 +1688,13 @@ async function boot(): Promise<void> {
   } else {
     updateSyncUi(undefined, false);
   }
+
+  // 새로고침해도 보던 탭에 머문다. 노트북을 역할별로 고정해 쓰기 때문에, 열람용
+  // 화면이 매번 측정 화면으로 돌아가면 그때마다 측정 제어가 다시 붙는다.
+  //
+  // gaitSync 가 만들어진 뒤에 불러야 한다 — 뷰어 전환이 이 소켓을 끊고 갈아타므로,
+  // 선언 전에 부르면 TDZ 에 걸려 부팅이 통째로 멈춘다.
+  setModule(loadActiveModule() ?? "measure");
   syncDock.setOnBack(() => {
     syncPlaybackActive = false;
     syncDock.stop();
@@ -1501,7 +1725,7 @@ async function boot(): Promise<void> {
       setSessionPhase("recording");
       if (gaitSync.connected && gaitSync.peers.mobile) {
         syncRecordPending = true;
-        gaitSync.requestRecord();
+        gaitSync.requestRecord(readSideDogInfo(), captureSettingsPayload(selectedCapturePreset));
       }
       return;
     }
@@ -1522,7 +1746,7 @@ async function boot(): Promise<void> {
     syncRecordPending = true;
     setSyncStatus(t("sync_pending"), "wait");
     setSessionPhase("recording");
-    gaitSync.requestRecord();
+    gaitSync.requestRecord(readSideDogInfo(), captureSettingsPayload(selectedCapturePreset));
   };
 
   const stopClinicSession = (): void => {
@@ -1593,6 +1817,12 @@ async function boot(): Promise<void> {
     ) {
       return;
     }
+    const gate = dogIdentityGate();
+    if (!gate.ok) {
+      applyDogIdentityGate();
+      setSyncStatus(gate.reason, "bad");
+      return;
+    }
     // 시작 → 1초 영점 보정 후 기존 세션 시작 흐름 진행.
     sessionBtn.disabled = true;
     if (sessionFloatBtn) sessionFloatBtn.disabled = true;
@@ -1602,6 +1832,10 @@ async function boot(): Promise<void> {
       startClinicSession();
     });
   };
+  for (const id of ["dogName", "dogWeightInfo"]) {
+    $opt(id)?.addEventListener("input", () => applyDogIdentityGate());
+  }
+  applyDogIdentityGate();
   sessionBtn.addEventListener("click", onSessionButtonClick);
   sessionFloatBtn?.addEventListener("click", onSessionButtonClick);
 
@@ -1627,7 +1861,7 @@ async function boot(): Promise<void> {
       syncRecordPending = true;
       setSyncStatus(t("sync_pending"));
       setSessionPhase("recording");
-      gaitSync.requestRecord();
+      gaitSync.requestRecord(readSideDogInfo(), captureSettingsPayload(selectedCapturePreset));
       return;
     }
 
@@ -1641,7 +1875,8 @@ async function boot(): Promise<void> {
 
   onClick("btnCsv", () => {
     const csv = framesToCanineGaitCsv(recorder.getFrames(), GRID_ROWS, GRID_COLS);
-    downloadText(`gait-${fileStamp()}.csv`, csv);
+    const dog = readSideDogInfo();
+    downloadText(pressureCsvName({ dog: { name: dog.name, weightKg: dog.weightKg } }), csv);
   });
 
   // Paw-tracking CSV: per-frame, per-paw label + position + pressure.
@@ -1654,7 +1889,12 @@ async function boot(): Promise<void> {
     try {
       const track = getRecordingTrack();
       const csv = pawTrackToCsv(track.overlayFrames, track.displayFields, track.timestampsSec, GRID_COLS);
-      downloadText(`gait-pawtrack-${fileStamp()}.csv`, csv);
+      const dog = readSideDogInfo();
+      const prefix = dogPrefix({ name: dog.name, weightKg: dog.weightKg });
+      downloadText(
+        `${prefix ? `${prefix}-` : ""}pawtrack-${stampFrom()}.csv`,
+        csv,
+      );
     } finally {
       btn.disabled = false;
       btn.textContent = prev;

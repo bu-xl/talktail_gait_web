@@ -1,0 +1,154 @@
+- generic [ref=f1e1]:
+  - banner [ref=f1e2]:
+    - generic [ref=f1e3]:
+      - link "Talktail" [ref=f1e4] [cursor=pointer]:
+        - /url: "#measure"
+        - img "Talktail" [ref=f1e5]
+      - generic "Talktail Gait": TalktailGait
+      - navigation "Modules" [ref=f1e6]:
+        - button "측정" [ref=f1e7] [cursor=pointer]
+        - button "파일 다운" [active] [ref=f1e8] [cursor=pointer]
+        - button "직접 분석" [ref=f1e9] [cursor=pointer]
+        - button "리포트" [ref=f1e10] [cursor=pointer]
+        - button "완료된 분석" [ref=f1e11] [cursor=pointer]
+  - text: origin analysis max-min angle-diff
+  - region "Stored files" [ref=f1e152]:
+    - generic [ref=f1e153]:
+      - generic [ref=f1e154]:
+        - heading "파일 다운" [level=1] [ref=f1e155]
+        - paragraph [ref=f1e156]: 서버에 저장된 압력 CSV와 원본 영상을 내려받습니다. 분석하지 않은 촬영도 포함됩니다.
+      - generic [ref=f1e157]:
+        - searchbox "파일 이름 검색" [ref=f1e158]
+        - button "새로고침" [ref=f1e159] [cursor=pointer]
+    - paragraph [ref=f1e160]
+    - generic [ref=f1e162]:
+      - region "압력 CSV" [ref=f1e163]:
+        - generic [ref=f1e164]:
+          - generic [ref=f1e165]: 압력 CSV
+          - generic [ref=f1e166]: 5개
+        - list [ref=f1e167]:
+          - listitem [ref=f1e168]:
+            - generic [ref=f1e169]:
+              - generic "pressure-20260819-143937-숫자표기-7daa8d5f.csv" [ref=f1e170]
+              - generic [ref=f1e171]: 2026-08-19 14:39 · 1.5 KB
+            - link "다운로드" [ref=f1e172] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/files/csv/pressure-20260819-143937-%EC%88%AB%EC%9E%90%ED%91%9C%EA%B8%B0-7daa8d5f.csv?download=1
+          - listitem [ref=f1e173]:
+            - generic [ref=f1e174]:
+              - generic "pressure-20260819-143937-누락-a4a69d8a.csv" [ref=f1e175]
+              - generic [ref=f1e176]: 2026-08-19 14:39 · 1.5 KB
+            - link "다운로드" [ref=f1e177] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/files/csv/pressure-20260819-143937-%EB%88%84%EB%9D%BD-a4a69d8a.csv?download=1
+          - listitem [ref=f1e178]:
+            - generic [ref=f1e179]:
+              - generic "pressure-20260819-143937-정상-ec23c5e9.csv" [ref=f1e180]
+              - generic [ref=f1e181]: 2026-08-19 14:39 · 1.5 KB
+            - link "다운로드" [ref=f1e182] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/files/csv/pressure-20260819-143937-%EC%A0%95%EC%83%81-ec23c5e9.csv?download=1
+          - listitem [ref=f1e183]:
+            - generic [ref=f1e184]:
+              - generic "pressure-20260819-143928-dog-0ab11305.csv" [ref=f1e185]
+              - generic [ref=f1e186]: 2026-08-19 14:39 · 3.0 MB
+            - link "다운로드" [ref=f1e187] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/files/csv/pressure-20260819-143928-dog-0ab11305.csv?download=1
+          - listitem [ref=f1e188]:
+            - generic [ref=f1e189]:
+              - generic "pressure-20260819-143901-검증견-3458a856.csv" [ref=f1e190]
+              - generic [ref=f1e191]: 2026-08-19 14:39 · 1.5 KB
+            - link "다운로드" [ref=f1e192] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/files/csv/pressure-20260819-143901-%EA%B2%80%EC%A6%9D%EA%B2%AC-3458a856.csv?download=1
+      - region "원본 영상" [ref=f1e193]:
+        - generic [ref=f1e194]:
+          - generic [ref=f1e195]: 원본 영상
+          - generic [ref=f1e196]: 15개
+        - list [ref=f1e197]:
+          - listitem [ref=f1e198]:
+            - generic [ref=f1e199]:
+              - generic "대박이-5kg-main-260819-164804.mp4" [ref=f1e200]
+              - generic [ref=f1e201]: Main · 2026-08-19 16:48 · 551.9 KB
+            - link "다운로드" [ref=f1e202] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/uploads/main/%EB%8C%80%EB%B0%95%EC%9D%B4-5kg-main-260819-164804.mp4?download=1
+          - listitem [ref=f1e203]:
+            - generic [ref=f1e204]:
+              - generic "대박이-5kg-main-260819-164737.mp4" [ref=f1e205]
+              - generic [ref=f1e206]: Main · 2026-08-19 16:47 · 974.5 KB
+            - link "다운로드" [ref=f1e207] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/uploads/main/%EB%8C%80%EB%B0%95%EC%9D%B4-5kg-main-260819-164737.mp4?download=1
+          - listitem [ref=f1e208]:
+            - generic [ref=f1e209]:
+              - generic "main-260819-163035.mp4" [ref=f1e210]
+              - generic [ref=f1e211]: Main · 2026-08-19 16:31 · 10.6 MB
+            - link "다운로드" [ref=f1e212] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/uploads/main/main-260819-163035.mp4?download=1
+          - listitem [ref=f1e213]:
+            - generic [ref=f1e214]:
+              - generic "main-260819-162153.mp4" [ref=f1e215]
+              - generic [ref=f1e216]: Main · 2026-08-19 16:21 · 865.7 KB
+            - link "다운로드" [ref=f1e217] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/uploads/main/main-260819-162153.mp4?download=1
+          - listitem [ref=f1e218]:
+            - generic [ref=f1e219]:
+              - generic "main-260819-162106.mp4" [ref=f1e220]
+              - generic [ref=f1e221]: Main · 2026-08-19 16:21 · 655.0 KB
+            - link "다운로드" [ref=f1e222] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/uploads/main/main-260819-162106.mp4?download=1
+          - listitem [ref=f1e223]:
+            - generic [ref=f1e224]:
+              - generic "main-260819-161859.mp4" [ref=f1e225]
+              - generic [ref=f1e226]: Main · 2026-08-19 16:19 · 1.2 MB
+            - link "다운로드" [ref=f1e227] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/uploads/main/main-260819-161859.mp4?download=1
+          - listitem [ref=f1e228]:
+            - generic [ref=f1e229]:
+              - generic "main-260819-160614.mp4" [ref=f1e230]
+              - generic [ref=f1e231]: Main · 2026-08-19 16:06 · 1.1 MB
+            - link "다운로드" [ref=f1e232] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/uploads/main/main-260819-160614.mp4?download=1
+          - listitem [ref=f1e233]:
+            - generic [ref=f1e234]:
+              - generic "main-260819-145812.mp4" [ref=f1e235]
+              - generic [ref=f1e236]: Main · 2026-08-19 14:58 · 2.6 MB
+            - link "다운로드" [ref=f1e237] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/uploads/main/main-260819-145812.mp4?download=1
+          - listitem [ref=f1e238]:
+            - generic [ref=f1e239]:
+              - generic "main-260819-145729.mp4" [ref=f1e240]
+              - generic [ref=f1e241]: Main · 2026-08-19 14:57 · 390.8 KB
+            - link "다운로드" [ref=f1e242] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/uploads/main/main-260819-145729.mp4?download=1
+          - listitem [ref=f1e243]:
+            - generic [ref=f1e244]:
+              - generic "main-260819-145721.mp4" [ref=f1e245]
+              - generic [ref=f1e246]: Main · 2026-08-19 14:57 · 434.7 KB
+            - link "다운로드" [ref=f1e247] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/uploads/main/main-260819-145721.mp4?download=1
+          - listitem [ref=f1e248]:
+            - generic [ref=f1e249]:
+              - generic "main-260819-144204.mp4" [ref=f1e250]
+              - generic [ref=f1e251]: Main · 2026-08-19 14:42 · 290.8 KB
+            - link "다운로드" [ref=f1e252] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/uploads/main/main-260819-144204.mp4?download=1
+          - listitem [ref=f1e253]:
+            - generic [ref=f1e254]:
+              - generic "main-260819-144155.mp4" [ref=f1e255]
+              - generic [ref=f1e256]: Main · 2026-08-19 14:41 · 542.7 KB
+            - link "다운로드" [ref=f1e257] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/uploads/main/main-260819-144155.mp4?download=1
+          - listitem [ref=f1e258]:
+            - generic [ref=f1e259]:
+              - generic "main-260819-143929.mp4" [ref=f1e260]
+              - generic [ref=f1e261]: Main · 2026-08-19 14:39 · 6.3 MB
+            - link "다운로드" [ref=f1e262] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/uploads/main/main-260819-143929.mp4?download=1
+          - listitem [ref=f1e263]:
+            - generic [ref=f1e264]:
+              - generic "sub1-260819-115051.mp4" [ref=f1e265]
+              - generic [ref=f1e266]: Sub · 2026-08-19 11:50 · 4.9 MB
+            - link "다운로드" [ref=f1e267] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/uploads/sub/sub1-260819-115051.mp4?download=1
+          - listitem [ref=f1e268]:
+            - generic [ref=f1e269]:
+              - generic "sub1-260819-115034.mp4" [ref=f1e270]
+              - generic [ref=f1e271]: Sub · 2026-08-19 11:50 · 1.0 MB
+            - link "다운로드" [ref=f1e272] [cursor=pointer]:
+              - /url: http://192.168.0.59:3000/api/uploads/sub/sub1-260819-115034.mp4?download=1
