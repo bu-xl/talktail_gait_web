@@ -339,6 +339,31 @@
       }
       .fd-col-head .section { margin: 0; }
       .fd-col-count { font-size: 12px; color: var(--muted); font-feature-settings: 'tnum' 1; }
+      .fd-col-actions {
+        display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+        padding: 10px 16px; border-bottom: 1px solid var(--divider);
+      }
+      .fd-selectall {
+        display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
+        font-size: 12px; font-weight: 600; cursor: pointer; user-select: none;
+      }
+      .fd-selectall input { width: 15px; height: 15px; accent-color: var(--primary); cursor: pointer; margin: 0; }
+      .fd-selectall input:disabled { cursor: not-allowed; opacity: .4; }
+      .fd-sel {
+        flex: 1; min-width: 0; font-size: 11px; color: var(--muted);
+        font-feature-settings: 'tnum' 1;
+      }
+      .fd-zip {
+        flex-shrink: 0; font-size: 12px; font-weight: 700; padding: 7px 12px;
+        border: 1px solid var(--primary); border-radius: 8px;
+        background: var(--primary); color: #fff; cursor: pointer;
+      }
+      .fd-zip:hover:not(:disabled) { background: var(--primary-hover); border-color: var(--primary-hover); }
+      .fd-zip:disabled { opacity: .4; cursor: not-allowed; }
+      .fd-check {
+        flex-shrink: 0; width: 15px; height: 15px; margin: 0;
+        accent-color: var(--primary); cursor: pointer;
+      }
       .fd-list { list-style: none; margin: 0; padding: 6px 0; }
       .fd-empty { margin: 0; padding: 28px 16px; font-size: 13px; color: var(--muted); text-align: center; }
       .fd-row {
@@ -1508,6 +1533,14 @@
               <div class="section" id="fdCsvHeading" data-i18n="files_csv_heading">압력 CSV</div>
               <span id="fdCsvCount" class="fd-col-count"></span>
             </div>
+            <div class="fd-col-actions">
+              <label class="fd-selectall">
+                <input type="checkbox" id="fdCsvAll" />
+                <span id="fdCsvAllLabel" data-i18n="files_select_all">모두 선택</span>
+              </label>
+              <span id="fdCsvSel" class="fd-sel"></span>
+              <button type="button" id="fdCsvZip" class="fd-zip" disabled data-i18n="files_zip_button">선택 파일 ZIP 받기</button>
+            </div>
             <p id="fdCsvEmpty" class="fd-empty" data-i18n="files_empty_csv">저장된 CSV가 없습니다.</p>
             <ul id="fdCsvList" class="fd-list"></ul>
           </section>
@@ -1515,6 +1548,14 @@
             <div class="fd-col-head">
               <div class="section" id="fdVideoHeading" data-i18n="files_video_heading">원본 영상</div>
               <span id="fdVideoCount" class="fd-col-count"></span>
+            </div>
+            <div class="fd-col-actions">
+              <label class="fd-selectall">
+                <input type="checkbox" id="fdVideoAll" />
+                <span id="fdVideoAllLabel" data-i18n="files_select_all">모두 선택</span>
+              </label>
+              <span id="fdVideoSel" class="fd-sel"></span>
+              <button type="button" id="fdVideoZip" class="fd-zip" disabled data-i18n="files_zip_button">선택 파일 ZIP 받기</button>
             </div>
             <p id="fdVideoEmpty" class="fd-empty" data-i18n="files_empty_video">저장된 영상이 없습니다.</p>
             <ul id="fdVideoList" class="fd-list"></ul>
