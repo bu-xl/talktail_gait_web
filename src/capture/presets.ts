@@ -30,7 +30,7 @@ export const CAPTURE_PRESETS: readonly CapturePreset[] = [
   { id: "4k60", label: "4K 60fps", videoQuality: "2160p", width: 3840, height: 2160, fps: 60, bitrate: 55_000_000 },
 ];
 
-export const DEFAULT_CAPTURE_PRESET_ID = "1080p30";
+export const DEFAULT_CAPTURE_PRESET_ID = "1080p60";
 
 export function presetById(id: string | null | undefined): CapturePreset {
   return CAPTURE_PRESETS.find((p) => p.id === id) ?? CAPTURE_PRESETS.find((p) => p.id === DEFAULT_CAPTURE_PRESET_ID)!;

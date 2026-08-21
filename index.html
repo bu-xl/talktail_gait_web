@@ -101,7 +101,9 @@
       body[data-module="upload"] #appBody,
       body[data-module="upload"] #btnSideToggle,
       body[data-module="files"] #appBody,
-      body[data-module="files"] #btnSideToggle { display: none !important; }
+      body[data-module="files"] #btnSideToggle,
+      body[data-module="verify"] #appBody,
+      body[data-module="verify"] #btnSideToggle { display: none !important; }
 
       /* —— Report page —— */
       #reportPage {
@@ -305,6 +307,123 @@
       .up-status.wait { color: var(--warning); }
       .up-status.bad { color: var(--danger); }
 
+      /* —— 데이터 검증 (촬영 한 번 단위) —— */
+      #verifyPage {
+        flex: 1; min-height: 0; display: none; flex-direction: column;
+        background: var(--bg); overflow: hidden;
+      }
+      body[data-module="verify"] #verifyPage { display: flex; }
+      .dv-body {
+        flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 300px;
+        gap: 16px; padding: 8px 24px 24px; overflow: hidden;
+      }
+      /* 목록은 오른쪽 — 측정 화면의 레일과 같은 자리에 둔다. */
+      .dv-detail { order: 1; }
+      .dv-side { order: 2; }
+      @media (max-width: 900px) {
+        /* 한 줄로 접히면 목록이 먼저 와야 고를 수 있다. */
+        .dv-body { grid-template-columns: 1fr; }
+        .dv-side { order: 1; }
+        .dv-detail { order: 2; }
+      }
+      .dv-side {
+        background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+        overflow: auto; min-height: 0;
+      }
+      .dv-list { list-style: none; margin: 0; padding: 6px; }
+      .dv-day {
+        position: sticky; top: 0; z-index: 1; background: var(--surface);
+        padding: 8px 10px 4px; font-size: 12px; font-weight: 700; color: var(--muted);
+        border-bottom: 1px solid var(--divider);
+      }
+      .dv-item {
+        width: 100%; display: grid; grid-template-columns: auto 1fr auto; align-items: center;
+        gap: 8px; padding: 8px 10px; margin: 2px 0; border: 1px solid transparent;
+        border-radius: 8px; background: none; color: var(--fg); font: inherit;
+        font-size: 13px; text-align: left; cursor: pointer;
+      }
+      .dv-item:hover { background: var(--bg); }
+      .dv-item.is-active { background: var(--primary-light); border-color: var(--primary); }
+      .dv-item-time { font-variant-numeric: tabular-nums; font-weight: 600; }
+      .dv-item-dog {
+        color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .dv-item-tags { display: flex; gap: 4px; }
+      .dv-tag {
+        font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 999px;
+        background: var(--divider); color: var(--muted);
+      }
+      .dv-tag.is-bad { background: var(--danger); color: #fff; }
+      .dv-detail { overflow: auto; min-height: 0; padding-right: 4px; }
+      .dv-detail-head { margin-bottom: 12px; }
+      .dv-detail-title { font-size: 20px; font-weight: 700; }
+      .dv-detail-sub { font-size: 13px; color: var(--muted); }
+      .dv-block {
+        background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+        padding: 14px 16px; margin-bottom: 14px;
+      }
+      .dv-warn { margin: 6px 0 0; font-size: 13px; color: var(--danger); }
+      .dv-file-row { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+      .dv-file-meta { min-width: 0; flex: 1; }
+      .dv-file-name {
+        font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .dv-span { font-size: 13px; font-weight: 600; color: var(--primary); }
+      .dv-span.is-bad { color: var(--danger); font-weight: 400; }
+      .dv-videos {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px;
+        margin-top: 8px;
+      }
+      .dv-video { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+      .dv-video-head { display: flex; align-items: baseline; gap: 8px; font-size: 13px; }
+      .dv-video-gap { font-size: 12px; color: var(--muted); }
+      .dv-video-gap.is-bad { color: var(--danger); font-weight: 700; }
+      .dv-video video {
+        width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 8px;
+        object-fit: contain;
+      }
+      .dv-video-meta { font-size: 12px; color: var(--muted); }
+      .dv-video-meta.is-bad { color: var(--danger); }
+      .dv-video-name {
+        font-size: 11px; color: var(--muted);
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .dv-detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+      .dv-del-btn {
+        flex: none; padding: 7px 14px; border-radius: 8px; font: inherit; font-size: 13px;
+        background: none; color: var(--danger); border: 1px solid var(--danger); cursor: pointer;
+      }
+      .dv-del-btn:hover:not(:disabled) { background: var(--danger); color: #fff; }
+      .dv-del-btn:disabled { opacity: .4; cursor: not-allowed; }
+      /* 삭제 확인 — 되돌릴 수 없으므로 무엇이 지워지는지 전부 보여준다. */
+      #dvDelModal {
+        position: fixed; inset: 0; z-index: 1100; display: flex;
+        align-items: center; justify-content: center; background: rgba(15, 18, 24, 0.5);
+      }
+      #dvDelModal[hidden] { display: none; }
+      #dvDelModal .dialog {
+        width: min(460px, calc(100vw - 32px));
+        background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+        box-shadow: 0 16px 48px rgba(15, 18, 24, 0.2); overflow: hidden;
+      }
+      #dvDelModal .dialog-head { padding: 18px 18px 10px; }
+      #dvDelModal .dialog-head h2 { margin: 0 0 8px; font-size: 16px; font-weight: 650; }
+      #dvDelModal .dialog-head p { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.45; }
+      .dv-del-list {
+        list-style: none; margin: 0 18px; padding: 8px 10px; max-height: 180px; overflow: auto;
+        background: var(--bg); border: 1px solid var(--divider); border-radius: 8px;
+        font-size: 12px; color: var(--muted);
+      }
+      .dv-del-list li { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      #dvDelModal .dialog-foot {
+        display: flex; gap: 8px; justify-content: flex-end; padding: 12px 18px;
+      }
+      #dvDelModal .dialog-foot button { min-width: 104px; }
+      #dvDelModal .dialog-foot button.danger {
+        background: var(--danger); border-color: var(--danger); color: #fff;
+      }
+      #dvDelModal .dialog-foot button.danger:disabled { opacity: .5; cursor: not-allowed; }
+
       /* —— 파일 다운 (디스크 CSV · 원본 영상) —— */
       #filesPage {
         flex: 1; min-height: 0; display: none; flex-direction: column;
@@ -314,14 +433,16 @@
       .fd-toolbar-extra {
         display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end;
       }
-      #fdSearch {
-        width: min(280px, 42vw); background: var(--bg); color: var(--fg);
+      #fdSearch, #fdFrom, #fdTo {
+        background: var(--bg); color: var(--fg);
         border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px;
         font: inherit; font-size: 13px;
       }
-      #fdSearch:focus {
+      #fdSearch { width: min(280px, 42vw); }
+      #fdSearch:focus, #fdFrom:focus, #fdTo:focus {
         outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light);
       }
+      .fd-date-sep { color: var(--muted); font-size: 13px; }
       .fd-status { margin: 0; padding: 0 24px; font-size: 13px; color: var(--muted); min-height: 1.2em; }
       .fd-status.is-bad { color: var(--danger); }
       .fd-scroll { flex: 1; min-height: 0; overflow: auto; padding: 16px 24px 40px; }
@@ -1176,6 +1297,7 @@
         <nav class="ah-nav" aria-label="Modules">
           <button type="button" class="active" data-module="measure" aria-current="page" data-i18n="nav_measure">측정</button>
           <button type="button" data-module="files" data-i18n="nav_files">파일 다운</button>
+          <button type="button" data-module="verify" data-i18n="nav_verify">데이터 검증</button>
           <button type="button" data-module="upload" data-i18n="nav_upload">직접 분석</button>
           <button type="button" data-module="report" data-i18n="nav_report">리포트</button>
         </nav>
@@ -1514,6 +1636,40 @@
     </main>
     </div><!-- #appBody -->
 
+    <section id="verifyPage" hidden aria-label="Data verification">
+      <div class="rp-toolbar">
+        <div class="rp-toolbar-text">
+          <h1 id="dvTitle" data-i18n="verify_page_title">데이터 검증</h1>
+          <p id="dvSub" data-i18n="verify_page_sub">촬영 한 번에 저장된 CSV와 영상을 함께 확인합니다.</p>
+        </div>
+        <div class="fd-toolbar-extra">
+          <span id="dvCount" class="fd-col-count"></span>
+          <button type="button" id="dvRefresh" data-i18n="btn_results_refresh">새로고침</button>
+        </div>
+      </div>
+      <p id="dvStatus" class="fd-status"></p>
+      <div class="dv-body">
+        <aside class="dv-side">
+          <p id="dvEmpty" class="fd-empty" data-i18n="verify_empty">저장된 테스트가 없습니다.</p>
+          <ul id="dvList" class="dv-list"></ul>
+        </aside>
+        <div id="dvDetail" class="dv-detail"></div>
+      </div>
+      <div id="dvDelModal" role="dialog" aria-modal="true" aria-labelledby="dvDelTitle" hidden>
+        <div class="dialog">
+          <div class="dialog-head">
+            <h2 id="dvDelTitle" data-i18n="verify_del_title">이 촬영을 삭제할까요?</h2>
+            <p id="dvDelHint"></p>
+          </div>
+          <ul id="dvDelList" class="dv-del-list"></ul>
+          <div class="dialog-foot">
+            <button type="button" id="dvDelCancel" data-i18n="verify_del_cancel">취소</button>
+            <button type="button" class="danger" id="dvDelConfirm" data-i18n="verify_del_confirm">완전히 삭제</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section id="filesPage" hidden aria-label="Stored files">
       <div class="rp-toolbar">
         <div class="rp-toolbar-text">
@@ -1522,6 +1678,9 @@
         </div>
         <div class="fd-toolbar-extra">
           <input id="fdSearch" type="search" autocomplete="off" data-i18n-title="files_search_placeholder" placeholder="파일 이름 검색" />
+          <input id="fdFrom" type="date" data-i18n-title="files_date_from" title="시작 날짜" />
+          <span class="fd-date-sep">~</span>
+          <input id="fdTo" type="date" data-i18n-title="files_date_to" title="끝 날짜" />
           <button type="button" id="fdRefresh" data-i18n="btn_results_refresh">새로고침</button>
         </div>
       </div>

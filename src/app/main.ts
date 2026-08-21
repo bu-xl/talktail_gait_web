@@ -90,6 +90,7 @@ import { ResultsPanel } from "../ui/resultsPanel.js";
 import { ReportPage } from "../ui/reportPage.js";
 import { UploadPage } from "../ui/uploadPage.js";
 import { FilesPage } from "../ui/filesPage.js";
+import { VerifyPage } from "../ui/verifyPage.js";
 import { openDogInfoModal } from "../ui/dogInfoModal.js";
 import {
   clearReviewPanes,
@@ -373,9 +374,9 @@ function wireDogInfoToggle(): void {
   sync();
 }
 
-type AppModule = "measure" | "report" | "upload" | "files" | "review";
+type AppModule = "measure" | "report" | "upload" | "files" | "verify" | "review";
 
-const APP_MODULES: readonly AppModule[] = ["measure", "report", "upload", "files", "review"];
+const APP_MODULES: readonly AppModule[] = ["measure", "report", "upload", "files", "verify", "review"];
 
 /**
  * 헤더에 "완료된 분석" 버튼을 코드로 붙인다.
@@ -546,6 +547,9 @@ async function boot(): Promise<void> {
   const filesPageEl = $opt("filesPage");
   const filesPage = filesPageEl ? new FilesPage(filesPageEl) : null;
   filesPage?.setApiBase(apiBase);
+  const verifyPageEl = $opt("verifyPage");
+  const verifyPage = verifyPageEl ? new VerifyPage(verifyPageEl) : null;
+  verifyPage?.setApiBase(apiBase);
   clearReviewPanes();
 
   const sessionBtn = $("btnSession") as HTMLButtonElement;
@@ -1113,6 +1117,8 @@ async function boot(): Promise<void> {
       else uploadPage?.hide();
       if (mod === "files") filesPage?.show();
       else filesPage?.hide();
+      if (mod === "verify") verifyPage?.show();
+      else verifyPage?.hide();
       if (mod === "review") enterViewerMode();
       else leaveViewerMode();
       // 탭을 옮기면 안내 토스트를 다시 평가한다. 측정으로 돌아왔을 때 시작 버튼만

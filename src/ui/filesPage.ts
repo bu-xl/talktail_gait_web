@@ -46,6 +46,8 @@ export class FilesPage {
   private readonly subEl: HTMLElement;
   private readonly statusEl: HTMLElement;
   private readonly searchEl: HTMLInputElement;
+  private readonly fromEl: HTMLInputElement;
+  private readonly toEl: HTMLInputElement;
   private readonly refreshBtn: HTMLButtonElement;
   private readonly csvCol: Column;
   private readonly videoCol: Column;
@@ -54,6 +56,9 @@ export class FilesPage {
   private csv: StoredCsvFile[] = [];
   private videos: StoredVideoFile[] = [];
   private query = "";
+  /** `<input type="date">` 값(`YYYY-MM-DD`), 비어 있으면 그 방향 제한 없음. */
+  private from = "";
+  private to = "";
   private loading = false;
 
   constructor(root: HTMLElement) {
@@ -61,6 +66,8 @@ export class FilesPage {
     this.subEl = root.querySelector("#fdSub") as HTMLElement;
     this.statusEl = root.querySelector("#fdStatus") as HTMLElement;
     this.searchEl = root.querySelector("#fdSearch") as HTMLInputElement;
+    this.fromEl = root.querySelector("#fdFrom") as HTMLInputElement;
+    this.toEl = root.querySelector("#fdTo") as HTMLInputElement;
     this.refreshBtn = root.querySelector("#fdRefresh") as HTMLButtonElement;
 
     this.csvCol = {
@@ -93,6 +100,13 @@ export class FilesPage {
       this.query = this.searchEl.value.trim().toLowerCase();
       this.render();
     });
+    for (const el of [this.fromEl, this.toEl]) {
+      el.addEventListener("change", () => {
+        this.from = this.fromEl.value;
+        this.to = this.toEl.value;
+        this.render();
+      });
+    }
     for (const col of [this.csvCol, this.videoCol]) {
       col.allEl.addEventListener("change", () => this.toggleAll(col, col.allEl.checked));
       col.zipBtn.addEventListener("click", () => void this.downloadZip(col));
@@ -172,14 +186,21 @@ export class FilesPage {
     }
   }
 
-  private matches(name: string): boolean {
-    if (!this.query) return true;
-    return name.toLowerCase().includes(this.query);
+  private matches(row: StoredFile): boolean {
+    if (this.query && !row.name.toLowerCase().includes(this.query)) return false;
+    if (this.from || this.to) {
+      // 저장 시각(mtime)의 로컬 날짜. 날짜 입력값과 같은 `YYYY-MM-DD` 라 문자열 비교로 충분하다.
+      const day = localDay(row.mtime);
+      if (!day) return false;
+      if (this.from && day < this.from) return false;
+      if (this.to && day > this.to) return false;
+    }
+    return true;
   }
 
-  /** 검색어에 걸린, 지금 화면에 보이는 행들. */
+  /** 검색어·날짜에 걸린, 지금 화면에 보이는 행들. */
   private visibleRows(col: Column): StoredFile[] {
-    return this.rowsOf(col).filter((row) => this.matches(row.name));
+    return this.rowsOf(col).filter((row) => this.matches(row));
   }
 
   private render(): void {
@@ -326,6 +347,14 @@ export class FilesPage {
       this.syncSelectionUi(col);
     }
   }
+}
+
+/** ISO(UTC) 시각 → 로컬 기준 `YYYY-MM-DD`. 잘못된 값은 빈 문자열. */
+export function localDay(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const p = (n: number): string => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
 function formatWhen(iso: string): string {
