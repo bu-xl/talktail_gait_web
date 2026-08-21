@@ -385,6 +385,7 @@ export const LOCALES = {
 
     /* 카메라 연결 상태 */
     sync_no_main: "카메라 {{n}}대 · Main 없음",
+    sync_sub_unnumbered: "카메라 {{n}}대 · 자리 번호 미지정 {{u}}대",
     sync_mobile_connected_n: "휴대 앱 연결됨 · {{n}}대",
 
     /* 시뮬레이션 모드(VITE_SIMULATE_AI) */
@@ -842,6 +843,7 @@ export const LOCALES = {
 
     /* Camera link status */
     sync_no_main: "{{n}} camera(s) · no Main",
+    sync_sub_unnumbered: "{{n}} camera(s) · {{u}} without a slot number",
     sync_mobile_connected_n: "Mobile app connected · {{n}}",
 
     /* Simulation mode (VITE_SIMULATE_AI) */

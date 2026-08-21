@@ -1162,6 +1162,10 @@ async function boot(): Promise<void> {
     const mobile = peers?.mobile ?? false;
     const camCount = peers?.mobileCount ?? (mobile ? 1 : 0);
     const hasMain = peers?.main;
+    // 자리 번호를 안 고른 Sub 카메라 수. 그대로 찍으면 파일명이 도착 순서로 매겨져
+    // 현장에서 맞춰 둔 자리와 어긋난다 — 촬영 버튼을 누르기 전에 알려야 한다.
+    const unnumbered =
+      peers?.subIndexes === undefined ? 0 : (peers.subCount ?? 0) - peers.subIndexes.length;
     if (mobileEl) {
       if (!mobile) {
         mobileEl.textContent = t("sync_mobile_waiting");
@@ -1169,6 +1173,9 @@ async function boot(): Promise<void> {
       } else if (hasMain === false) {
         // 카메라는 있으나 Main 없음 → 분석 대상 없음 경고.
         mobileEl.textContent = t("sync_no_main", { n: camCount });
+        mobileEl.className = "wait";
+      } else if (unnumbered > 0) {
+        mobileEl.textContent = t("sync_sub_unnumbered", { n: camCount, u: unnumbered });
         mobileEl.className = "wait";
       } else {
         mobileEl.textContent =

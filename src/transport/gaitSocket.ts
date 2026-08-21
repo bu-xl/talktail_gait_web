@@ -14,6 +14,11 @@ export type SyncPeers = {
   main?: boolean;
   /** Sub 카메라 수. */
   subCount?: number;
+  /**
+   * 지금 쓰이고 있는 자리 번호(sub1, sub2 …). 폰이 스스로 들고 오는 값이라
+   * `subCount` 보다 적을 수 있다 — 그 차이가 곧 "번호를 안 고른 카메라" 수다.
+   */
+  subIndexes?: number[];
 };
 
 export type CaptureSettingsPayload = {
