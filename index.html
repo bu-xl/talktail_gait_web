@@ -103,7 +103,9 @@
       body[data-module="files"] #appBody,
       body[data-module="files"] #btnSideToggle,
       body[data-module="verify"] #appBody,
-      body[data-module="verify"] #btnSideToggle { display: none !important; }
+      body[data-module="verify"] #btnSideToggle,
+      body[data-module="storage"] #appBody,
+      body[data-module="storage"] #btnSideToggle { display: none !important; }
 
       /* —— Report page —— */
       #reportPage {
@@ -425,6 +427,44 @@
       #dvDelModal .dialog-foot button.danger:disabled { opacity: .5; cursor: not-allowed; }
 
       /* —— 파일 다운 (디스크 CSV · 원본 영상) —— */
+      /* —— Server storage page —— */
+      #storagePage {
+        flex: 1; min-height: 0; display: none; flex-direction: column;
+        background: var(--bg); overflow: hidden;
+      }
+      body[data-module="storage"] #storagePage { display: flex; }
+      .st-scroll { flex: 1; min-height: 0; overflow: auto; padding: 20px 24px 32px; }
+      .st-cards {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px; margin-bottom: 16px;
+      }
+      .st-card {
+        padding: 16px 18px; border-radius: 12px;
+        background: var(--surface); border: 1px solid var(--border);
+      }
+      .st-card-label { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+      .st-card-value {
+        font-size: 26px; font-weight: 700; letter-spacing: -0.02em;
+        font-feature-settings: 'tnum' 1;
+      }
+      .st-card-free .st-card-value { color: var(--primary-pressed, var(--fg)); }
+      .st-bar {
+        height: 14px; border-radius: 7px; overflow: hidden;
+        background: var(--surface-hover); border: 1px solid var(--border);
+      }
+      .st-bar-fill { height: 100%; width: 0; background: var(--primary); transition: width .2s ease; }
+      .st-bar-fill.is-low { background: var(--danger, #e5484d); }
+      .st-bar-note { margin: 8px 0 20px; font-size: 13px; color: var(--muted); font-feature-settings: 'tnum' 1; }
+      .st-bar-note.is-low { color: var(--danger, #e5484d); font-weight: 700; }
+      .st-folders { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+      .st-folder {
+        display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+        border-radius: 10px; background: var(--surface); border: 1px solid var(--border);
+      }
+      .st-folder-name { flex: 1; min-width: 0; font-weight: 700; }
+      .st-folder-count { font-size: 12px; color: var(--muted); font-feature-settings: 'tnum' 1; }
+      .st-folder-size { font-weight: 700; font-feature-settings: 'tnum' 1; }
+
       #filesPage {
         flex: 1; min-height: 0; display: none; flex-direction: column;
         background: var(--bg); overflow: hidden;
@@ -1667,6 +1707,39 @@
             <button type="button" class="danger" id="dvDelConfirm" data-i18n="verify_del_confirm">완전히 삭제</button>
           </div>
         </div>
+      </div>
+    </section>
+
+    <section id="storagePage" hidden aria-label="Server storage">
+      <div class="rp-toolbar">
+        <div class="rp-toolbar-text">
+          <h1 data-i18n="storage_page_title">서버 조회</h1>
+          <p data-i18n="storage_page_sub">back 서버 디스크 여유 공간과 업로드 폴더 사용량입니다. 촬영 나가기 전에 확인하세요.</p>
+        </div>
+        <div class="rp-toolbar-actions">
+          <button type="button" id="stRefresh" data-i18n="btn_results_refresh">새로고침</button>
+        </div>
+      </div>
+      <p id="stStatus" class="fd-status"></p>
+      <div class="st-scroll">
+        <div class="st-cards">
+          <div class="st-card">
+            <div class="st-card-label" data-i18n="storage_total">전체 용량</div>
+            <div class="st-card-value" id="stTotal">–</div>
+          </div>
+          <div class="st-card">
+            <div class="st-card-label" data-i18n="storage_used">사용 중</div>
+            <div class="st-card-value" id="stUsed">–</div>
+          </div>
+          <div class="st-card st-card-free">
+            <div class="st-card-label" data-i18n="storage_free">사용 가능</div>
+            <div class="st-card-value" id="stFree">–</div>
+          </div>
+        </div>
+        <div class="st-bar"><div class="st-bar-fill" id="stBarFill"></div></div>
+        <p class="st-bar-note" id="stPercent"></p>
+        <div class="section" data-i18n="storage_folders">업로드 폴더</div>
+        <ul class="st-folders" id="stFolders"></ul>
       </div>
     </section>
 

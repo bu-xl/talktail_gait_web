@@ -91,6 +91,7 @@ import { ReportPage } from "../ui/reportPage.js";
 import { UploadPage } from "../ui/uploadPage.js";
 import { FilesPage } from "../ui/filesPage.js";
 import { VerifyPage } from "../ui/verifyPage.js";
+import { StoragePage } from "../ui/storagePage.js";
 import { openDogInfoModal } from "../ui/dogInfoModal.js";
 import {
   clearReviewPanes,
@@ -374,25 +375,31 @@ function wireDogInfoToggle(): void {
   sync();
 }
 
-type AppModule = "measure" | "report" | "upload" | "files" | "verify" | "review";
+type AppModule = "measure" | "report" | "upload" | "files" | "verify" | "review" | "storage";
 
-const APP_MODULES: readonly AppModule[] = ["measure", "report", "upload", "files", "verify", "review"];
+const APP_MODULES: readonly AppModule[] = ["measure", "report", "upload", "files", "verify", "review", "storage"];
 
 /**
  * 헤더에 "완료된 분석" 버튼을 코드로 붙인다.
  *
  * index.html 을 건드리지 않는 이유는 이 화면이 측정 화면의 마크업을 그대로 재사용하기
  * 때문이다. 레일만 갈아 끼우면 되므로 새 페이지 마크업이 필요 없다.
+ * "서버 조회" 는 그 오른쪽에 와야 해서 같이 붙인다 — index.html 의 버튼들은 이미 왼쪽이다.
  */
-function ensureCompletedNavButton(): void {
+function ensureLateNavButtons(): void {
   const nav = document.querySelector("#appHeader .ah-nav");
-  if (!nav || nav.querySelector('[data-module="review"]')) return;
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.dataset.module = "review";
-  btn.setAttribute("data-i18n", "nav_completed");
-  btn.textContent = t("nav_completed");
-  nav.appendChild(btn);
+  if (!nav) return;
+  const add = (mod: AppModule, key: "nav_completed" | "nav_storage"): void => {
+    if (nav.querySelector(`[data-module="${mod}"]`)) return;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.dataset.module = mod;
+    btn.setAttribute("data-i18n", key);
+    btn.textContent = t(key);
+    nav.appendChild(btn);
+  };
+  add("review", "nav_completed");
+  add("storage", "nav_storage");
 }
 
 /** 헤더 nav 를 연결하고, 코드에서 모듈을 바꿀 수 있는 함수를 돌려준다. */
@@ -414,7 +421,7 @@ function loadActiveModule(): AppModule | null {
 }
 
 function wireAppHeader(opts: { onModuleChange: (mod: AppModule) => void }): (mod: AppModule) => void {
-  ensureCompletedNavButton();
+  ensureLateNavButtons();
   const setActive = (mod: AppModule): void => {
     document.body.dataset.module = mod;
     try {
@@ -550,6 +557,9 @@ async function boot(): Promise<void> {
   const verifyPageEl = $opt("verifyPage");
   const verifyPage = verifyPageEl ? new VerifyPage(verifyPageEl) : null;
   verifyPage?.setApiBase(apiBase);
+  const storagePageEl = $opt("storagePage");
+  const storagePage = storagePageEl ? new StoragePage(storagePageEl) : null;
+  storagePage?.setApiBase(apiBase);
   clearReviewPanes();
 
   const sessionBtn = $("btnSession") as HTMLButtonElement;
@@ -1119,6 +1129,8 @@ async function boot(): Promise<void> {
       else filesPage?.hide();
       if (mod === "verify") verifyPage?.show();
       else verifyPage?.hide();
+      if (mod === "storage") storagePage?.show();
+      else storagePage?.hide();
       if (mod === "review") enterViewerMode();
       else leaveViewerMode();
       // 탭을 옮기면 안내 토스트를 다시 평가한다. 측정으로 돌아왔을 때 시작 버튼만

@@ -431,6 +431,19 @@ export const LOCALES = {
     session_need_dog_weight: "강아지 몸무게를 입력해야 측정을 시작할 수 있습니다.",
     session_need_dog_both: "강아지 이름과 몸무게를 입력해야 측정을 시작할 수 있습니다.",
 
+    nav_storage: "서버 조회",
+    storage_page_title: "서버 조회",
+    storage_page_sub: "back 서버 디스크 여유 공간과 업로드 폴더 사용량입니다. 촬영 나가기 전에 확인하세요.",
+    storage_total: "전체 용량",
+    storage_used: "사용 중",
+    storage_free: "사용 가능",
+    storage_percent: "{{p}}% 사용 중",
+    storage_low: "여유 공간이 얼마 없습니다. 촬영 전에 정리하세요.",
+    storage_folders: "업로드 폴더",
+    storage_files: "{{n}}개",
+    storage_loading: "불러오는 중…",
+    storage_error: "용량을 불러오지 못했습니다: {{msg}}",
+
     /* 완료된 분석 (열람 전용 화면) */
     nav_completed: "완료된 분석",
     cp_title: "최근 완료 분석",
@@ -874,6 +887,19 @@ export const LOCALES = {
     session_need_dog_name: "Enter the dog's name before starting a measurement.",
     session_need_dog_weight: "Enter the dog's weight before starting a measurement.",
     session_need_dog_both: "Enter the dog's name and weight before starting a measurement.",
+
+    nav_storage: "Server",
+    storage_page_title: "Server storage",
+    storage_page_sub: "Free space on the back server disk and how much the upload folders use. Check before heading out.",
+    storage_total: "Total",
+    storage_used: "Used",
+    storage_free: "Available",
+    storage_percent: "{{p}}% used",
+    storage_low: "Almost out of space. Clean up before recording.",
+    storage_folders: "Upload folders",
+    storage_files: "{{n}} files",
+    storage_loading: "Loading…",
+    storage_error: "Could not load storage usage: {{msg}}",
 
     /* Completed analyses (read-only screen) */
     nav_completed: "Completed",
