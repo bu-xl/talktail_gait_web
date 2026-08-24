@@ -74,7 +74,7 @@ import {
   cancelAnalyzeJob,
   type SyncPeers,
 } from "../transport/gaitSocket.js";
-import { hasDogInfo, type ManualAnalyzeJob, type ManualDogInfo } from "../api/analyzeApi.js";
+import type { ManualAnalyzeJob, ManualDogInfo } from "../api/analyzeApi.js";
 import {
   dismissTopToast,
   showBlockingTopToast,
@@ -86,13 +86,11 @@ import { CompletedPage } from "../ui/completedPage.js";
 import type { CompletedSessionRef } from "../ui/completedPage.js";
 import { getResultDetail, listResultDates, listResultSessions } from "../api/resultsApi.js";
 import { getSessionNotes, saveSessionNotes } from "../api/sessionNotesApi.js";
-import { ResultsPanel } from "../ui/resultsPanel.js";
 import { ReportPage } from "../ui/reportPage.js";
 import { UploadPage } from "../ui/uploadPage.js";
 import { FilesPage } from "../ui/filesPage.js";
 import { VerifyPage } from "../ui/verifyPage.js";
 import { StoragePage } from "../ui/storagePage.js";
-import { openDogInfoModal } from "../ui/dogInfoModal.js";
 import {
   clearReviewPanes,
   setAnalysisVideo,
@@ -271,20 +269,6 @@ export type SessionArtifacts = Record<
   string,
   { kind?: string; filename?: string; url?: string | null; available?: boolean }
 >;
-
-/** Last clinic-session report payload (cyclogram + derived) for the Report tab later. */
-let lastReportBundle: {
-  originalUrl: string | null;
-  artifacts: SessionArtifacts | null;
-  date: string | null;
-  time: string | null;
-  stem: string | null;
-  sessionPath: string | null;
-} | null = null;
-
-export function getLastReportBundle() {
-  return lastReportBundle;
-}
 
 /** Live overlay canvas backing resolution — portrait 1 : 2.3014 (height derived
  *  from the true mat aspect), higher-res than the heatmap canvas so burned-in
@@ -527,27 +511,15 @@ async function boot(): Promise<void> {
   let lastAiVideoUrl: string | null = null;
   let pendingAnalyzeJob: string | null = null;
   /** Clinic session driven from the right-rail Start/Stop (web-led). */
-  type SessionPhase = "idle" | "recording" | "saving" | "confirm" | "analyzing" | "review";
+  type SessionPhase = "idle" | "recording" | "saving" | "confirm";
   let sessionPhase: SessionPhase = "idle";
-  let pressureGifObjectUrl: string | null = null;
   let clinicSessionActive = false;
-  let simulateTimer: number | null = null;
   let confirmBusy = false;
   /** 재촬영한 job 의 analyze_done 은 웹 리뷰 칸을 채우지 않는다. */
   let ignoreDoneJobId: string | null = null;
   /** 업로드보다 재촬영을 먼저 누른 경우, job 이 생기면 그때 AI 를 건너뛴다. */
   let retakeRequested = false;
 
-  const clearSimulateTimer = (): void => {
-    if (simulateTimer != null) {
-      window.clearTimeout(simulateTimer);
-      simulateTimer = null;
-    }
-  };
-
-  const resultsPanelEl = $opt("resultsPanel");
-  const resultsPanel = resultsPanelEl ? new ResultsPanel(resultsPanelEl) : null;
-  resultsPanel?.setApiBase(apiBase);
   const reportPageEl = $opt("reportPage");
   const reportPage = reportPageEl ? new ReportPage(reportPageEl) : null;
   reportPage?.setApiBase(apiBase);
@@ -570,20 +542,6 @@ async function boot(): Promise<void> {
   const confirmAnalyzeBtn = $("confirmAnalyzeBtn") as HTMLButtonElement;
   const confirmCancelBtn = $("confirmCancelBtn") as HTMLButtonElement;
 
-  /**
-   * 화면에 떠 있는 결과의 반려견 정보. 촬영 세션은 우측 레일 입력에서, 직접 분석은
-   * 업로드 폼에서 온다 — 결과 섹션의 "정보" 버튼이 이 값을 보여 준다.
-   */
-  let lastDogInfo: ManualDogInfo | null = null;
-  const stageInfoBtn = $opt("btnStageInfo") as HTMLButtonElement | null;
-
-  /** 결과를 보고 있고 보여 줄 정보가 있을 때만 "정보" 버튼을 띄운다. */
-  const syncStageInfoBtn = (): void => {
-    const show = sessionPhase === "review" && hasDogInfo(lastDogInfo);
-    stageInfoBtn?.classList.toggle("hidden", !show);
-  };
-  stageInfoBtn?.addEventListener("click", () => openDogInfoModal(lastDogInfo));
-
   /** 우측 레일 "반려견" 입력값 — 촬영 세션의 결과에 붙일 정보. */
   const readSideDogInfo = (): ManualDogInfo => {
     const text = (id: string): string | null =>
@@ -600,13 +558,6 @@ async function boot(): Promise<void> {
       weightKg: num("dogWeightInfo"),
       heightCm: num("dogHeight"),
     };
-  };
-
-  const revokePressureGif = (): void => {
-    if (pressureGifObjectUrl) {
-      URL.revokeObjectURL(pressureGifObjectUrl);
-      pressureGifObjectUrl = null;
-    }
   };
 
   const hideConfirmModal = (): void => {
@@ -635,12 +586,8 @@ async function boot(): Promise<void> {
   const setSessionPhase = (phase: SessionPhase): void => {
     sessionPhase = phase;
     document.body.classList.toggle("session-recording", phase === "recording");
-    document.body.classList.toggle(
-      "session-analyzing",
-      phase === "analyzing" || phase === "saving" || phase === "confirm",
-    );
-    const showOverlay =
-      phase === "recording" || phase === "analyzing" || phase === "saving";
+    document.body.classList.toggle("session-analyzing", phase === "saving" || phase === "confirm");
+    const showOverlay = phase === "recording" || phase === "saving";
     sessionOverlay.classList.toggle("show", showOverlay);
     if (phase !== "confirm") hideConfirmModal();
 
@@ -662,12 +609,6 @@ async function boot(): Promise<void> {
       sessionBtn.classList.add("is-stop");
       sessionBtn.disabled = true;
       showConfirmModal();
-    } else if (phase === "analyzing") {
-      $("sessionOverlayTitle").textContent = t("session_analyzing_title");
-      $("sessionOverlaySub").textContent = t("session_analyzing_sub");
-      sessionBtn.textContent = t("btn_session_stop");
-      sessionBtn.classList.add("is-stop");
-      sessionBtn.disabled = true;
     } else {
       sessionBtn.textContent = t("btn_session_start");
       sessionBtn.classList.remove("is-stop");
@@ -681,7 +622,6 @@ async function boot(): Promise<void> {
       sessionFloatBtn.disabled = sessionBtn.disabled;
       sessionFloatBtn.classList.toggle("is-stop", sessionBtn.classList.contains("is-stop"));
     }
-    syncStageInfoBtn();
   };
 
 
@@ -704,7 +644,7 @@ async function boot(): Promise<void> {
   const applyDogIdentityGate = (): void => {
     const gate = dogIdentityGate();
     // 촬영 중이거나 분석 중이면 그 상태의 버튼 규칙이 우선한다.
-    const idle = sessionPhase === "idle" || sessionPhase === "review";
+    const idle = sessionPhase === "idle";
     if (idle) {
       sessionBtn.disabled = !gate.ok;
       if (sessionFloatBtn) sessionFloatBtn.disabled = !gate.ok;
@@ -718,58 +658,26 @@ async function boot(): Promise<void> {
   /** 완료를 기다리는 분석 잡들 — WS `analyze_done` 을 놓쳤을 때의 백그라운드 폴링 폴백. */
   const watchedJobs = new Set<string>();
 
-  type DoneBundle = {
-    jobId: string | null;
-    resultUrl: string;
-    originalUrl?: string | null;
-    artifacts?: SessionArtifacts | null;
-    date?: string | null;
-    time?: string | null;
-    stem?: string | null;
-    sessionPath?: string | null;
-  };
+  type DoneBundle = { jobId: string | null; stem?: string | null };
 
   /**
-   * 분석 완료 공통 처리 — 화면이 한가하면 바로 결과를 펼치고,
-   * 다음 촬영/확인이 진행 중이면 화면을 뺏지 않고 토스트로만 알린다(클릭 시 열람).
+   * 분석 완료 공통 처리 — 측정 화면은 결과를 띄우지 않는다.
+   *
+   * 측정은 시작/종료만 담당하므로 완료는 토스트로만 알리고, 누르면 "완료된 분석"
+   * 화면으로 옮겨 그 세션을 연다. 촬영 중에 결과가 화면을 뺏는 일이 없어진다.
    */
   const handleAnalyzeDone = (done: DoneBundle): void => {
     if (done.jobId) watchedJobs.delete(done.jobId);
-    const review = {
-      analysisUrl: absolutizeResultUrl(apiBase, done.resultUrl),
-      originalUrl: done.originalUrl ?? null,
-      artifacts: done.artifacts ?? null,
-      date: done.date ?? null,
-      time: done.time ?? null,
-      stem: done.stem ?? null,
-      sessionPath: done.sessionPath ?? null,
-    };
-    const openWhenSafe = (): void => {
-      if (sessionPhase === "recording" || sessionPhase === "saving" || sessionPhase === "confirm") {
-        // 촬영 흐름을 끊지 않는다 — 토스트를 다시 걸어 두고 나중에 연다.
-        showToast({
-          kind: "ok",
-          title: t("toast_done_title"),
-          message: t("toast_done_view"),
-          durationMs: 12000,
-          onClick: openWhenSafe,
-        });
-        return;
-      }
-      enterReview(review);
-    };
-    if (sessionPhase === "idle" || sessionPhase === "review") {
-      enterReview(review);
-      showToast({ kind: "ok", title: t("toast_done_title") });
-    } else {
-      showToast({
-        kind: "ok",
-        title: t("toast_done_title"),
-        message: t("toast_done_view"),
-        durationMs: 12000,
-        onClick: openWhenSafe,
-      });
-    }
+    showToast({
+      kind: "ok",
+      title: t("toast_done_title"),
+      message: t("toast_done_view"),
+      durationMs: 12000,
+      onClick: () => {
+        setModule("review");
+        void completedPage.openStem(done.stem ?? null);
+      },
+    });
   };
 
   /** UI 를 막지 않는 잡 완료 감시. WS 가 먼저 처리하면 이 폴링은 조용히 물러난다. */
@@ -781,16 +689,7 @@ async function boot(): Promise<void> {
         if (!watchedJobs.has(jobId)) return;
         watchedJobs.delete(jobId);
         if (job.status === "completed" && job.resultUrl) {
-          handleAnalyzeDone({
-            jobId,
-            resultUrl: job.resultUrl,
-            originalUrl: job.originalUrl ?? null,
-            artifacts: job.artifacts ?? null,
-            date: job.date ?? null,
-            time: job.time ?? null,
-            stem: job.stem ?? null,
-            sessionPath: job.sessionPath ?? null,
-          });
+          handleAnalyzeDone({ jobId, stem: job.stem ?? null });
         } else if (job.status === "failed") {
           showToast({ kind: "bad", title: t("toast_failed_title"), message: job.error ?? undefined });
           setSyncStatus(`${t("sync_analyze_failed")}: ${job.error ?? "unknown"}`, "bad");
@@ -845,7 +744,6 @@ async function boot(): Promise<void> {
     cameraPlayer.setLoading(false);
     hideConfirmModal();
     clearReviewPanes();
-    revokePressureGif();
     setSessionPhase("idle");
     setSyncStatus(t("confirm_analyze_cancelled"), "ok");
     updateSyncUi(gaitSync.peers, gaitSync.connected);
@@ -881,53 +779,20 @@ async function boot(): Promise<void> {
   confirmCancelBtn.addEventListener("click", () => onCancelAnalyze());
 
 
-  const buildPressureGifUrl = (): string | null => {
-    if (recorder.frameCount < 2) return null;
-    try {
-      const track = getRecordingTrack();
-      const po = config.paw_overlay;
-      const delayMs = track.fps > 1 ? 1000 / track.fps : 33;
-      const bytes = encodeAnnotatedGif({
-        displayFields: track.displayFields,
-        overlayFrames: track.overlayFrames,
-        rows: GRID_ROWS,
-        cols: GRID_COLS,
-        width: po.gif_width,
-        height: aspectHeight(po.gif_width),
-        direction: track.direction,
-        delayMs,
-        config,
-        unit: liveUnit(),
-        timestampsSec: track.timestampsSec,
-        maxFrames: po.gif_max_frames,
-        makeCtx: makeExportCtx,
-      });
-      revokePressureGif();
-      const copy = Uint8Array.from(bytes);
-      pressureGifObjectUrl = URL.createObjectURL(new Blob([copy], { type: "image/gif" }));
-      return pressureGifObjectUrl;
-    } catch (err) {
-      console.warn("[session] pressure gif failed", err);
-      return null;
-    }
-  };
-
-  const enterReview = (opts: {
+  /**
+   * 5패널에 결과를 싣는다 — 촬영 흐름이 아니라 **프로모 시연 경로 전용**이다.
+   * 촬영 결과 열람은 "완료된 분석"(completedPage.onPick)이 같은 패널을 직접 채운다.
+   */
+  const showPromoResult = (opts: {
     analysisUrl: string;
     originalUrl?: string | null;
     /** Pane 1 override (promo pressboard mp4 / gif). */
     pressureUrl?: string | null;
     artifacts?: SessionArtifacts | null;
-    date?: string | null;
-    time?: string | null;
-    stem?: string | null;
-    sessionPath?: string | null;
   }): void => {
     const { analysisUrl, originalUrl, artifacts } = opts;
-    clearSimulateTimer();
     lastAiVideoUrl = analysisUrl;
     clinicSessionActive = false;
-    setSessionPhase("review");
     sessionOverlay.classList.remove("show");
 
     // 2-1 원본 (back/uploads), 2-2 스켈레톤 영상
@@ -962,7 +827,7 @@ async function boot(): Promise<void> {
       void loadAngleDiffPane(null);
     }
 
-    // 1번 압력: result_pressure → explicit pressureUrl → pad-session GIF → placeholder
+    // 1번 압력: result_pressure → explicit pressureUrl → placeholder
     const pressureArt = artifacts?.pressure;
     const pressureFromArtifacts =
       pressureArt && pressureArt.available !== false && pressureArt.url ? pressureArt.url : null;
@@ -973,26 +838,13 @@ async function boot(): Promise<void> {
           ? pressureSrc
           : absolutizeResultUrl(apiBase, pressureSrc);
       setPressureMedia(abs);
-    } else {
-      const gifUrl = buildPressureGifUrl() ?? (isSimulateAi() ? placeholderUrl("foot.gif") : null);
-      if (gifUrl) setPressureGif(gifUrl);
+    } else if (isSimulateAi()) {
+      setPressureGif(placeholderUrl("foot.gif"));
     }
 
     // Sources are assigned; pick the master and drive all panes as one.
     reviewSync?.refresh();
-
-    lastReportBundle = {
-      originalUrl: originalUrl ?? null,
-      artifacts: artifacts ?? null,
-      date: opts.date ?? null,
-      time: opts.time ?? null,
-      stem: opts.stem ?? null,
-      sessionPath: opts.sessionPath ?? null,
-    };
-
     setSyncStatus(t("sync_analyze_done"), "ok");
-    syncStageInfoBtn();
-    void resultsPanel?.refresh();
   };
 
   /**
@@ -1000,8 +852,7 @@ async function boot(): Promise<void> {
    * 화면을 막지 않으므로 분석이 도는 동안에도 촬영 세션을 시작할 수 있다.
    * 이 잡은 WS 방에 속하지 않으므로(촬영 세션이 아니다) 완료는 백그라운드 잡 폴링으로 받는다.
    */
-  const startManualAnalysis = (job: ManualAnalyzeJob, dog: ManualDogInfo): void => {
-    lastDogInfo = dog;
+  const startManualAnalysis = (job: ManualAnalyzeJob): void => {
     clinicSessionActive = false;
     syncSessionId = null;
     syncRecordPending = false;
@@ -1009,7 +860,6 @@ async function boot(): Promise<void> {
     syncDock.stop();
     syncDock.hide();
     clearReviewPanes();
-    revokePressureGif();
     setModule("measure");
     setSyncStatus(t("sync_analyzing"), "wait");
     const behind = (job.queuePosition ?? 0) > 0;
@@ -1025,7 +875,7 @@ async function boot(): Promise<void> {
   const uploadPage = uploadPageEl
     ? new UploadPage(uploadPageEl, {
         apiBase,
-        onSubmitted: (job, dog) => startManualAnalysis(job, dog),
+        onSubmitted: (job) => startManualAnalysis(job),
       })
     : null;
 
@@ -1133,6 +983,8 @@ async function boot(): Promise<void> {
       else storagePage?.hide();
       if (mod === "review") enterViewerMode();
       else leaveViewerMode();
+      // 측정 화면의 1·압력패드는 라이브 히트맵이다 — 열람이 덮어 둔 결과 미디어를 걷어낸다.
+      if (mod === "measure") clearReviewPanes();
       // 탭을 옮기면 안내 토스트를 다시 평가한다. 측정으로 돌아왔을 때 시작 버튼만
       // 잠겨 있고 이유가 없으면 사용자는 무엇을 고쳐야 할지 알 수 없다.
       applyDogIdentityGate();
@@ -1525,8 +1377,6 @@ async function boot(): Promise<void> {
     durationSec: () => recorder.durationSec,
     fps: () => recorder.fps,
     buildCsv: () => framesToCanineGaitCsv(recorder.getFrames(), GRID_ROWS, GRID_COLS),
-    rows: GRID_ROWS,
-    cols: GRID_COLS,
     // 동기 촬영 세션과 같은 sessionId 로 묶어 back 이 영상+CSV 를 한 세션으로 연결하게 한다.
     sessionId: () => syncSessionId,
     startedAt: () => recordingStartedAt,
@@ -1540,9 +1390,6 @@ async function boot(): Promise<void> {
     syncDock.stop();
     syncDock.hide();
     syncPlaybackActive = false;
-    // 이번 세션 결과에 붙일 반려견 정보 — CSV 업로드와 같은 입력란에서 읽는다.
-    lastDogInfo = readSideDogInfo();
-
     /**
      * ★ 녹화 시작점(performance.now 축).
      *
@@ -1626,7 +1473,6 @@ async function boot(): Promise<void> {
       syncDock.hide();
       syncPlaybackActive = false;
       clearReviewPanes();
-      revokePressureGif();
       setSessionPhase("recording");
       setSyncStatus(t("sync_pending"));
       void waitUntilRecordAt(msg.recordAt).then(() => {
@@ -1669,28 +1515,15 @@ async function boot(): Promise<void> {
       // 지금 확인을 기다리는 잡(pendingAnalyzeJob)이 아니면 건드리지 않는다.
       if (msg.jobId && msg.jobId === pendingAnalyzeJob) pendingAnalyzeJob = null;
       cameraPlayer.setLoading(false);
-      handleAnalyzeDone({
-        jobId: msg.jobId ?? null,
-        resultUrl: msg.resultUrl,
-        originalUrl: msg.originalUrl ?? null,
-        artifacts: msg.artifacts ?? null,
-        date: msg.date ?? null,
-        time: msg.time ?? null,
-        stem: msg.stem ?? null,
-        sessionPath: msg.sessionPath ?? null,
-      });
+      handleAnalyzeDone({ jobId: msg.jobId ?? null, stem: msg.stem ?? null });
     }
     if (msg.type === "analyze_failed") {
       if (msg.jobId) watchedJobs.delete(msg.jobId);
       cameraPlayer.setLoading(false);
       showToast({ kind: "bad", title: t("toast_failed_title"), message: msg.error });
       setSyncStatus(`${t("sync_analyze_failed")}: ${msg.error}`, "bad");
+      // 진행 중인 촬영/확인 UI(촬영·확인 페이즈)는 유지한다 — 이전 잡의 실패가 다음 촬영을 끊지 않는다.
       if (msg.jobId && msg.jobId === pendingAnalyzeJob) pendingAnalyzeJob = null;
-      // 진행 중인 촬영/확인 UI 는 유지한다 — 이전 잡의 실패가 다음 촬영을 끊지 않게.
-      if (sessionPhase === "analyzing") {
-        clinicSessionActive = false;
-        setSessionPhase("idle");
-      }
     }
     if (msg.type === "analyze_cancelled") {
       watchedJobs.delete(msg.jobId);
@@ -1728,22 +1561,15 @@ async function boot(): Promise<void> {
     clearOverlay();
     if (gaitSync.peers.mobile) cameraPlayer.showIdle(t("camera_preview_receiving"));
   });
-  void resultsPanel?.refresh();
   setSessionPhase("idle");
 
   const startClinicSession = (): void => {
-    if (
-      sessionPhase === "recording" ||
-      sessionPhase === "analyzing" ||
-      sessionPhase === "saving" ||
-      sessionPhase === "confirm"
-    ) {
+    if (sessionPhase === "recording" || sessionPhase === "saving" || sessionPhase === "confirm") {
       return;
     }
     // Simulate mode: web-only Start/Stop to verify review panes without app/AI.
     if (isSimulateAi()) {
       clinicSessionActive = true;
-      revokePressureGif();
       clearReviewPanes();
       syncRecordPending = false;
       setSyncStatus(t("sim_recording"), "wait");
@@ -1766,7 +1592,6 @@ async function boot(): Promise<void> {
     retakeRequested = false;
     ignoreDoneJobId = null;
     pendingAnalyzeJob = null;
-    revokePressureGif();
     clearReviewPanes();
     syncRecordPending = true;
     setSyncStatus(t("sync_pending"), "wait");
@@ -1835,11 +1660,7 @@ async function boot(): Promise<void> {
       stopClinicSession();
       return;
     }
-    if (
-      sessionPhase === "analyzing" ||
-      sessionPhase === "saving" ||
-      sessionPhase === "confirm"
-    ) {
+    if (sessionPhase === "saving" || sessionPhase === "confirm") {
       return;
     }
     const gate = dogIdentityGate();
@@ -1882,7 +1703,6 @@ async function boot(): Promise<void> {
     if (gaitSync.connected && gaitSync.peers.mobile) {
       clinicSessionActive = true;
       clearReviewPanes();
-      revokePressureGif();
       syncRecordPending = true;
       setSyncStatus(t("sync_pending"));
       setSessionPhase("recording");
@@ -2296,7 +2116,7 @@ async function boot(): Promise<void> {
         const analysisUrl = artifacts.video?.url;
         if (!analysisUrl) throw new Error("promo video url missing");
 
-        enterReview({
+        showPromoResult({
           analysisUrl,
           originalUrl: promoAssetUrl(promoCase.originUpload),
           // Pane 1: artifacts.pressure → ai-server result_pressure; else optional promo override / GIF.
@@ -2304,17 +2124,11 @@ async function boot(): Promise<void> {
             ? promoAssetUrl(promoCase.pressureUrl)
             : undefined,
           artifacts,
-          date: promoCase.date,
-          time: promoCase.time,
-          stem: promoCase.stem,
-          sessionPath: `${promoCase.date}/${promoCase.time}`,
         });
         if (!$opt("wsBody1")?.classList.contains("has-media")) {
           setPressureGif(promoAssetUrl(PROMO_PRESSURE_GIF));
         }
 
-        // Warm the results sidebar list (API may use localhost; failure is non-fatal).
-        void resultsPanel?.refresh();
         setSyncStatus(t("promo_ready", { id: promoCaseId }), "ok");
       } catch (err) {
         console.error("[promo] load failed", err);

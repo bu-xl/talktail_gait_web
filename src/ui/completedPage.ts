@@ -117,6 +117,16 @@ export class CompletedPage {
     void this.refresh();
   }
 
+  /**
+   * 완료 토스트를 눌러 들어왔을 때 그 세션을 바로 편다.
+   * stem 이 없거나 목록에서 못 찾으면 가장 최근 것을 연다 — 빈 화면으로 두지 않는다.
+   */
+  async openStem(stem: string | null): Promise<void> {
+    await this.refresh();
+    const ref = (stem && this.recent.find((r) => r.session.stem === stem)) || this.recent[0];
+    if (ref) await this.pick(ref);
+  }
+
   get isEmpty(): boolean {
     return this.recent.length === 0;
   }

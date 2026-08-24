@@ -19,8 +19,6 @@ export type PressureRecording = {
   frames: number | null;
   durationSec: number | null;
   fps: number | null;
-  rows: number | null;
-  cols: number | null;
   startedAt: string | null;
 };
 
@@ -29,7 +27,8 @@ export type PressureRecord = {
   createdAt: string;
   dog: PressureDog;
   recording: PressureRecording;
-  csv: { filename: string; size: number; path?: string | null };
+  /** `filename` 은 back 이 `path` 에서 떼어 준다 — DB 컬럼이 아니다. */
+  csv: { filename: string; path?: string | null };
   /** 백엔드 상대 경로 (`/api/pressure/records/:id/csv`). */
   csvUrl: string;
 };
@@ -83,7 +82,7 @@ export async function uploadPressureCsv(
   if (breed) form.append("dogBreed", breed);
   if (weightKg != null && Number.isFinite(weightKg)) form.append("dogWeightKg", String(weightKg));
   if (heightCm != null && Number.isFinite(heightCm)) form.append("dogHeightCm", String(heightCm));
-  for (const key of ["frames", "durationSec", "fps", "rows", "cols"] as const) {
+  for (const key of ["frames", "durationSec", "fps"] as const) {
     const v = rec[key];
     if (v != null && Number.isFinite(v)) form.append(key, String(v));
   }

@@ -544,14 +544,8 @@
       }
       .fd-download:hover { background: var(--primary-light); }
 
-      /* —— 결과 섹션의 "정보" 버튼 + 반려견 정보 모달 —— */
-      #btnStageInfo {
-        position: absolute; top: 16px; right: 44px; z-index: 35;
-        padding: 6px 12px; font-size: 12px; font-weight: 600;
-        background: var(--surface); border: 1px solid var(--border-strong); border-radius: 999px;
-        box-shadow: 0 2px 8px rgba(31, 35, 41, 0.08);
-      }
-      #btnStageInfo.hidden, #rpReviewInfo.hidden { display: none !important; }
+      /* —— 리포트 열람의 "정보" 버튼 + 반려견 정보 모달 —— */
+      #rpReviewInfo.hidden { display: none !important; }
       #rpReviewInfo {
         background: transparent; color: #e8f4f2; border-color: rgba(232,244,242,.35);
       }
@@ -624,6 +618,10 @@
           minmax(0, 1.6fr);
         gap: 10px; padding: 12px;
       }
+      /* 측정 화면은 시작/종료 전용 — 결과 패널(2·3)은 "완료된 분석"이 소유한다. */
+      body[data-module="measure"] #wsPane2,
+      body[data-module="measure"] #wsPane3 { display: none; }
+      body[data-module="measure"] #stage.workspace { grid-template-columns: minmax(0, 1fr); }
       .ws-pane, .ws-cell {
         min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 6px;
       }
@@ -1184,19 +1182,7 @@
       #portModal .dialog-foot button.primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
       #portModal .dialog-foot button.primary:disabled { opacity: .4; cursor: not-allowed; }
 
-      /* Camera sync + AI results */
-      #resultsPanel { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--divider); padding-top: 12px; }
-      #resultsPanel .results-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-      #resultsPanel .results-head .section { margin: 0; }
-      #resultsBreadcrumb { font-size: 12px; color: var(--muted); min-height: 1.2em; }
-      #resultsLoading.hidden, #resultsEmpty.hidden, #btnResultsBack.hidden { display: none !important; }
-      #resultsList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; }
-      button.results-item {
-        width: 100%; text-align: left; padding: 10px 12px; border-radius: 8px;
-        background: var(--surface); border: 1px solid var(--border);
-      }
-      button.results-item:hover { background: var(--surface-hover); border-color: var(--border-strong); }
-      #resultsEmpty, #resultsLoading { font-size: 12px; color: var(--muted); padding: 8px 0; }
+      /* Camera sync */
       #syncStatus.ok, #syncHub.ok { color: var(--success); }
       #syncStatus.wait, #syncHub.wait { color: var(--warning); }
       #syncStatus.off, #syncHub.off { color: var(--muted); }
@@ -1513,28 +1499,12 @@
       <div class="row"><span data-i18n="sync_mobile_waiting">Mobile</span><b id="syncStatus" class="wait">–</b></div>
       <div class="row"><span>Hub</span><b id="syncHub" class="wait">–</b></div>
 
-      <div id="resultsPanel">
-        <div class="results-head">
-          <div class="section" data-i18n="section_ai_results">AI results</div>
-          <div style="display:flex;gap:6px;">
-            <button type="button" id="btnResultsBack" class="hidden" data-i18n="btn_results_back">Back</button>
-            <button type="button" id="btnResultsRefresh" data-i18n="btn_results_refresh">Refresh</button>
-          </div>
-        </div>
-        <div id="resultsBreadcrumb" data-i18n="results_dates_hint">Pick a date</div>
-        <div id="resultsLoading" class="hidden">…</div>
-        <div id="resultsEmpty" data-i18n="results_empty">No results</div>
-        <ul id="resultsList"></ul>
-      </div>
       -->
     </aside>
 
     <button type="button" id="btnSideToggle" aria-expanded="false" aria-controls="side" title="패널 열기/접기">‹</button>
 
     <main id="stage" class="workspace">
-      <!-- 결과 섹션 우측 상단 · 입력한 반려견 정보 보기 -->
-      <button type="button" id="btnStageInfo" class="hidden" data-i18n="btn_dog_info">ⓘ 정보</button>
-
       <!-- 레일이 접혀 있을 때만 보이는 세션 시작/종료 미러 (#btnSession 과 동기) -->
       <button type="button" id="btnSessionFloat" data-i18n="btn_session_start">시작</button>
 

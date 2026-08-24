@@ -27,9 +27,6 @@ export interface PressureCsvDeps {
   fps: () => number;
   /** 녹화 프레임 → canine_gait 호환 CSV 문자열. */
   buildCsv: () => string;
-  /** 그리드 크기(메타데이터용). */
-  rows: number;
-  cols: number;
   /** 동기 촬영 세션 id (영상과 CSV 를 back 에서 한 세션으로 묶기 위함). */
   sessionId?: () => string | null;
   /** 녹화 시작 시각 — CSV 파일명의 도장. 업로드 시각이 아니다. */
@@ -179,8 +176,6 @@ export function createPressureCsvController(deps: PressureCsvDeps): PressureCsvC
       frames,
       durationSec: deps.durationSec(),
       fps: deps.fps(),
-      rows: deps.rows,
-      cols: deps.cols,
       startedAt,
     };
     // 나노초는 문자열로만 다룬다 — Number 로 바꾸면 2^53 을 넘어 자릿수가 잘린다.
