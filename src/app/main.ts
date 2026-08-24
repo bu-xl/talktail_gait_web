@@ -23,6 +23,7 @@ import { configureSync, isSyncEnabled, resolveApiBase, resolveRoomId, resolveWsU
 import { clockSync } from "../transport/clockSync.js";
 import { loadConfig } from "../core/config.js";
 import { GRID_COLS, GRID_ROWS, aspectHeight } from "../core/constants.js";
+import { checkDogIdentity } from "../core/dogIdentity.js";
 import { framesToCanineGaitCsv } from "../core/csvExport.js";
 import { dogPrefix, pressureCsvName, stampFrom } from "../core/sessionNaming.js";
 import {
@@ -83,6 +84,7 @@ import {
   updateQueueToast,
 } from "../ui/toast.js";
 import { CompletedPage } from "../ui/completedPage.js";
+import { DogPresetsCard } from "../ui/dogPresetsCard.js";
 import type { CompletedSessionRef } from "../ui/completedPage.js";
 import { getResultDetail, listResultDates, listResultSessions } from "../api/resultsApi.js";
 import { getSessionNotes, saveSessionNotes } from "../api/sessionNotesApi.js";
@@ -254,15 +256,6 @@ function applyPromoDogInfo(dog: PromoDogInfo): void {
   if (weightEl) weightEl.value = dog.weightKg > 0 ? String(dog.weightKg) : "";
   if (breedEl) breedEl.value = dog.breed[lang];
 
-  const form = $opt("dogInfoForm");
-  const btn = $opt("btnDogInfoToggle") as HTMLButtonElement | null;
-  if (form) {
-    form.classList.remove("is-collapsed");
-    if (btn) {
-      btn.textContent = t("btn_dog_info_collapse");
-      btn.setAttribute("aria-expanded", "true");
-    }
-  }
 }
 
 export type SessionArtifacts = Record<
@@ -324,39 +317,6 @@ function isSimulateAi(): boolean {
 
 function placeholderUrl(file: string): string {
   return `${window.location.origin}/placeholders/${file}`;
-}
-
-function wireSideToggle(): void {
-  const btn = $("btnSideToggle") as HTMLButtonElement;
-  const sync = (): void => {
-    const collapsed = document.body.classList.contains("side-collapsed");
-    btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
-    /* Rail is on the right: collapsed → open with ‹, open → close with › */
-    btn.textContent = collapsed ? "‹" : "›";
-    btn.title = collapsed ? t("side_toggle_open") : t("side_toggle_close");
-  };
-  btn.addEventListener("click", () => {
-    document.body.classList.toggle("side-collapsed");
-    sync();
-  });
-  onLangChange(sync);
-  sync();
-}
-
-function wireDogInfoToggle(): void {
-  const form = $opt("dogInfoForm");
-  const btn = $opt("btnDogInfoToggle") as HTMLButtonElement | null;
-  if (!form || !btn) return;
-  const sync = (): void => {
-    const collapsed = form.classList.contains("is-collapsed");
-    btn.textContent = collapsed ? t("btn_dog_info_expand") : t("btn_dog_info_collapse");
-    btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
-  };
-  btn.addEventListener("click", () => {
-    form.classList.toggle("is-collapsed");
-    sync();
-  });
-  sync();
 }
 
 type AppModule = "measure" | "report" | "upload" | "files" | "verify" | "review" | "storage";
@@ -442,8 +402,6 @@ async function boot(): Promise<void> {
     userSettings.lang = langParam;
   }
   initI18n(userSettings.lang);
-  wireSideToggle();
-  wireDogInfoToggle();
   wireWorkspaceVideoControls();
 
   const config = await fetchConfig();
@@ -529,14 +487,33 @@ async function boot(): Promise<void> {
   const verifyPageEl = $opt("verifyPage");
   const verifyPage = verifyPageEl ? new VerifyPage(verifyPageEl) : null;
   verifyPage?.setApiBase(apiBase);
+  /**
+   * 빠른 입력 — 등록해 둔 반려견을 눌러 아래 입력란을 채운다.
+   * 채운 뒤 게이트를 다시 평가해야 시작 버튼이 그 자리에서 풀린다.
+   */
+  const dogPresets = new DogPresetsCard({
+    onPick: (preset) => {
+      const set = (id: string, value: string): void => {
+        const el = $opt(id) as HTMLInputElement | null;
+        if (el) el.value = value;
+      };
+      set("dogName", preset.name);
+      set("dogWeightInfo", String(preset.weightKg));
+      set("dogHeight", preset.heightCm == null ? "" : String(preset.heightCm));
+      set("dogBreed", preset.breed ?? "");
+      applyDogIdentityGate();
+    },
+  });
+  dogPresets.setApiBase(apiBase);
+  void dogPresets.refresh();
+  onLangChange(() => dogPresets.renderLabels());
+
   const storagePageEl = $opt("storagePage");
   const storagePage = storagePageEl ? new StoragePage(storagePageEl) : null;
   storagePage?.setApiBase(apiBase);
   clearReviewPanes();
 
   const sessionBtn = $("btnSession") as HTMLButtonElement;
-  /** 레일이 접혀 있을 때 측정 화면에 뜨는 시작/종료 미러 버튼 — 상태는 sessionBtn 을 따라간다. */
-  const sessionFloatBtn = $opt("btnSessionFloat") as HTMLButtonElement | null;
   const sessionOverlay = $("sessionOverlay");
   const confirmModal = $("confirmAnalyzeModal");
   const confirmAnalyzeBtn = $("confirmAnalyzeBtn") as HTMLButtonElement;
@@ -617,28 +594,13 @@ async function boot(): Promise<void> {
     }
     // 마지막에 한 번 더: 대기 상태의 활성화는 신원 입력이 결정한다.
     applyDogIdentityGate();
-    if (sessionFloatBtn) {
-      sessionFloatBtn.textContent = sessionBtn.textContent;
-      sessionFloatBtn.disabled = sessionBtn.disabled;
-      sessionFloatBtn.classList.toggle("is-stop", sessionBtn.classList.contains("is-stop"));
-    }
   };
 
 
-  /**
-   * 이름과 몸무게가 없으면 측정을 시작할 수 없다.
-   *
-   * 두 값은 나중에 붙이는 메타데이터가 아니라 **파일명에 들어간다**. 빠진 채로 찍으면
-   * 영상과 CSV 가 `main-260819-144204` 로 저장되어 나중에 누구의 보행인지 되찾을 수
-   * 없다. 그래서 시작 시점에 막는다.
-   */
+  /** 판정은 직접 분석과 공유한다 — 규칙이 갈라지지 않게. [core/dogIdentity.ts] */
   const dogIdentityGate = (): { ok: boolean; reason: string } => {
-    const dog = readSideDogInfo();
-    const hasName = Boolean(dog.name && dog.name.trim());
-    const hasWeight = dog.weightKg != null && Number.isFinite(dog.weightKg) && dog.weightKg > 0;
-    if (hasName && hasWeight) return { ok: true, reason: "" };
-    if (!hasName && !hasWeight) return { ok: false, reason: t("session_need_dog_both") };
-    return { ok: false, reason: hasName ? t("session_need_dog_weight") : t("session_need_dog_name") };
+    const gate = checkDogIdentity(readSideDogInfo());
+    return { ok: gate.ok, reason: gate.reasonKey ? t(gate.reasonKey) : "" };
   };
 
   const applyDogIdentityGate = (): void => {
@@ -647,7 +609,6 @@ async function boot(): Promise<void> {
     const idle = sessionPhase === "idle";
     if (idle) {
       sessionBtn.disabled = !gate.ok;
-      if (sessionFloatBtn) sessionFloatBtn.disabled = !gate.ok;
     }
     // 측정 화면에서만 띄운다. 다른 탭에서는 시작 버튼 자체가 안 보인다.
     const onMeasure = document.body.dataset.module === "measure";
@@ -1671,10 +1632,8 @@ async function boot(): Promise<void> {
     }
     // 시작 → 1초 영점 보정 후 기존 세션 시작 흐름 진행.
     sessionBtn.disabled = true;
-    if (sessionFloatBtn) sessionFloatBtn.disabled = true;
     void runZeroCalibration().finally(() => {
       sessionBtn.disabled = false;
-      if (sessionFloatBtn) sessionFloatBtn.disabled = false;
       startClinicSession();
     });
   };
@@ -1683,7 +1642,6 @@ async function boot(): Promise<void> {
   }
   applyDogIdentityGate();
   sessionBtn.addEventListener("click", onSessionButtonClick);
-  sessionFloatBtn?.addEventListener("click", onSessionButtonClick);
 
   onClick("btnRecord", () => {
     /* Pad-only / legacy control — clinic flow prefers #btnSession (Start/Stop). */
@@ -1974,12 +1932,6 @@ async function boot(): Promise<void> {
     applyDocumentI18n();
     refreshLabelsBtn();
     applySharpMode(sharpIdx);
-    const dogForm = $opt("dogInfoForm");
-    const dogBtn = $opt("btnDogInfoToggle") as HTMLButtonElement | null;
-    if (dogForm && dogBtn) {
-      const collapsed = dogForm.classList.contains("is-collapsed");
-      dogBtn.textContent = collapsed ? t("btn_dog_info_expand") : t("btn_dog_info_collapse");
-    }
     if (promoCase) applyPromoDogInfo(promoCase.dog);
     const { connected, detail } = lastStatus;
     setStatus(connected, detail);

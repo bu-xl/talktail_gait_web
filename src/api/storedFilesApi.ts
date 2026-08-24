@@ -39,7 +39,13 @@ export function storedFileUrl(apiBaseUrl: string, rel: string, download = true):
   return `${url}${url.includes("?") ? "&" : "?"}download=1`;
 }
 
-export type ZipKind = "csv" | "video";
+/**
+ * `task` 는 촬영 한 건을 통째로 묶는다 — zip 안이 태스크 폴더로 갈리고 그 안에
+ * CSV 와 영상이 함께 들어간다. `csv`/`video` 는 파일 단위 묶음(다른 화면이 쓴다).
+ */
+export type ZipKind = "csv" | "video" | "task";
+
+const ZIP_KINDS: readonly ZipKind[] = ["csv", "video", "task"];
 
 export type ZipTicket = {
   token: string;
@@ -60,7 +66,8 @@ export type ZipTicket = {
  * 파일명을 URL 에 싣지 않으려고 POST 로 목록을 보내고, 실제 내려받기는
  * `zipDownloadUrl()` 을 브라우저에 맡긴다 — 수 GB 를 Blob 으로 들고 있지 않기 위해서다.
  *
- * @param files csv 는 파일명(`a.csv`), 영상은 `role/파일명`(`main/x.mp4`).
+ * @param files csv 는 파일명(`a.csv`), 영상은 `role/파일명`(`main/x.mp4`),
+ *              task 는 태스크명(`대박이-5.2kg-260819-144204`) — 파일 찾기는 서버가 한다.
  */
 export async function createZipTicket(
   apiBaseUrl: string,
@@ -79,7 +86,7 @@ export async function createZipTicket(
   }
   return {
     token: String(json.token || ""),
-    kind: json.kind === "video" ? "video" : "csv",
+    kind: ZIP_KINDS.includes(json.kind as ZipKind) ? (json.kind as ZipKind) : kind,
     count: Number(json.count) || 0,
     totalSize: Number(json.totalSize) || 0,
     filename: String(json.filename || "files.zip"),

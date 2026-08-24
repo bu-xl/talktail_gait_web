@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { fetchCsvSpan } from "../src/api/storedFilesApi.js";
-import { groupSessions } from "../src/ui/verifyPage.js";
+import { groupSessions, taskName, ungroupedFiles } from "../src/core/sessionNaming.js";
 
 const csv = (name: string) => ({ name, size: 100, mtime: "2026-08-20T06:09:29.914Z", url: `/api/files/csv/${name}` });
 const vid = (name: string, role: "main" | "sub") => ({
@@ -100,4 +100,22 @@ test("개명 이전 CSV 이름도 같은 도장으로 읽는다", () => {
   assert.equal(joined?.dog, "danbi");
   const placeholder = sessions.find((s) => s.stamp === "260818-131402");
   assert.equal(placeholder?.dog, "", "`dog` 는 이름이 아니라 자리표시자다");
+});
+
+test("도장이 없는 파일은 묶이지 않고 '분류 안 됨' 으로 남는다", () => {
+  const loose = ungroupedFiles(
+    [csv("메모.csv"), csv("제니-9.8kg-260820-150920.csv")],
+    [vid("옛날영상.mp4", "main")],
+  );
+  assert.deepEqual(
+    loose.map((row) => row.name),
+    ["메모.csv", "옛날영상.mp4"],
+  );
+});
+
+test("태스크명은 zip 폴더명이자 서버가 받는 키다", () => {
+  const [withDog] = groupSessions([csv("제니-9.8kg-260820-150920.csv")], []);
+  const [noDog] = groupSessions([], [vid("main-260820-150920.mp4", "main")]);
+  assert.equal(taskName(withDog), "제니-9.8kg-260820-150920");
+  assert.equal(taskName(noDog), "260820-150920");
 });

@@ -15,6 +15,7 @@ import {
   type ResultSession,
 } from "../api/resultsApi.js";
 import { hasDogInfo } from "../api/analyzeApi.js";
+import { dogPrefix } from "../core/sessionNaming.js";
 import { onLangChange, t } from "../i18n/index.js";
 import { LOCALES, type Lang, type LocaleKey } from "../i18n/locales.js";
 import { openDogInfoModal } from "./dogInfoModal.js";
@@ -233,11 +234,11 @@ export class ReportPage {
       const d = this.lastDetail;
       const orient = d?.session.orientation || this.selectedSession.orientation;
       const orientLabel = orient ? orientationLabel(orient) : "";
-      this.titleEl.textContent = this.selectedSession.displayTime;
+      this.titleEl.textContent = sessionLabel(this.selectedSession);
       this.subEl.textContent = orientLabel
         ? `${this.selectedDate.displayDate} · ${orientLabel}`
         : this.selectedDate.displayDate;
-      this.crumbsEl.textContent = `${t("results_list")} › ${this.selectedDate.displayDate} › ${this.selectedSession.displayTime}`;
+      this.crumbsEl.textContent = `${t("results_list")} › ${this.selectedDate.displayDate} › ${sessionLabel(this.selectedSession)}`;
     }
     this.syncActionLabels();
   }
@@ -377,9 +378,9 @@ export class ReportPage {
       btn.className = "rp-card";
       const orient = s.orientation ? orientationLabel(s.orientation) : "";
       const size = s.width && s.height ? `${s.width}×${s.height}` : "";
-      const dog = s.dog?.name || "";
-      const meta = [dog, orient, size].filter(Boolean).join(" · ");
-      btn.innerHTML = `<span class="rp-card-title">${escapeHtml(s.displayTime)}</span><span class="rp-card-meta">${escapeHtml(meta || s.stem)}</span>`;
+      const meta = [s.displayTime, orient, size].filter(Boolean).join(" · ");
+      const title = s.dog?.name || s.displayTime;
+      btn.innerHTML = `<span class="rp-card-title">${escapeHtml(title)}</span><span class="rp-card-meta">${escapeHtml(meta)}</span>`;
       btn.addEventListener("click", () => void this.openDetail(date, s));
       this.listEl.appendChild(btn);
     }
@@ -795,6 +796,18 @@ function displayLabel(label: string, lang: ReportLang): string {
   if (label.startsWith("앞발")) return `${rt("ko", "report_front")} · ${label.slice(2).trim()}`;
   if (label.startsWith("뒷발")) return `${rt("ko", "report_rear")} · ${label.slice(2).trim()}`;
   return label;
+}
+
+/**
+ * `대박이-5.2kg-14:42:04` — the capture filename with a readable clock.
+ *
+ * Display only. `dogPrefix` is the same builder the filename uses, but the
+ * stored `taskName` stays the key for anything that touches disk: renaming a
+ * dog would change what this returns while the files keep the old name.
+ */
+function sessionLabel(s: ResultSession): string {
+  const prefix = dogPrefix({ name: s.dog?.name, weightKg: s.dog?.weightKg });
+  return prefix ? `${prefix}-${s.displayTime}` : s.displayTime;
 }
 
 function orientationLabel(o: string): string {

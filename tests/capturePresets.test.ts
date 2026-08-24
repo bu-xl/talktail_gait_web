@@ -8,9 +8,9 @@ import {
   presetById,
 } from "../src/capture/presets.js";
 
-test("default capture preset is 1080p 30fps", () => {
-  assert.equal(DEFAULT_CAPTURE_PRESET_ID, "1080p30");
-  assert.equal(presetById(undefined).id, "1080p30");
+test("default capture preset is 1080p 60fps", () => {
+  assert.equal(DEFAULT_CAPTURE_PRESET_ID, "1080p60");
+  assert.equal(presetById(undefined).id, "1080p60");
 });
 
 test("capture presets include the clinic menu", () => {

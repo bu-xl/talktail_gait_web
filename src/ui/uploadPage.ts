@@ -2,12 +2,15 @@
  * "직접 분석" 페이지 — 압력 CSV + 촬영 영상을 직접 올려 분석한다.
  *
  * 매트/폰 없이 이미 수집해 둔 파일로 같은 파이프라인(back → ai-server)을 타는 경로다.
- * 두 파일이 모두 선택되어야 "분석하기" 가 열리고, 반려견 정보는 선택 입력이다.
+ * 두 파일 + 반려견 이름·몸무게가 모두 있어야 "분석하기" 가 열린다. 이름과 몸무게는
+ * 파일명에 들어가는 값이라 측정 화면과 같은 게이트를 쓴다([core/dogIdentity.ts]).
+ * 견종·신장은 선택 입력이다.
  * 업로드가 접수되면(202) 잡 id 를 넘겨 주고, 진행 표시와 결과 표시는 측정 화면의
  * 기존 "분석 중" 오버레이가 그대로 맡는다.
  */
 
 import { uploadManualAnalysis, type ManualAnalyzeJob, type ManualDogInfo } from "../api/analyzeApi.js";
+import { checkDogIdentity } from "../core/dogIdentity.js";
 import { onLangChange, t } from "../i18n/index.js";
 
 export type UploadPageOptions = {
@@ -25,6 +28,8 @@ export class UploadPage {
   private readonly analyzeBtn: HTMLButtonElement;
   private readonly files: Record<Slot, File | null> = { csv: null, video: null };
   private busy = false;
+  /** 지금 상태줄에 떠 있는 것이 게이트 안내인지 — 다른 메시지를 덮어쓰지 않으려고 둔다. */
+  private statusIsGate = false;
 
   constructor(root: HTMLElement, opts: UploadPageOptions) {
     this.root = root;
@@ -35,6 +40,10 @@ export class UploadPage {
     this.wireSlot("csv", "upCsvInput", "upCsvBox", "upCsvName");
     this.wireSlot("video", "upVideoInput", "upVideoBox", "upVideoName");
     this.analyzeBtn.addEventListener("click", () => void this.submit());
+    // 이름·몸무게를 채우는 즉시 버튼이 풀려야 한다 — 안 그러면 왜 막혔는지 못 찾는다.
+    for (const id of ["upDogName", "upDogWeight"]) {
+      this.root.querySelector(`#${id}`)?.addEventListener("input", () => this.syncUi());
+    }
     onLangChange(() => this.syncUi());
     this.syncUi();
   }
@@ -109,13 +118,26 @@ export class UploadPage {
   }
 
   private setStatus(text: string, tone?: "ok" | "wait" | "bad"): void {
+    this.statusIsGate = false;
     this.statusEl.textContent = text;
     this.statusEl.className = `up-status${tone ? ` ${tone}` : ""}`;
   }
 
   private syncUi(): void {
-    const ready = Boolean(this.files.csv && this.files.video);
-    this.analyzeBtn.disabled = !ready || this.busy;
+    const hasFiles = Boolean(this.files.csv && this.files.video);
+    const gate = checkDogIdentity(this.readDog());
+    this.analyzeBtn.disabled = !hasFiles || !gate.ok || this.busy;
+
+    // 파일까지 고른 뒤에도 막혀 있으면 이유를 보여 준다. 파일이 아직이면 그쪽이
+    // 먼저 눈에 보이는 문제이므로 신원 안내로 덮지 않는다.
+    if (hasFiles && !gate.ok && !this.busy && gate.reasonKey) {
+      this.setStatus(t(gate.reasonKey), "bad");
+      this.statusIsGate = true;
+    } else if (this.statusIsGate) {
+      this.setStatus("");
+      this.statusIsGate = false;
+    }
+
     this.analyzeBtn.textContent = this.busy ? t("upload_sending") : t("btn_upload_analyze");
     for (const [slot, pickId] of [
       ["csv", "upCsvPick"],
@@ -138,11 +160,17 @@ export class UploadPage {
     }
     if (this.busy) return;
 
+    const dog = this.readDog();
+    const gate = checkDogIdentity(dog);
+    if (!gate.ok && gate.reasonKey) {
+      this.setStatus(t(gate.reasonKey), "bad");
+      return;
+    }
+
     this.busy = true;
     this.syncUi();
     this.setStatus(t("upload_sending"), "wait");
 
-    const dog = this.readDog();
     try {
       const job = await uploadManualAnalysis(this.opts.apiBase, { csv, video, dog });
       this.setStatus(t("upload_started"), "ok");

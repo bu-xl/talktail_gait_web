@@ -70,8 +70,11 @@
         font-size: clamp(22px, 2.6vw, 30px); color: var(--brand-text);
         margin-left: 0.28em; font-weight: 600;
       }
-      .ah-nav {
-        justify-self: end; display: flex; align-items: center; gap: 6px;
+      .ah-right { justify-self: end; display: flex; align-items: center; gap: 12px; }
+      .ah-nav { display: flex; align-items: center; gap: 6px; }
+      .ah-lang {
+        background: var(--surface); color: var(--muted); border: 1px solid var(--border);
+        border-radius: 8px; padding: 7px 8px; font: inherit; font-size: 12px; cursor: pointer;
       }
       .ah-nav button {
         min-width: 72px; padding: 9px 16px; border-radius: 10px;
@@ -97,15 +100,10 @@
         flex: 1; min-height: 0; display: flex; position: relative;
       }
       body[data-module="report"] #appBody,
-      body[data-module="report"] #btnSideToggle,
       body[data-module="upload"] #appBody,
-      body[data-module="upload"] #btnSideToggle,
       body[data-module="files"] #appBody,
-      body[data-module="files"] #btnSideToggle,
       body[data-module="verify"] #appBody,
-      body[data-module="verify"] #btnSideToggle,
-      body[data-module="storage"] #appBody,
-      body[data-module="storage"] #btnSideToggle { display: none !important; }
+      body[data-module="storage"] #appBody { display: none !important; }
 
       /* —— Report page —— */
       #reportPage {
@@ -485,24 +483,10 @@
       .fd-date-sep { color: var(--muted); font-size: 13px; }
       .fd-status { margin: 0; padding: 0 24px; font-size: 13px; color: var(--muted); min-height: 1.2em; }
       .fd-status.is-bad { color: var(--danger); }
-      .fd-scroll { flex: 1; min-height: 0; overflow: auto; padding: 16px 24px 40px; }
-      .fd-cols {
-        display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start;
-      }
-      @media (max-width: 860px) { .fd-cols { grid-template-columns: 1fr; } }
-      .fd-col {
-        background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
-        min-height: 220px; display: flex; flex-direction: column; overflow: hidden;
-      }
-      .fd-col-head {
-        display: flex; align-items: baseline; justify-content: space-between;
-        gap: 10px; padding: 14px 16px 10px; border-bottom: 1px solid var(--divider);
-      }
-      .fd-col-head .section { margin: 0; }
-      .fd-col-count { font-size: 12px; color: var(--muted); font-feature-settings: 'tnum' 1; }
-      .fd-col-actions {
-        display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-        padding: 10px 16px; border-bottom: 1px solid var(--divider);
+      .fd-scroll { flex: 1; min-height: 0; overflow: auto; padding: 8px 24px 40px; }
+      .fd-actions {
+        display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+        padding: 10px 24px; border-bottom: 1px solid var(--divider);
       }
       .fd-selectall {
         display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
@@ -510,6 +494,7 @@
       }
       .fd-selectall input { width: 15px; height: 15px; accent-color: var(--primary); cursor: pointer; margin: 0; }
       .fd-selectall input:disabled { cursor: not-allowed; opacity: .4; }
+      .fd-col-count { font-size: 12px; color: var(--muted); font-feature-settings: 'tnum' 1; }
       .fd-sel {
         flex: 1; min-width: 0; font-size: 11px; color: var(--muted);
         font-feature-settings: 'tnum' 1;
@@ -525,24 +510,67 @@
         flex-shrink: 0; width: 15px; height: 15px; margin: 0;
         accent-color: var(--primary); cursor: pointer;
       }
-      .fd-list { list-style: none; margin: 0; padding: 6px 0; }
-      .fd-empty { margin: 0; padding: 28px 16px; font-size: 13px; color: var(--muted); text-align: center; }
-      .fd-row {
-        display: flex; align-items: center; gap: 12px;
-        padding: 10px 16px; border-bottom: 1px solid var(--divider);
+      .fd-list { list-style: none; margin: 0; padding: 0; }
+      .fd-empty { margin: 0; padding: 40px 16px; font-size: 13px; color: var(--muted); text-align: center; }
+      .fd-empty[hidden] { display: none; }
+
+      /* —— 태스크(촬영 1건) 한 줄 + 펼치면 그 안의 파일들 —— */
+      .fd-task {
+        background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+        margin-bottom: 8px; overflow: hidden;
       }
-      .fd-row:last-child { border-bottom: none; }
-      .fd-row:hover { background: var(--surface-hover); }
+      .fd-task.is-warn { border-color: var(--danger, #e5484d); }
+      .fd-task-head {
+        display: flex; align-items: center; gap: 12px; padding: 12px 16px; cursor: pointer;
+      }
+      .fd-task-head:hover { background: var(--surface-hover); }
+      .fd-caret {
+        flex-shrink: 0; width: 24px; padding: 2px 0; font-size: 12px; line-height: 1;
+        background: none; border: none; color: var(--muted); cursor: pointer;
+      }
+      .fd-task-meta { min-width: 0; flex: 1; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+      .fd-task-name {
+        font-size: 14px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .fd-task-sub {
+        flex-basis: 100%; font-size: 11px; color: var(--muted); font-feature-settings: 'tnum' 1;
+      }
+      .fd-warn {
+        flex-shrink: 0; width: 18px; height: 18px; border-radius: 50%;
+        display: inline-flex; align-items: center; justify-content: center;
+        font-size: 12px; font-weight: 800; color: #fff; background: var(--danger, #e5484d);
+      }
+      .fd-task-size { flex-shrink: 0; font-size: 12px; font-weight: 700; font-feature-settings: 'tnum' 1; }
+      .fd-icon-btn {
+        flex-shrink: 0; font-size: 13px; line-height: 1; padding: 7px 9px; border-radius: 8px;
+        border: 1px solid var(--border); background: var(--bg); color: var(--fg);
+        cursor: pointer; text-decoration: none;
+      }
+      .fd-icon-btn:hover:not(:disabled) { background: var(--primary-light); border-color: var(--primary); }
+      .fd-icon-btn:disabled { opacity: .4; cursor: not-allowed; }
+      .fd-files { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--divider); }
+      .fd-file {
+        display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+        padding: 10px 16px 10px 52px; border-bottom: 1px solid var(--divider);
+      }
+      .fd-file:last-child { border-bottom: none; }
+      .fd-tag {
+        flex-shrink: 0; min-width: 46px; text-align: center; padding: 3px 6px; border-radius: 6px;
+        font-size: 11px; font-weight: 700; background: var(--primary-light); color: var(--primary-pressed);
+      }
       .fd-row-meta { min-width: 0; flex: 1; }
       .fd-row-name {
         font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       }
       .fd-row-sub { font-size: 11px; color: var(--muted); margin-top: 2px; font-feature-settings: 'tnum' 1; }
-      .fd-download {
-        flex-shrink: 0; font-size: 12px; font-weight: 700; color: var(--primary-pressed);
-        text-decoration: none; padding: 8px 10px; border-radius: 8px;
+      .fd-video { flex-basis: 100%; width: 100%; max-height: 320px; margin-top: 8px; background: #000; border-radius: 8px; }
+      .fd-loose { margin-top: 24px; }
+      .fd-loose[hidden] { display: none; }
+      .fd-loose-hint { margin: 4px 0 10px; font-size: 12px; color: var(--muted); }
+      .fd-loose .fd-file {
+        padding-left: 16px; background: var(--surface);
+        border: 1px solid var(--border); border-radius: 10px; margin-bottom: 6px;
       }
-      .fd-download:hover { background: var(--primary-light); }
 
       /* —— 리포트 열람의 "정보" 버튼 + 반려견 정보 모달 —— */
       #rpReviewInfo.hidden { display: none !important; }
@@ -580,30 +608,15 @@
       }
       #dogInfoModal .dim-foot button { min-width: 72px; }
 
-      /* —— Right control rail (collapsible) —— */
+      /* —— 우측 레일은 "완료된 분석"(#completedRail) 전용으로만 남는다.
+         측정 컨트롤은 본화면(#measureControls)으로 나갔다. —— */
       #side {
         order: 2; width: 320px; flex: 0 0 320px; background: var(--panel);
         border-left: 1px solid var(--border);
         padding: 18px; display: flex; flex-direction: column; gap: 14px;
         overflow-x: hidden; overflow-y: auto;
-        transition: flex-basis .22s ease, width .22s ease, padding .22s ease, opacity .18s ease;
       }
-      body.side-collapsed #side {
-        flex-basis: 0; width: 0; padding-left: 0; padding-right: 0;
-        opacity: 0; pointer-events: none; border-left-width: 0;
-      }
-      #btnSideToggle {
-        position: absolute; top: 12px; z-index: 40;
-        width: 28px; height: 56px; padding: 0;
-        border-radius: 8px 0 0 8px; border: 1px solid var(--border); border-right: none;
-        background: var(--surface); color: var(--muted); font-size: 16px; line-height: 1;
-        box-shadow: -1px 2px 8px rgba(31, 35, 41, 0.06);
-      }
-      body:not(.side-collapsed) #btnSideToggle { right: 320px; left: auto; }
-      body.side-collapsed #btnSideToggle {
-        right: 0; left: auto;
-        border-right: 1px solid var(--border); border-radius: 8px 0 0 8px;
-      }
+      body:not([data-module="review"]) #side { display: none; }
 
       /* —— Workspace: pad | 16:9 capture stack | remaining analysis ——
          Col2 width ≈ two stacked 16:9 (1920×1080) panes: W = (H − labels/gaps) × 8/9.
@@ -618,10 +631,151 @@
           minmax(0, 1.6fr);
         gap: 10px; padding: 12px;
       }
-      /* 측정 화면은 시작/종료 전용 — 결과 패널(2·3)은 "완료된 분석"이 소유한다. */
+      /* —— 측정 화면 —— 결과 패널(2·3)은 "완료된 분석"이 소유한다. 여기는 좌 압력패드
+         (라이브) · 우 측정 컨트롤 2단이고, 컨트롤은 스크롤 없이 한 화면에 들어와야 한다. */
       body[data-module="measure"] #wsPane2,
       body[data-module="measure"] #wsPane3 { display: none; }
-      body[data-module="measure"] #stage.workspace { grid-template-columns: minmax(0, 1fr); }
+      /* 압력패드 폭은 원래 3단 배치에서 1열이 잡던 정도로 되돌린다(세로로 긴 실물 비율). */
+      /* 검은 프레임까지 실물 매트 비율(1:2.3014)로 맞춘다 — 세로로 길쭉한 판이 가로로
+         퍼져 보이면 어느 쪽이 진행 방향인지 헷갈린다. #stage 가 container-type: size 라
+         100cqh 로 높이를 읽는다(47px = 패딩 24 + 라벨 17 + 간격 6). */
+      body[data-module="measure"] #stage.workspace {
+        grid-template-columns: minmax(0, calc((100cqh - 47px) / 2.3014)) minmax(0, 1fr);
+      }
+      /* 여기서 영상을 틀 일이 없다 — 패널 하단 재생바도, 공용 트랜스포트 바도 뺀다. */
+      body[data-module="measure"] .ws-media-controls,
+      body[data-module="measure"] #stage > .rs-transport { display: none !important; }
+
+      #measureControls { display: none; }
+      /* 현장 화면이다 — 손이 가는 순서(연결 → 신원 → 해상도 → 시작)로 위에서 아래로
+         깔고, 가장 자주 누르는 시작/종료가 남는 높이를 전부 먹게 한다. */
+      body[data-module="measure"] #measureControls {
+        display: flex; flex-direction: column; gap: 10px; min-height: 0;
+      }
+      .mc-card {
+        display: flex; flex-direction: column; gap: 10px; min-width: 0;
+        background: var(--panel); border: 1px solid var(--border);
+        border-radius: 10px; padding: 12px 14px;
+      }
+      .mc-card > .section { margin-top: 0; }
+      .mc-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+      .mc-head .section { margin: 0; }
+
+      /* 패드 연결 + 매트 실시간 — 연결하자마자 값이 도는지 같은 카드에서 확인한다. */
+      .mc-pad { flex-shrink: 0; }
+      .mc-pad-state { display: flex; align-items: center; gap: 12px; font-size: 16px; font-weight: 700; }
+      .mc-pad-btns { margin-left: auto; display: flex; gap: 10px; }
+      .mc-pad-btns button {
+        min-height: 52px; min-width: 132px; padding: 0 26px;
+        font-size: 16px; font-weight: 700; border-radius: 12px;
+      }
+      .mc-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 6px; }
+      .mc-stat {
+        display: flex; flex-direction: column; gap: 2px; padding: 7px 9px;
+        background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+      }
+      .mc-stat > span {
+        font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+        color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      .mc-stat > b { font-size: 15px; font-feature-settings: 'tnum' 1; }
+      .mc-pad .pad-hint { margin: 0; font-size: 12px; color: var(--muted); }
+
+      /* 반려견 — 가로 4칸 */
+      .mc-dog { flex-shrink: 0; }
+      .mc-dog .dog-info .field-col input { min-height: 42px; font-size: 15px; }
+      body[data-module="measure"] .mc-dog .dog-info {
+        display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px;
+      }
+
+      /* 촬영 설정 — 라벨과 선택을 한 줄로 */
+      .mc-capture { flex-shrink: 0; }
+      body[data-module="measure"] .mc-capture .capture-preset {
+        display: grid; grid-template-columns: auto minmax(0, 1fr);
+        align-items: center; gap: 8px 12px; margin: 0;
+      }
+      body[data-module="measure"] .mc-capture .capture-preset select {
+        min-height: 42px; font-size: 15px;
+      }
+      body[data-module="measure"] .mc-capture .capture-preset .pad-hint { grid-column: 1 / -1; }
+
+      /* 시작/종료 — 오른쪽 열을 통째로 쓰는 독립 블록 */
+      /* 빠른 입력 — 한 줄에 5장. 현장에서 손가락으로 누르는 카드라 넉넉하게. */
+      .mc-quick .dp-hint { font-size: 12px; color: var(--muted); }
+      .mc-quick .mc-head #btnDogPresetAdd {
+        margin-left: auto; min-height: 40px; padding: 0 18px; font-size: 14px;
+        font-weight: 700; border-radius: 10px;
+      }
+      .dp-empty { margin: 0; font-size: 12px; color: var(--muted); }
+      .dp-list { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+      @media (max-width: 1100px) { .dp-list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+      .dp-card {
+        position: relative; display: flex; min-width: 0;
+        border: 1px solid var(--border); border-radius: 10px; background: var(--surface);
+      }
+      .dp-card:hover { border-color: var(--border-strong); background: var(--surface-hover); }
+      .dp-pick {
+        flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;
+        align-items: flex-start; text-align: left; padding: 10px 12px;
+        background: none; border: none; color: inherit; cursor: pointer;
+      }
+      .dp-name {
+        font-size: 14px; font-weight: 700; max-width: 100%;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .dp-meta {
+        font-size: 11px; color: var(--muted); max-width: 100%;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .dp-del {
+        flex-shrink: 0; align-self: flex-start; padding: 6px 8px; line-height: 1;
+        background: none; border: none; color: var(--muted); font-size: 12px; cursor: pointer;
+      }
+      .dp-del:hover { color: var(--danger); }
+
+      /* 빠른 입력 등록 모달 */
+      #dogPresetModal {
+        display: none; position: fixed; inset: 0; z-index: 1100;
+        align-items: center; justify-content: center; background: rgba(15, 18, 24, 0.45);
+      }
+      #dogPresetModal.open { display: flex; }
+      .dpm-shell {
+        width: min(420px, calc(100vw - 32px));
+        background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+        box-shadow: 0 16px 48px rgba(15, 18, 24, 0.18); overflow: hidden;
+      }
+      .dpm-head { padding: 16px 18px 12px; border-bottom: 1px solid var(--divider); }
+      .dpm-head h2 { margin: 0; font-size: 15px; font-weight: 700; }
+      .dpm-head p { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+      .dpm-body { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 16px 18px; }
+      .dpm-body .field-col { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+      .dpm-body label { font-size: 12px; color: var(--muted); }
+      .dpm-body input {
+        width: 100%; min-height: 40px; background: var(--bg); color: var(--fg);
+        border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
+        font: inherit; font-feature-settings: 'tnum' 1;
+      }
+      .dpm-error { margin: 0 18px; font-size: 12px; color: var(--danger); min-height: 1.2em; }
+      .dpm-foot {
+        display: flex; justify-content: flex-end; gap: 8px;
+        padding: 12px 18px; border-top: 1px solid var(--divider);
+      }
+      .dpm-foot button { min-width: 84px; min-height: 40px; }
+
+      .mc-start { flex-shrink: 0; padding: 10px; }
+      .mc-start #btnSession {
+        width: 100%; height: 104px; grid-column: auto;
+        font-size: 28px; font-weight: 800; letter-spacing: -0.02em; border-radius: 12px;
+      }
+      .mc-start .rec-status { text-align: center; flex-shrink: 0; }
+
+
+      /* 보행 분석표는 결과가 있을 때만(#gaitResult.show) 나온다 — 빈 카드가 자리를
+         잡아먹지 않게. 나오면 폭을 다 쓰되 카드 안에서만 스크롤한다. */
+      .mc-card-wide { display: none; }
+      .mc-card-wide:has(#gaitResult.show) {
+        display: flex; grid-column: 1 / -1; max-height: 34vh; overflow: auto;
+      }
       .ws-pane, .ws-cell {
         min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 6px;
       }
@@ -963,20 +1117,6 @@
       }
       #btnSession.is-stop:hover { filter: brightness(1.05); }
 
-      /* 레일을 접어도 세션 시작/종료를 잃지 않도록 측정 화면 상단 중앙에 미러 버튼 */
-      #btnSessionFloat {
-        display: none; position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
-        z-index: 36; min-width: 132px; padding: 10px 22px;
-        font-weight: 700; font-size: 14px; border-radius: 999px;
-        background: var(--primary); border: 1px solid var(--primary); color: #fff;
-        box-shadow: 0 4px 14px rgba(31, 35, 41, 0.18);
-      }
-      body.side-collapsed #btnSessionFloat { display: block; }
-      #btnSessionFloat:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
-      #btnSessionFloat.is-stop { background: var(--danger); border-color: var(--danger); }
-      #btnSessionFloat.is-stop:hover { filter: brightness(1.05); }
-      #btnSessionFloat:disabled { opacity: .45; cursor: not-allowed; }
-
       /* Legacy hosts kept for existing JS (heatmap / sync player) — not the review layout */
       #legacyHosts {
         position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
@@ -1044,14 +1184,6 @@
       }
       .field input[type=number]:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
       .dog-info { display: flex; flex-direction: column; gap: 8px; }
-      .dog-info.is-collapsed { display: none; }
-      .dog-info-head {
-        display: flex; align-items: center; justify-content: space-between; gap: 8px;
-      }
-      .dog-info-head .section { margin-top: 0; }
-      .dog-info-head #btnDogInfoToggle {
-        flex-shrink: 0; padding: 4px 10px; font-size: 12px; color: var(--muted);
-      }
       .dog-info .field-col {
         display: flex; flex-direction: column; align-items: stretch; gap: 4px;
       }
@@ -1073,12 +1205,6 @@
         border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font: inherit;
       }
       .capture-preset .pad-hint { margin: 0; }
-      /* Pad connection panel — top of side rail */
-      #padConnectPanel {
-        display: flex; flex-direction: column; gap: 10px;
-        padding: 12px; border: 1px solid var(--border); border-radius: 10px;
-        background: var(--surface);
-      }
       #padConnectPanel.is-connected {
         border-color: color-mix(in srgb, var(--success) 35%, var(--border));
         background: color-mix(in srgb, var(--success) 6%, var(--surface));
@@ -1086,15 +1212,6 @@
       #padConnectPanel.is-waiting {
         border-color: color-mix(in srgb, var(--warning) 35%, var(--border));
         background: color-mix(in srgb, var(--warning) 6%, var(--surface));
-      }
-      #padConnectPanel .pad-status-row {
-        display: flex; flex-direction: column; gap: 6px;
-      }
-      #padConnectPanel .pad-status-row .row {
-        padding: 2px 0; border-bottom: none;
-      }
-      #padConnectPanel .pad-hint {
-        font-size: 12px; color: var(--muted); line-height: 1.45; margin: 0;
       }
       #padConnectPanel .controls { margin: 0; }
       #padConnectPanel #btnConnect.primary { grid-column: span 2; }
@@ -1192,18 +1309,6 @@
       .rec-status.ok { color: var(--success); }
       .rec-status.warn { color: var(--warning); }
       .rec-status.bad { color: var(--danger, #eb463c); }
-      .pressure-rec-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; }
-      .pressure-rec-empty { font-size: 12px; color: var(--muted); padding: 6px 0; }
-      .pressure-rec-item {
-        display: flex; align-items: center; justify-content: space-between; gap: 8px;
-        padding: 8px 10px; border-radius: 8px; background: var(--surface); border: 1px solid var(--border);
-      }
-      .pressure-rec-meta { min-width: 0; }
-      .pressure-rec-title { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .pressure-rec-sub { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .pressure-rec-actions { display: flex; gap: 8px; flex-shrink: 0; }
-      .pressure-rec-actions a { font-size: 12px; color: var(--primary); cursor: pointer; text-decoration: none; }
-      .pressure-rec-actions a:hover { text-decoration: underline; }
 
       /* Report modal — light clinic surface for video + metrics */
       body.modal-open { overflow: hidden; }
@@ -1310,7 +1415,6 @@
     
     </style>
   </head>
-  <!-- 시작/종료 버튼이 있는 우측 레일은 기본으로 펼쳐 둔다(side-collapsed 기본값 제거). -->
   <body data-module="measure">
     <header id="appHeader">
       <div class="ah-bar">
@@ -1320,194 +1424,28 @@
         <div class="ah-wordmark" aria-label="Talktail Gait">
           <span class="ah-wordmark-talk">Talktail</span><span class="ah-wordmark-gait">Gait</span>
         </div>
-        <nav class="ah-nav" aria-label="Modules">
-          <button type="button" class="active" data-module="measure" aria-current="page" data-i18n="nav_measure">측정</button>
-          <button type="button" data-module="files" data-i18n="nav_files">파일 다운</button>
-          <button type="button" data-module="verify" data-i18n="nav_verify">데이터 검증</button>
-          <button type="button" data-module="upload" data-i18n="nav_upload">직접 분석</button>
-          <button type="button" data-module="report" data-i18n="nav_report">리포트</button>
-        </nav>
+        <div class="ah-right">
+          <nav class="ah-nav" aria-label="Modules">
+            <button type="button" class="active" data-module="measure" aria-current="page" data-i18n="nav_measure">측정</button>
+            <button type="button" data-module="files" data-i18n="nav_files">파일 다운</button>
+            <button type="button" data-module="verify" data-i18n="nav_verify">데이터 검증</button>
+            <button type="button" data-module="upload" data-i18n="nav_upload">직접 분석</button>
+            <button type="button" data-module="report" data-i18n="nav_report">리포트</button>
+          </nav>
+          <select id="langSelect" class="ah-lang" aria-label="Language">
+            <option value="ko">한국어</option>
+            <option value="en">English</option>
+          </select>
+        </div>
       </div>
     </header>
 
     <div id="appBody">
     <!-- side is order:2 (right); stage is order:1 -->
     <aside id="side">
-      <div class="section" data-i18n="section_pad_connect">패드 연결</div>
-      <div id="padConnectPanel">
-        <div class="pad-status-row">
-          <div class="row">
-            <span data-i18n="stat_connection">연결</span>
-            <b id="status" class="off">○ 대기</b>
-          </div>
-          <div class="row">
-            <span data-i18n="stat_calibration">보정</span>
-            <b id="statCal" class="warn" data-i18n="cal_uncalibrated">미보정</b>
-          </div>
-        </div>
-        <div class="controls">
-          <button type="button" id="btnConnect" class="primary" data-i18n="btn_connect_pad">패드 연결</button>
-          <button type="button" id="btnCalibrate" data-i18n="btn_calibrate" disabled>보정</button>
-        </div>
-        <p class="pad-hint" data-i18n="pad_connect_hint">USB로 압력 패드를 연결한 뒤 버튼을 누르세요. 연결 후 보정을 권장합니다.</p>
-      </div>
-
-      <div class="lang-row">
-        <label for="langSelect" class="muted" data-i18n="lang_label">Language</label>
-        <select id="langSelect" aria-label="Language">
-          <option value="ko">한국어</option>
-          <option value="en">English</option>
-        </select>
-      </div>
-
-      <!-- 기타 컨트롤: 파일 재생 / 라벨 / 격자 / 선명도 (임시 비표시)
-      <div class="controls">
-        <label class="btn" for="file" data-i18n="btn_replay_file">Replay file</label>
-        <button id="btnLabels" data-i18n="btn_labels_on">🐾 Labels: On</button>
-        <button id="btnGrid" data-i18n="btn_grid">Grid</button>
-        <button id="btnSharp" data-i18n="btn_sharp_soft">Sharpness: Soft</button>
-      </div>
-      <input id="file" type="file" accept=".txt,.csv,.log" />
-      -->
-
-      <div class="dog-info-head">
-        <div class="section" data-i18n="section_dog_info">반려견</div>
-        <button type="button" id="btnDogInfoToggle" data-i18n="btn_dog_info_expand">펼치기</button>
-      </div>
-      <div class="dog-info" id="dogInfoForm">
-        <div class="field-col">
-          <label for="dogName" data-i18n="dog_name">이름</label>
-          <input id="dogName" type="text" placeholder="예: 바둑이" autocomplete="off" />
-        </div>
-        <div class="field-col">
-          <label for="dogHeight" data-i18n="dog_height">신장</label>
-          <input id="dogHeight" type="number" placeholder="cm" min="0" step="0.1" />
-        </div>
-        <div class="field-col">
-          <label for="dogWeightInfo" data-i18n="dog_weight">몸무게</label>
-          <input id="dogWeightInfo" type="number" placeholder="kg" min="0" step="0.1" />
-        </div>
-        <div class="field-col">
-          <label for="dogBreed" data-i18n="dog_breed">견종</label>
-          <input id="dogBreed" type="text" placeholder="예: 진돗개" autocomplete="off" />
-        </div>
-      </div>
-
-      <div class="section" data-i18n="section_session">세션</div>
-      <div class="capture-preset">
-        <label for="capturePreset" data-i18n="capture_preset">촬영 해상도</label>
-        <select id="capturePreset" aria-label="Capture quality"></select>
-        <p class="pad-hint" data-i18n="capture_preset_hint">연결된 모든 폰이 같은 해상도·프레임으로 촬영합니다.</p>
-      </div>
-      <div class="controls">
-        <button type="button" id="btnSession" class="primary" data-i18n="btn_session_start">시작</button>
-      </div>
-      <div id="pressureRecStatus" class="rec-status"></div>
-
-      <!-- 세션 종료 시 저장된 압력판 CSV 목록 (반려견 정보로 업로드됨) -->
-      <div class="results-head" style="margin-top:8px;">
-        <div class="section" style="margin:0;" data-i18n="section_saved_csv">저장된 CSV</div>
-        <button type="button" id="btnPressureRefresh" data-i18n="btn_results_refresh">새로고침</button>
-      </div>
-      <ul id="pressureRecList" class="pressure-rec-list"></ul>
-
-      <!-- 녹화 섹션 (임시 비표시)
-      <div class="section" data-i18n="section_recording">Recording</div>
-      <div class="controls">
-        <button id="btnRecord" data-i18n="btn_record">● Record</button>
-        <button id="btnReplay" disabled data-i18n="btn_replay_rec">Replay rec</button>
-        <button id="btnCsv" disabled data-i18n="btn_raw_csv">Raw CSV</button>
-        <button id="btnTrackCsv" disabled data-i18n="btn_paw_csv">Paw CSV</button>
-        <button id="btnGif" disabled data-i18n="btn_gif">GIF</button>
-        <button id="btnPng" disabled data-i18n="btn_png">Heatmap PNG</button>
-      </div>
-      -->
-
-      <!-- 보행 분석 버튼 (임시 비표시)
-      <div class="section" data-i18n="section_gait">Gait analysis</div>
-      <div class="controls">
-        <button id="btnGait" class="primary" disabled data-i18n="btn_analyze_gait">🐾 Analyze gait</button>
-        <button id="btnGaitCsv" disabled data-i18n="btn_report_csv">Report CSV</button>
-        <button id="btnGaitPdf" disabled data-i18n="btn_report_pdf">Report PDF</button>
-        <button id="btnGaitJson" disabled>Report JSON</button>
-      </div>
-      -->
-
-      <div id="gaitResult">
-        <div class="row">
-          <span data-i18n="gait_result">Result</span>
-          <b><span id="gaitBadge" class="badge INVALID">–</span></b>
-        </div>
-        <div class="row"><span data-i18n="gait_direction">Direction</span><b id="gaitDir">–</b></div>
-        <div class="row"><span data-i18n="gait_detected_paws">Detected paws</span><b id="gaitPaws">–</b></div>
-        <div class="row"><span data-i18n="gait_duration_hz">Duration · Hz</span><b id="gaitDur">–</b></div>
-        <div class="row"><span data-i18n="gait_cadence">Cadence</span><b id="gaitCadence">–</b></div>
-        <div class="row"><span data-i18n="gait_fore_hind">Fore / Hind load</span><b id="gaitFH">–</b></div>
-        <div class="row"><span data-i18n="gait_symmetry">Symmetry F/H</span><b id="gaitSym">–</b></div>
-        <div class="row"><span>Speed</span><b id="gaitSpeed">–</b></div>
-        <div class="row"><span>Stride / Step</span><b id="gaitStride">–</b></div>
-        <div class="row"><span>Step width</span><b id="gaitStepW">–</b></div>
-        <div class="row"><span>Double support</span><b id="gaitDS">–</b></div>
-        <div class="row"><span>COP path / area</span><b id="gaitCop">–</b></div>
-        <div class="row"><span>Paw sequence</span><b id="gaitSeq">–</b></div>
-        <table class="paws">
-          <thead>
-            <tr>
-              <th data-i18n="th_paw">Paw</th>
-              <th data-i18n="th_load">Load%</th>
-              <th data-i18n="th_peak">Peak</th>
-              <th data-i18n="th_impulse">Impulse</th>
-              <th data-i18n="th_area">Area</th>
-              <th data-i18n="th_steps">Steps</th>
-            </tr>
-          </thead>
-          <tbody id="gaitTbody"></tbody>
-        </table>
-        <div id="gaitFlags"></div>
-        <div id="gaitNote" class="gaitSummaryText"></div>
-      </div>
-
-      <div>
-        <div class="row"><span data-i18n="stat_max">Max pressure</span><b id="statMax">–</b></div>
-        <div class="row"><span data-i18n="stat_avg">Avg pressure</span><b id="statAvg">–</b></div>
-        <div class="row"><span data-i18n="stat_contact">Contact area</span><b id="statContact">–</b></div>
-        <div class="row"><span data-i18n="stat_medium">30–50 area</span><b id="statMedium">–</b></div>
-        <div class="row"><span data-i18n="stat_high">&gt;50 area</span><b id="statHigh">–</b></div>
-        <div class="row">
-          <span data-i18n="stat_input_hz">Input Hz</span>
-          <b id="statHz">–</b>
-        </div>
-        <div class="row">
-          <span data-i18n="stat_render_fps">Render FPS</span>
-          <b id="statFps">–</b>
-        </div>
-        <div class="row"><span data-i18n="stat_recording">Recording</span><b id="statRec" class="off">–</b></div>
-      </div>
-
-      <!-- 색 스펙트럼 · 발 라벨 · 카메라 동기화 · AI 결과 (임시 비표시)
-      <div id="legend"><span>10</span><div id="bar"></div><span>80</span></div>
-      <div class="section" data-i18n="section_paw_labels">Paw labels</div>
-      <div id="pawLegend">
-        <span><i style="background:#3c82f6"></i>LF</span>
-        <span><i style="background:#eb463c"></i>RF</span>
-        <span><i style="background:#28c8dc"></i>LH</span>
-        <span><i style="background:#ff9628"></i>RH</span>
-        <span><i style="background:#a5aab2"></i>?</span>
-      </div>
-
-      <div class="section" data-i18n="section_camera_sync">Camera sync</div>
-      <div class="row"><span data-i18n="sync_mobile_waiting">Mobile</span><b id="syncStatus" class="wait">–</b></div>
-      <div class="row"><span>Hub</span><b id="syncHub" class="wait">–</b></div>
-
-      -->
     </aside>
 
-    <button type="button" id="btnSideToggle" aria-expanded="false" aria-controls="side" title="패널 열기/접기">‹</button>
-
     <main id="stage" class="workspace">
-      <!-- 레일이 접혀 있을 때만 보이는 세션 시작/종료 미러 (#btnSession 과 동기) -->
-      <button type="button" id="btnSessionFloat" data-i18n="btn_session_start">시작</button>
-
       <div id="sessionOverlay" aria-live="polite">
         <div class="session-overlay-card">
           <div class="so-pulse" aria-hidden="true"></div>
@@ -1607,6 +1545,123 @@
           </div>
         </div>
       </section>
+
+      <!-- 측정 컨트롤 — 사이드바에서 본화면으로 나온 영역. 측정 모듈에서만 보인다.
+           배치 의도: 패드 연결과 실시간 값을 한 카드에 붙여 연결 직후 값이 도는지 바로 보이게,
+           시작 버튼은 오른쪽에 크게 독립시켜 다른 컨트롤과 섞이지 않게. -->
+      <div id="measureControls">
+        <!-- 패드 연결 + 매트 실시간 값 (연결 확인이 한 카드에서 끝난다) -->
+        <section class="mc-card mc-pad">
+          <div class="mc-head">
+            <div class="section" data-i18n="section_pad_connect">패드 연결</div>
+            <div class="mc-pad-state">
+              <b id="status" class="off">○ 대기</b>
+              <b id="statCal" class="warn" data-i18n="cal_uncalibrated">미보정</b>
+            </div>
+            <div class="mc-pad-btns">
+              <button type="button" id="btnConnect" class="primary" data-i18n="btn_connect_pad">패드 연결</button>
+              <button type="button" id="btnCalibrate" data-i18n="btn_calibrate" disabled>보정</button>
+            </div>
+          </div>
+          <div class="mc-stats">
+            <div class="mc-stat"><span data-i18n="stat_max">Max pressure</span><b id="statMax">–</b></div>
+            <div class="mc-stat"><span data-i18n="stat_avg">Avg pressure</span><b id="statAvg">–</b></div>
+            <div class="mc-stat"><span data-i18n="stat_contact">Contact area</span><b id="statContact">–</b></div>
+            <div class="mc-stat"><span data-i18n="stat_medium">30–50 area</span><b id="statMedium">–</b></div>
+            <div class="mc-stat"><span data-i18n="stat_high">&gt;50 area</span><b id="statHigh">–</b></div>
+            <div class="mc-stat"><span data-i18n="stat_input_hz">Input Hz</span><b id="statHz">–</b></div>
+            <div class="mc-stat"><span data-i18n="stat_render_fps">Render FPS</span><b id="statFps">–</b></div>
+            <div class="mc-stat"><span data-i18n="stat_recording">Recording</span><b id="statRec" class="off">–</b></div>
+          </div>
+          <p class="pad-hint" data-i18n="pad_connect_hint">USB로 압력 패드를 연결한 뒤 버튼을 누르세요. 연결 후 보정을 권장합니다.</p>
+        </section>
+
+        <!-- 촬영 설정 -->
+        <section class="mc-card mc-capture">
+          <div class="capture-preset">
+            <label for="capturePreset" data-i18n="capture_preset">촬영 해상도</label>
+            <select id="capturePreset" aria-label="Capture quality"></select>
+            <p class="pad-hint" data-i18n="capture_preset_hint">연결된 모든 폰이 같은 해상도·프레임으로 촬영합니다.</p>
+          </div>
+        </section>
+
+        <!-- 빠른 입력 — 등록해 둔 반려견을 눌러 아래 입력란을 채운다. -->
+        <section class="mc-card mc-quick">
+          <div class="mc-head">
+            <div class="section" id="dogPresetTitle" data-i18n="qi_title">빠른 입력</div>
+            <span class="dp-hint" id="dogPresetHint" data-i18n="qi_hint">등록해 둔 반려견을 누르면 아래 입력란이 채워집니다.</span>
+            <button type="button" id="btnDogPresetAdd" class="primary" data-i18n="qi_register">＋ 빠른 입력 등록</button>
+          </div>
+          <p class="dp-empty" id="dogPresetEmpty" hidden></p>
+          <div class="dp-list" id="dogPresetList"></div>
+        </section>
+
+        <!-- 반려견 — 가로 4칸. 이름·몸무게는 파일명에 들어가는 필수값이다. -->
+        <section class="mc-card mc-dog">
+          <div class="section" data-i18n="section_dog_info">반려견</div>
+          <div class="dog-info" id="dogInfoForm">
+            <div class="field-col">
+              <label for="dogName" data-i18n="dog_name">이름</label>
+              <input id="dogName" type="text" placeholder="예: 바둑이" autocomplete="off" />
+            </div>
+            <div class="field-col">
+              <label for="dogWeightInfo" data-i18n="dog_weight">몸무게</label>
+              <input id="dogWeightInfo" type="number" placeholder="kg" min="0" step="0.1" />
+            </div>
+            <div class="field-col">
+              <label for="dogHeight" data-i18n="dog_height">신장</label>
+              <input id="dogHeight" type="number" placeholder="cm" min="0" step="0.1" />
+            </div>
+            <div class="field-col">
+              <label for="dogBreed" data-i18n="dog_breed">견종</label>
+              <input id="dogBreed" type="text" placeholder="예: 진돗개" autocomplete="off" />
+            </div>
+          </div>
+        </section>
+
+        <!-- 시작/종료 — 손이 마지막에 가는 자리. 측정 화면의 유일한 주 동작이다. -->
+        <section class="mc-card mc-start">
+          <button type="button" id="btnSession" class="primary" data-i18n="btn_session_start">시작</button>
+          <div id="pressureRecStatus" class="rec-status"></div>
+        </section>
+
+        <!-- 로컬 보행 분석 결과 (#btnGait 로 돌렸을 때만 .show 가 붙는다) -->
+        <section class="mc-card mc-card-wide">
+          <div id="gaitResult">
+            <div class="row">
+              <span data-i18n="gait_result">Result</span>
+              <b><span id="gaitBadge" class="badge INVALID">–</span></b>
+            </div>
+            <div class="row"><span data-i18n="gait_direction">Direction</span><b id="gaitDir">–</b></div>
+            <div class="row"><span data-i18n="gait_detected_paws">Detected paws</span><b id="gaitPaws">–</b></div>
+            <div class="row"><span data-i18n="gait_duration_hz">Duration · Hz</span><b id="gaitDur">–</b></div>
+            <div class="row"><span data-i18n="gait_cadence">Cadence</span><b id="gaitCadence">–</b></div>
+            <div class="row"><span data-i18n="gait_fore_hind">Fore / Hind load</span><b id="gaitFH">–</b></div>
+            <div class="row"><span data-i18n="gait_symmetry">Symmetry F/H</span><b id="gaitSym">–</b></div>
+            <div class="row"><span>Speed</span><b id="gaitSpeed">–</b></div>
+            <div class="row"><span>Stride / Step</span><b id="gaitStride">–</b></div>
+            <div class="row"><span>Step width</span><b id="gaitStepW">–</b></div>
+            <div class="row"><span>Double support</span><b id="gaitDS">–</b></div>
+            <div class="row"><span>COP path / area</span><b id="gaitCop">–</b></div>
+            <div class="row"><span>Paw sequence</span><b id="gaitSeq">–</b></div>
+            <table class="paws">
+              <thead>
+                <tr>
+                  <th data-i18n="th_paw">Paw</th>
+                  <th data-i18n="th_load">Load%</th>
+                  <th data-i18n="th_peak">Peak</th>
+                  <th data-i18n="th_impulse">Impulse</th>
+                  <th data-i18n="th_area">Area</th>
+                  <th data-i18n="th_steps">Steps</th>
+                </tr>
+              </thead>
+              <tbody id="gaitTbody"></tbody>
+            </table>
+            <div id="gaitFlags"></div>
+            <div id="gaitNote" class="gaitSummaryText"></div>
+          </div>
+        </section>
+      </div>
 
       <!-- Existing pipeline hosts (IDs required by main.ts / SyncPlaybackDock) -->
       <div id="legacyHosts">
@@ -1717,10 +1772,10 @@
       <div class="rp-toolbar">
         <div class="rp-toolbar-text">
           <h1 id="fdTitle" data-i18n="files_page_title">파일 다운</h1>
-          <p id="fdSub" data-i18n="files_page_sub">서버에 저장된 압력 CSV와 원본 영상을 내려받습니다.</p>
+          <p id="fdSub" data-i18n="files_page_sub">서버에 저장된 촬영을 한 건씩 내려받습니다.</p>
         </div>
         <div class="fd-toolbar-extra">
-          <input id="fdSearch" type="search" autocomplete="off" data-i18n-title="files_search_placeholder" placeholder="파일 이름 검색" />
+          <input id="fdSearch" type="search" autocomplete="off" data-i18n-title="files_search_placeholder" placeholder="반려견 이름·파일명 검색" />
           <input id="fdFrom" type="date" data-i18n-title="files_date_from" title="시작 날짜" />
           <span class="fd-date-sep">~</span>
           <input id="fdTo" type="date" data-i18n-title="files_date_to" title="끝 날짜" />
@@ -1728,41 +1783,25 @@
         </div>
       </div>
       <p id="fdStatus" class="fd-status"></p>
+      <div class="fd-actions">
+        <label class="fd-selectall">
+          <input type="checkbox" id="fdAll" />
+          <span id="fdAllLabel" data-i18n="files_select_all">모두 선택</span>
+        </label>
+        <span id="fdCount" class="fd-col-count"></span>
+        <span id="fdSel" class="fd-sel"></span>
+        <button type="button" id="fdZip" class="fd-zip" disabled data-i18n="files_zip_button">선택 촬영 ZIP 받기</button>
+      </div>
       <div class="fd-scroll">
-        <div class="fd-cols">
-          <section class="fd-col" aria-labelledby="fdCsvHeading">
-            <div class="fd-col-head">
-              <div class="section" id="fdCsvHeading" data-i18n="files_csv_heading">압력 CSV</div>
-              <span id="fdCsvCount" class="fd-col-count"></span>
-            </div>
-            <div class="fd-col-actions">
-              <label class="fd-selectall">
-                <input type="checkbox" id="fdCsvAll" />
-                <span id="fdCsvAllLabel" data-i18n="files_select_all">모두 선택</span>
-              </label>
-              <span id="fdCsvSel" class="fd-sel"></span>
-              <button type="button" id="fdCsvZip" class="fd-zip" disabled data-i18n="files_zip_button">선택 파일 ZIP 받기</button>
-            </div>
-            <p id="fdCsvEmpty" class="fd-empty" data-i18n="files_empty_csv">저장된 CSV가 없습니다.</p>
-            <ul id="fdCsvList" class="fd-list"></ul>
-          </section>
-          <section class="fd-col" aria-labelledby="fdVideoHeading">
-            <div class="fd-col-head">
-              <div class="section" id="fdVideoHeading" data-i18n="files_video_heading">원본 영상</div>
-              <span id="fdVideoCount" class="fd-col-count"></span>
-            </div>
-            <div class="fd-col-actions">
-              <label class="fd-selectall">
-                <input type="checkbox" id="fdVideoAll" />
-                <span id="fdVideoAllLabel" data-i18n="files_select_all">모두 선택</span>
-              </label>
-              <span id="fdVideoSel" class="fd-sel"></span>
-              <button type="button" id="fdVideoZip" class="fd-zip" disabled data-i18n="files_zip_button">선택 파일 ZIP 받기</button>
-            </div>
-            <p id="fdVideoEmpty" class="fd-empty" data-i18n="files_empty_video">저장된 영상이 없습니다.</p>
-            <ul id="fdVideoList" class="fd-list"></ul>
-          </section>
-        </div>
+        <p id="fdEmpty" class="fd-empty" data-i18n="files_empty_tasks">저장된 촬영이 없습니다.</p>
+        <ul id="fdList" class="fd-list"></ul>
+        <section id="fdLoose" class="fd-loose" hidden aria-labelledby="fdLooseHeading">
+          <div class="section" id="fdLooseHeading" data-i18n="files_ungrouped_heading">분류 안 됨</div>
+          <p id="fdLooseHint" class="fd-loose-hint" data-i18n="files_ungrouped_hint">
+            파일명에 도장이 없어 촬영으로 묶이지 않습니다. 개별로만 받을 수 있습니다.
+          </p>
+          <ul id="fdLooseList" class="fd-list"></ul>
+        </section>
       </div>
     </section>
 
@@ -1950,6 +1989,39 @@
           </section>
         </div>
       </div>
+    </div>
+
+    <!-- 빠른 입력 등록 -->
+    <div id="dogPresetModal" role="dialog" aria-modal="true" aria-labelledby="dogPresetModalTitle">
+      <form class="dpm-shell" id="dogPresetForm">
+        <div class="dpm-head">
+          <h2 id="dogPresetModalTitle" data-i18n="qi_modal_title">반려견 등록</h2>
+          <p id="dogPresetModalSub" data-i18n="qi_modal_sub">이름과 몸무게는 파일명에 들어가므로 필수입니다.</p>
+        </div>
+        <div class="dpm-body">
+          <div class="field-col">
+            <label for="dpName" data-i18n="dog_name">이름</label>
+            <input id="dpName" type="text" autocomplete="off" required />
+          </div>
+          <div class="field-col">
+            <label for="dpWeight" data-i18n="dog_weight">몸무게</label>
+            <input id="dpWeight" type="number" placeholder="kg" min="0" step="0.1" required />
+          </div>
+          <div class="field-col">
+            <label for="dpHeight" data-i18n="dog_height">신장</label>
+            <input id="dpHeight" type="number" placeholder="cm" min="0" step="0.1" />
+          </div>
+          <div class="field-col">
+            <label for="dpBreed" data-i18n="dog_breed">견종</label>
+            <input id="dpBreed" type="text" autocomplete="off" />
+          </div>
+        </div>
+        <p class="dpm-error" id="dogPresetError"></p>
+        <div class="dpm-foot">
+          <button type="button" id="dogPresetCancel" data-i18n="qi_cancel">취소</button>
+          <button type="submit" id="dogPresetSave" class="primary" data-i18n="qi_save">등록</button>
+        </div>
+      </form>
     </div>
 
     <div id="dogInfoModal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="dogInfoModalTitle">

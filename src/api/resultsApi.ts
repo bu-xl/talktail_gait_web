@@ -11,6 +11,8 @@ export type ResultDate = {
 
 export type ResultSession = {
   stem: string;
+  /** `gait_sessions.task_name` — canonical name the files on disk are built from. */
+  taskName?: string;
   startedAt: string;
   displayTime: string;
   width?: number;
