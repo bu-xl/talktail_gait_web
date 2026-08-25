@@ -725,11 +725,8 @@
         display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0;
       }
       body[data-module="measure"] .mc-capture .capture-preset select {
-        width: max-content; min-width: 12ch; max-width: 16ch;
-        min-height: 42px; font-size: 15px; padding: 8px 28px 8px 10px;
-      }
-      body[data-module="measure"] .mc-capture .capture-preset .pad-hint {
-        flex-basis: 100%;
+        width: max-content; min-width: 18ch;
+        min-height: 42px; font-size: 15px; padding: 8px 32px 8px 12px;
       }
 
       /* 시작/종료 — 오른쪽 열을 통째로 쓰는 독립 블록 */
@@ -1243,10 +1240,9 @@
       }
       .capture-preset label { font-size: 12px; color: var(--muted); }
       .capture-preset select {
-        width: auto; min-width: 11.5em; box-sizing: border-box; background: var(--surface); color: var(--fg);
+        width: auto; min-width: 15em; box-sizing: border-box; background: var(--surface); color: var(--fg);
         border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font: inherit;
       }
-      .capture-preset .pad-hint { margin: 0; }
       #padConnectPanel.is-connected {
         border-color: color-mix(in srgb, var(--success) 35%, var(--border));
         background: color-mix(in srgb, var(--success) 6%, var(--surface));
@@ -1361,6 +1357,7 @@
       .cam-state { margin-left: 0; font-size: 11px; line-height: 1.25; color: var(--muted); }
       .cam-row.is-recording .cam-state { color: var(--success); }
       .cam-row.is-idle .cam-state { color: var(--muted); }
+      .cam-row.is-uploading .cam-state { color: var(--primary); }
       .cam-row.is-warn { outline: 1px solid var(--warning); }
       .cam-row.is-warn .cam-state { color: var(--warning); }
 
@@ -1649,7 +1646,6 @@
           <div class="capture-preset">
             <label for="capturePreset" data-i18n="capture_preset">촬영 해상도</label>
             <select id="capturePreset" aria-label="Capture quality"></select>
-            <p class="pad-hint" data-i18n="capture_preset_hint">연결된 모든 폰이 같은 해상도·프레임으로 촬영합니다.</p>
           </div>
         </section>
 

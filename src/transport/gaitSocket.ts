@@ -21,6 +21,9 @@ export type SyncPeers = {
   subIndexes?: number[];
 };
 
+/** 카메라 목록에 보이는 상태. 이 셋이 전부다. */
+export type CamState = "idle" | "recording" | "uploading";
+
 export type CaptureSettingsPayload = {
   presetId: string;
   videoQuality: string;
@@ -61,6 +64,19 @@ export type SyncMessage =
       type: "record_stopped";
       roomId: string;
       sessionId: string | null;
+      deviceId: string | null;
+      captureRole: "main" | "sub";
+      subIndex: number | null;
+      serverNow: number;
+    }
+  /**
+   * 폰이 스스로 말하는 표시 상태. 카메라 목록은 이것만 보고 그린다 — 사건을 모아
+   * 상태를 추측하지 않으므로 업로드가 끝나 대기로 돌아온 것도 그대로 보인다.
+   */
+  | {
+      type: "cam_state";
+      roomId: string;
+      state: CamState;
       deviceId: string | null;
       captureRole: "main" | "sub";
       subIndex: number | null;

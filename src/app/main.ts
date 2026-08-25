@@ -74,11 +74,11 @@ import {
   confirmAnalyzeJob,
   cancelAnalyzeJob,
   type SyncPeers,
+  type CamState,
 } from "../transport/gaitSocket.js";
 import type { ManualAnalyzeJob, ManualDogInfo } from "../api/analyzeApi.js";
 import {
   dismissTopToast,
-  showBlockingTopToast,
   showToast,
   showTopToast,
   updateQueueToast,
@@ -596,10 +596,8 @@ async function boot(): Promise<void> {
     if (idle) {
       sessionBtn.disabled = !gate.ok;
     }
-    // 측정 화면에서만 띄운다. 다른 탭에서는 시작 버튼 자체가 안 보인다.
-    const onMeasure = document.body.dataset.module === "measure";
-    if (idle && !gate.ok && onMeasure) showBlockingTopToast("dog-identity", gate.reason);
-    else dismissTopToast("dog-identity");
+    // 상단 토스트는 띄우지 않는다 — 시작 버튼 비활성화로 충분하다.
+    dismissTopToast("dog-identity");
   };
 
   /** 완료를 기다리는 분석 잡들 — WS `analyze_done` 을 놓쳤을 때의 백그라운드 폴링 폴백. */
@@ -992,16 +990,17 @@ async function boot(): Promise<void> {
   };
 
   /**
-   * 이번 촬영에서 **실제로 녹화를 시작했다고 알려 온** 기기들.
+   * 자리별 카메라 상태 — 폰이 `cam_state` 로 알려 온 것을 그대로 담는다.
    *
-   * 키는 `deviceId` 이고, 없으면 `main`/`sub{n}` 자리로 대신한다(구버전 앱 대비).
-   * `sync_start` 마다 비운다 — 지난 촬영의 표시가 남으면 "찍고 있다" 는 거짓말이 된다.
+   * 키는 **자리**다. 목록의 줄도 자리로 그리므로(`renderCamList`) 여기서 deviceId 를
+   * 쓰면 조회가 영원히 빗나간다 — 실제로 "촬영 중" 이 안 뜨던 원인이 이거였다.
+   * 비우지 않는다: 폰이 전이마다 다시 알려주므로 스스로 맞춰진다.
    */
-  const recordingDevices = new Set<string>();
+  const camStates = new Map<string, CamState>();
 
-  /** 기기 한 대를 가리키는 키. deviceId 가 정본이고 자리는 폴백이다. */
-  const camKey = (deviceId: string | null, role: string, subIndex: number | null): string =>
-    deviceId || (role === "main" ? "main" : `sub${subIndex ?? "?"}`);
+  /** 자리 한 칸을 가리키는 키. 목록의 줄과 같은 규칙이어야 한다. */
+  const camKey = (role: string, subIndex: number | null): string =>
+    role === "main" ? "main" : `sub${subIndex ?? "?"}`;
 
   /**
    * 연결된 카메라 목록을 그린다.
@@ -1022,14 +1021,16 @@ async function boot(): Promise<void> {
 
     const row = (slot: string, key: string | null, warn?: string): void => {
       const li = document.createElement("li");
-      const recording = key != null && recordingDevices.has(key);
-      li.className = `cam-row ${warn ? "is-warn" : recording ? "is-recording" : "is-idle"}`;
+      const state: CamState = (key != null && camStates.get(key)) || "idle";
+      const mod = warn ? "is-warn" : state === "recording" ? "is-recording" : state === "uploading" ? "is-uploading" : "is-idle";
+      li.className = `cam-row ${mod}`;
       const slotEl = document.createElement("span");
       slotEl.className = "cam-slot";
       slotEl.textContent = slot;
       const stateEl = document.createElement("span");
       stateEl.className = "cam-state";
-      stateEl.textContent = warn ?? (recording ? t("cam_recording") : t("cam_idle"));
+      stateEl.textContent =
+        warn ?? t(state === "recording" ? "cam_recording" : state === "uploading" ? "cam_uploading" : "cam_idle");
       li.append(slotEl, stateEl);
       listEl.appendChild(li);
     };
@@ -1475,20 +1476,13 @@ async function boot(): Promise<void> {
         cameraPlayer.showPreviewFrame(`data:${mime};base64,${msg.data}`);
       }
     }
-    if (msg.type === "record_started") {
-      // 폰이 실제로 찍기 시작했다. 지난 촬영의 표시가 남지 않도록 sync_start 에서 비운다.
-      recordingDevices.add(camKey(msg.deviceId, msg.captureRole, msg.subIndex));
-      renderCamList(gaitSync.peers);
-    }
-    if (msg.type === "record_stopped") {
-      recordingDevices.delete(camKey(msg.deviceId, msg.captureRole, msg.subIndex));
+    if (msg.type === "cam_state") {
+      // 폰이 말하는 상태를 그대로 쓴다 — 사건을 모아 추측하지 않는다.
+      camStates.set(camKey(msg.captureRole, msg.subIndex), msg.state);
       renderCamList(gaitSync.peers);
     }
     if (msg.type === "sync_start") {
       syncRecordPending = false;
-      // 새 촬영이 시작된다 — "찍고 있다" 표시를 초기화한다.
-      recordingDevices.clear();
-      renderCamList(gaitSync.peers);
       syncSessionId = msg.sessionId;
       syncDock.hide();
       syncPlaybackActive = false;
@@ -1501,8 +1495,6 @@ async function boot(): Promise<void> {
     }
     if (msg.type === "record_stop") {
       syncRecordPending = false;
-      recordingDevices.clear();
-      renderCamList(gaitSync.peers);
       if (recorder.isRecording) stopLocalRecording();
       syncSessionId = null;
       if (clinicSessionActive || sessionPhase === "recording") {
