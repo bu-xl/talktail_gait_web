@@ -43,6 +43,20 @@ export type SyncMessage =
       captureSettings?: CaptureSettingsPayload | null;
     }
   | { type: "record_stop"; roomId: string; sessionId: string | null; from: string; serverNow: number }
+  /**
+   * 폰이 **실제로** 녹화를 시작했다. `sync_start` 는 지시일 뿐이고 폰마다 카메라를 올리는
+   * 시간이 달라, 이 신호가 있어야 "몇 대 중 몇 대가 찍고 있나" 를 웹에서 알 수 있다.
+   * Sub 것도 온다(`upload_started` 와 다른 점).
+   */
+  | {
+      type: "record_started";
+      roomId: string;
+      sessionId: string | null;
+      deviceId: string | null;
+      captureRole: "main" | "sub";
+      subIndex: number | null;
+      serverNow: number;
+    }
   | {
       type: "capture_settings";
       presetId: string;

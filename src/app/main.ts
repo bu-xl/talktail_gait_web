@@ -88,7 +88,8 @@ import { DogPresetsCard } from "../ui/dogPresetsCard.js";
 import type { CompletedSessionRef } from "../ui/completedPage.js";
 import { getResultDetail, listResultDates, listResultSessions } from "../api/resultsApi.js";
 import { getSessionNotes, saveSessionNotes } from "../api/sessionNotesApi.js";
-import { ReportPage } from "../ui/reportPage.js";
+import { ResultsPage } from "../ui/resultsPage.js";
+import { ReportsPage } from "../ui/reportsPage.js";
 import { UploadPage } from "../ui/uploadPage.js";
 import { FilesPage } from "../ui/filesPage.js";
 import { VerifyPage } from "../ui/verifyPage.js";
@@ -319,32 +320,9 @@ function placeholderUrl(file: string): string {
   return `${window.location.origin}/placeholders/${file}`;
 }
 
-type AppModule = "measure" | "report" | "upload" | "files" | "verify" | "review" | "storage";
+type AppModule = "measure" | "results" | "report" | "upload" | "files" | "verify" | "review" | "storage";
 
-const APP_MODULES: readonly AppModule[] = ["measure", "report", "upload", "files", "verify", "review", "storage"];
-
-/**
- * 헤더에 "완료된 분석" 버튼을 코드로 붙인다.
- *
- * index.html 을 건드리지 않는 이유는 이 화면이 측정 화면의 마크업을 그대로 재사용하기
- * 때문이다. 레일만 갈아 끼우면 되므로 새 페이지 마크업이 필요 없다.
- * "서버 조회" 는 그 오른쪽에 와야 해서 같이 붙인다 — index.html 의 버튼들은 이미 왼쪽이다.
- */
-function ensureLateNavButtons(): void {
-  const nav = document.querySelector("#appHeader .ah-nav");
-  if (!nav) return;
-  const add = (mod: AppModule, key: "nav_completed" | "nav_storage"): void => {
-    if (nav.querySelector(`[data-module="${mod}"]`)) return;
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.dataset.module = mod;
-    btn.setAttribute("data-i18n", key);
-    btn.textContent = t(key);
-    nav.appendChild(btn);
-  };
-  add("review", "nav_completed");
-  add("storage", "nav_storage");
-}
+const APP_MODULES: readonly AppModule[] = ["measure", "results", "report", "upload", "files", "verify", "review", "storage"];
 
 /** 헤더 nav 를 연결하고, 코드에서 모듈을 바꿀 수 있는 함수를 돌려준다. */
 const MODULE_STORAGE_KEY = "gait.activeModule";
@@ -365,7 +343,7 @@ function loadActiveModule(): AppModule | null {
 }
 
 function wireAppHeader(opts: { onModuleChange: (mod: AppModule) => void }): (mod: AppModule) => void {
-  ensureLateNavButtons();
+  const menu = document.querySelector<HTMLDetailsElement>("#appHeader .ah-menu");
   const setActive = (mod: AppModule): void => {
     document.body.dataset.module = mod;
     try {
@@ -373,12 +351,17 @@ function wireAppHeader(opts: { onModuleChange: (mod: AppModule) => void }): (mod
     } catch {
       // 시크릿 모드 등 저장이 막힌 환경 — 이번 세션에서만 유지된다.
     }
-    document.querySelectorAll<HTMLButtonElement>("#appHeader .ah-nav button[data-module]").forEach((btn) => {
+    document.querySelectorAll<HTMLElement>("#appHeader .ah-nav [data-module]").forEach((btn) => {
       const active = btn.dataset.module === mod;
       btn.classList.toggle("active", active);
       if (active) btn.setAttribute("aria-current", "page");
       else btn.removeAttribute("aria-current");
     });
+    if (menu) {
+      // 메뉴 안의 화면을 보고 있으면 ≡ 자체를 활성으로 — 헤더가 통째로 비어 보이지 않게.
+      menu.open = false;
+      menu.querySelector("summary")?.classList.toggle("active", !!menu.querySelector(`[data-module="${mod}"]`));
+    }
     opts.onModuleChange(mod);
   };
 
@@ -478,9 +461,12 @@ async function boot(): Promise<void> {
   /** 업로드보다 재촬영을 먼저 누른 경우, job 이 생기면 그때 AI 를 건너뛴다. */
   let retakeRequested = false;
 
-  const reportPageEl = $opt("reportPage");
-  const reportPage = reportPageEl ? new ReportPage(reportPageEl) : null;
-  reportPage?.setApiBase(apiBase);
+  const resultsPageEl = $opt("resultsPage");
+  const resultsPage = resultsPageEl ? new ResultsPage(resultsPageEl) : null;
+  resultsPage?.setApiBase(apiBase);
+  const reportsPageEl = $opt("reportPage");
+  const reportsPage = reportsPageEl ? new ReportsPage(reportsPageEl) : null;
+  reportsPage?.setApiBase(apiBase);
   const filesPageEl = $opt("filesPage");
   const filesPage = filesPageEl ? new FilesPage(filesPageEl) : null;
   filesPage?.setApiBase(apiBase);
@@ -932,8 +918,10 @@ async function boot(): Promise<void> {
 
   const setModule = wireAppHeader({
     onModuleChange: (mod) => {
-      if (mod === "report") reportPage?.show();
-      else reportPage?.hide();
+      if (mod === "results") resultsPage?.show();
+      else resultsPage?.hide();
+      if (mod === "report") reportsPage?.show();
+      else reportsPage?.hide();
       if (mod === "upload") uploadPage?.show();
       else uploadPage?.hide();
       if (mod === "files") filesPage?.show();
@@ -1000,6 +988,75 @@ async function boot(): Promise<void> {
       cameraPlayer.showIdle(t("camera_preview_receiving"));
     }
     if (!mobile && !syncPlaybackActive) cameraPlayer.clearPreview();
+    renderCamList(peers);
+  };
+
+  /**
+   * 이번 촬영에서 **실제로 녹화를 시작했다고 알려 온** 기기들.
+   *
+   * 키는 `deviceId` 이고, 없으면 `main`/`sub{n}` 자리로 대신한다(구버전 앱 대비).
+   * `sync_start` 마다 비운다 — 지난 촬영의 표시가 남으면 "찍고 있다" 는 거짓말이 된다.
+   */
+  const recordingDevices = new Set<string>();
+
+  // 목록 펼치기. 데이터는 peer_update 로 이미 실시간으로 오므로 이 버튼은 **조회가 아니라
+  // 표시 토글**이다 — 눌러야 갱신되는 게 아니다.
+  onClick("btnCamList", () => {
+    const listEl = $opt("camList");
+    if (!listEl) return;
+    listEl.hidden = !listEl.hidden;
+    const btn = $opt("btnCamList");
+    if (btn) btn.textContent = listEl.hidden ? t("cams_toggle") : t("cams_toggle_hide");
+  });
+
+  /** 기기 한 대를 가리키는 키. deviceId 가 정본이고 자리는 폴백이다. */
+  const camKey = (deviceId: string | null, role: string, subIndex: number | null): string =>
+    deviceId || (role === "main" ? "main" : `sub${subIndex ?? "?"}`);
+
+  /**
+   * 연결된 카메라 목록을 그린다.
+   *
+   * 서버가 주는 것은 **개수와 번호 집합**뿐이라(`peersOf`) 기기를 낱개로 식별할 수 없다.
+   * 그래서 자리 기준으로 줄을 세운다 — Main 1줄 + 번호를 가진 Sub + 번호 미지정 Sub 묶음.
+   * 자리 번호가 곧 현장의 카메라 위치라 사람이 찾아가기에는 이게 더 낫다.
+   */
+  const renderCamList = (peers?: SyncPeers): void => {
+    const listEl = $opt("camList") as HTMLUListElement | null;
+    const hintEl = $opt("camHint");
+    if (!listEl) return;
+    listEl.innerHTML = "";
+
+    const hasMain = peers?.main ?? false;
+    const subIndexes = peers?.subIndexes ?? [];
+    const unnumbered = Math.max(0, (peers?.subCount ?? 0) - subIndexes.length);
+
+    const row = (slot: string, key: string | null, warn?: string): void => {
+      const li = document.createElement("li");
+      const recording = key != null && recordingDevices.has(key);
+      li.className = `cam-row ${warn ? "is-warn" : recording ? "is-recording" : "is-idle"}`;
+      const slotEl = document.createElement("span");
+      slotEl.className = "cam-slot";
+      slotEl.textContent = slot;
+      const stateEl = document.createElement("span");
+      stateEl.className = "cam-state";
+      stateEl.textContent = warn ?? (recording ? t("cam_recording") : t("cam_idle"));
+      li.append(slotEl, stateEl);
+      listEl.appendChild(li);
+    };
+
+    if (hasMain) row("MAIN", "main");
+    for (const n of subIndexes) row(`SUB${n}`, `sub${n}`);
+    // 번호 미지정 폰은 촬영을 하지 않는다(앱이 막는다) — 경고로 표시한다.
+    for (let i = 0; i < unnumbered; i += 1) row("SUB ?", null, t("cam_no_slot"));
+
+    if (!listEl.children.length) {
+      const li = document.createElement("li");
+      li.className = "cam-row is-idle";
+      li.textContent = t("cams_empty");
+      listEl.appendChild(li);
+    }
+    // 힌트는 아직 아무 카메라도 안 붙었을 때만 쓸모가 있다.
+    if (hintEl) hintEl.hidden = hasMain || subIndexes.length > 0 || unnumbered > 0;
   };
 
   const renderSyncedMatFrame = (raw: import("../core/types.js").Matrix): void => {
@@ -1428,8 +1485,16 @@ async function boot(): Promise<void> {
         cameraPlayer.showPreviewFrame(`data:${mime};base64,${msg.data}`);
       }
     }
+    if (msg.type === "record_started") {
+      // 폰이 실제로 찍기 시작했다. 지난 촬영의 표시가 남지 않도록 sync_start 에서 비운다.
+      recordingDevices.add(camKey(msg.deviceId, msg.captureRole, msg.subIndex));
+      renderCamList(gaitSync.peers);
+    }
     if (msg.type === "sync_start") {
       syncRecordPending = false;
+      // 새 촬영이 시작된다 — "찍고 있다" 표시를 초기화한다.
+      recordingDevices.clear();
+      renderCamList(gaitSync.peers);
       syncSessionId = msg.sessionId;
       syncDock.hide();
       syncPlaybackActive = false;
@@ -1442,6 +1507,8 @@ async function boot(): Promise<void> {
     }
     if (msg.type === "record_stop") {
       syncRecordPending = false;
+      recordingDevices.clear();
+      renderCamList(gaitSync.peers);
       if (recorder.isRecording) stopLocalRecording();
       syncSessionId = null;
       if (clinicSessionActive || sessionPhase === "recording") {

@@ -89,6 +89,26 @@
       .ah-nav button.active:hover {
         background: var(--primary-light); color: var(--primary-pressed);
       }
+      .ah-menu { position: relative; }
+      .ah-menu summary {
+        list-style: none; cursor: pointer; user-select: none;
+        min-width: 0; padding: 9px 14px; border-radius: 10px;
+        background: transparent; border: 1px solid transparent; color: var(--muted);
+        font-size: 15px; font-weight: 700; line-height: 1.1;
+      }
+      .ah-menu summary::-webkit-details-marker { display: none; }
+      .ah-menu summary:hover { background: var(--surface-hover); color: var(--fg); }
+      .ah-menu summary.active {
+        background: var(--primary-light); color: var(--primary-pressed);
+      }
+      .ah-menu-list {
+        position: absolute; top: calc(100% + 6px); right: 0; z-index: 60;
+        display: flex; flex-direction: column; gap: 2px; padding: 6px;
+        min-width: 160px; background: var(--surface);
+        border: 1px solid var(--border); border-radius: 10px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, .12);
+      }
+      .ah-menu-list button { text-align: left; width: 100%; }
       @media (max-width: 640px) {
         .ah-bar { grid-template-columns: auto 1fr auto; gap: 10px; padding: 8px 12px; }
         .ah-logo img { height: 30px; max-width: 112px; }
@@ -99,6 +119,7 @@
       #appBody {
         flex: 1; min-height: 0; display: flex; position: relative;
       }
+      body[data-module="results"] #appBody,
       body[data-module="report"] #appBody,
       body[data-module="upload"] #appBody,
       body[data-module="files"] #appBody,
@@ -106,11 +127,11 @@
       body[data-module="storage"] #appBody { display: none !important; }
 
       /* —— Report page —— */
-      #reportPage {
+      #resultsPage {
         flex: 1; min-height: 0; display: none; flex-direction: column;
         background: var(--bg); overflow: hidden;
       }
-      body[data-module="report"] #reportPage { display: flex; }
+      body[data-module="results"] #resultsPage { display: flex; }
       .rp-toolbar {
         flex-shrink: 0; display: flex; align-items: flex-start; justify-content: space-between;
         gap: 12px; padding: 16px 24px 12px; border-bottom: 1px solid var(--divider);
@@ -135,72 +156,26 @@
       }
       .rp-card:hover { border-color: var(--primary); background: var(--brand-selected-bg, var(--primary-light)); }
       .rp-card-title { font-size: 16px; font-weight: 700; color: var(--fg); }
-      .rp-card-meta { font-size: 12px; color: var(--muted); font-feature-settings: 'tnum' 1; }
+      .rp-card-meta { font-size: 15px; font-weight: 600; color: var(--fg); font-feature-settings: 'tnum' 1; }
       #rpEmpty, #rpLoading { font-size: 14px; color: var(--muted); padding: 32px 8px; text-align: center; }
       #rpDetail {
-        display: grid; grid-template-columns: minmax(280px, 42%) 1fr; gap: 20px; align-items: start;
-      }
-      @media (max-width: 900px) {
-        #rpDetail { grid-template-columns: 1fr; }
+        display: flex; flex-direction: column; gap: 12px; min-height: 0;
       }
       #rpDetail.hidden, #rpList.hidden, #rpEmpty.hidden, #rpLoading.hidden, #rpBack.hidden { display: none !important; }
-      #rpDetailVideo.video-panel {
-        background: var(--mat-frame); border: 1px solid var(--border); border-radius: 12px;
-        overflow: hidden; display: flex; flex-direction: column; min-height: 280px; position: sticky; top: 0;
-      }
-      #rpDetailVideo .video-viewport { min-height: 280px; }
-      #rpCyclogramVideo {
-        position: absolute; inset: 0; width: 100%; height: 100%;
-        object-fit: contain; display: none; background: #05070a;
-      }
-      #rpDetailVideo.has-media #rpCyclogramVideo { display: block; }
-      #rpDetailVideo.has-media .camera-placeholder { display: none; }
       #rpDetailActions {
-        display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
-        margin: 0 0 14px;
+        display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0;
       }
-      #rpDetailActions .rp-lang-toggle {
-        display: inline-flex; border: 1px solid var(--border); border-radius: 999px;
-        overflow: hidden; background: var(--surface);
-      }
-      #rpDetailActions .rp-lang-toggle button {
-        border: 0; border-radius: 0; background: transparent; color: var(--muted);
-        padding: 7px 14px; font-size: 12px; font-weight: 600;
-      }
-      #rpDetailActions .rp-lang-toggle button.active {
-        background: var(--fg); color: var(--bg);
-      }
-      #rpViewMedia {
+      #rpOpenReport {
         margin-left: auto;
         background: #1f6f6a; color: #fff; border-color: #1f6f6a;
       }
-      #rpViewMedia:hover { filter: brightness(1.06); }
-      #rpLangHint { width: 100%; font-size: 12px; color: var(--muted); margin: 0; }
+      #rpOpenReport:hover { filter: brightness(1.06); }
+      #rpLangHint { width: 100%; font-size: 12px; color: var(--muted); margin: 0 0 10px; }
 
-      /* Report session replay — same 5 panes as measure, visually distinct archive mode */
-      #rpReviewOverlay {
-        display: none; position: fixed; inset: 0; z-index: 80;
-        background: rgba(12, 18, 22, 0.72); backdrop-filter: blur(4px);
-        padding: 18px; box-sizing: border-box;
-      }
-      #rpReviewOverlay.open { display: flex; flex-direction: column; }
-      #rpReviewShell {
-        flex: 1; min-height: 0; display: flex; flex-direction: column;
-        background: #eef3f2; border: 1px solid #c5d4d1; border-radius: 16px;
-        overflow: hidden; box-shadow: 0 18px 48px rgba(12, 28, 26, 0.28);
-      }
-      #rpReviewTop {
-        flex-shrink: 0; display: flex; align-items: flex-start; justify-content: space-between;
-        gap: 12px; padding: 14px 18px; background: #163a37; color: #e8f4f2;
-      }
-      #rpReviewBadge {
-        display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .08em;
-        text-transform: uppercase; color: #7fd4c8; margin-bottom: 4px;
-      }
-      #rpReviewTitle { margin: 0; font-size: 18px; font-weight: 700; }
-      #rpReviewSub { margin: 4px 0 0; font-size: 12px; color: rgba(232,244,242,.72); }
-      #rpReviewClose {
-        background: transparent; color: #e8f4f2; border-color: rgba(232,244,242,.35);
+      /* Session replay — same 5 panes as measure, inline in the detail body */
+      #rpReviewPanel {
+        flex: 1; min-height: 420px; display: flex; flex-direction: column;
+        background: #eef3f2; border: 1px solid #c5d4d1; border-radius: 16px; overflow: hidden;
       }
       #rpReviewStage {
         flex: 1; min-height: 0; display: grid;
@@ -246,9 +221,54 @@
         #rpReviewStage { grid-template-columns: 1fr; overflow: auto; }
       }
 
+      /* Report text, moved out of the page body into its own modal */
+      #rpReportModal {
+        display: none; position: fixed; inset: 0; z-index: 80;
+        background: rgba(12, 18, 22, 0.72); backdrop-filter: blur(4px);
+        padding: 24px; box-sizing: border-box;
+      }
+      #rpReportModal.open { display: flex; align-items: stretch; justify-content: center; }
+      #rpReportShell {
+        flex: 1; max-width: 760px; min-height: 0; display: flex; flex-direction: column;
+        background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+        overflow: hidden; box-shadow: 0 18px 48px rgba(12, 28, 26, 0.28);
+      }
+      #rpReportTop {
+        flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;
+        gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--divider);
+      }
+      #rpReportTop .rp-lang-toggle {
+        display: inline-flex; border: 1px solid var(--border); border-radius: 999px;
+        overflow: hidden; background: var(--bg);
+      }
+      #rpReportTop .rp-lang-toggle button {
+        border: 0; border-radius: 0; background: transparent; color: var(--muted);
+        padding: 7px 14px; font-size: 12px; font-weight: 600;
+      }
+      #rpReportTop .rp-lang-toggle button.active { background: var(--fg); color: var(--bg); }
+      #rpReportScroll { flex: 1; min-height: 0; overflow: auto; padding: 18px 20px; }
+      #rpReportFoot {
+        flex-shrink: 0; display: flex; justify-content: flex-end;
+        padding: 12px 16px; border-top: 1px solid var(--divider);
+      }
+      #rpReportDownload { background: #1f6f6a; color: #fff; border-color: #1f6f6a; }
+      #rpReportDownload:hover:not(:disabled) { filter: brightness(1.06); }
+      #rpReportDownload:disabled { opacity: .45; cursor: not-allowed; }
+
+      /* Print container — the PDF path for single and bulk report download */
+      #rpPrintRoot { display: none; }
+      .rp-print-head h2 { margin: 0; font-size: 20px; }
+      .rp-print-head p { margin: 2px 0 14px; font-size: 12px; color: var(--muted); }
+      @media print {
+        body.rp-printing > *:not(#rpPrintRoot) { display: none !important; }
+        body.rp-printing #rpPrintRoot { display: block; }
+        body.rp-printing .rp-print-page { break-after: page; }
+        body.rp-printing .rp-print-page:last-child { break-after: auto; }
+        body.rp-printing .rm-metric, body.rp-printing .rm-section { break-inside: avoid; }
+      }
+
       #rpDetailLoading { text-align: center; color: var(--muted); padding: 24px; }
       #rpDetailBody { min-width: 0; }
-      .rp-detail-main { min-width: 0; }
 
       /* —— 직접 분석 (CSV + 영상 직접 업로드) —— */
       #uploadPage {
@@ -468,6 +488,12 @@
         background: var(--bg); overflow: hidden;
       }
       body[data-module="files"] #filesPage { display: flex; }
+      #reportPage {
+        flex: 1; min-height: 0; display: none; flex-direction: column;
+        background: var(--bg); overflow: hidden;
+      }
+      body[data-module="report"] #reportPage { display: flex; }
+      #rlList .fd-file { padding: 10px 12px; }
       .fd-toolbar-extra {
         display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end;
       }
@@ -1304,6 +1330,20 @@
       #syncStatus.wait, #syncHub.wait { color: var(--warning); }
       #syncStatus.off, #syncHub.off { color: var(--muted); }
 
+      /* 연결된 카메라 목록 — 한 줄에 한 대. 상태 점으로 촬영 여부를 본다. */
+      .cam-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
+      .cam-row {
+        display: flex; align-items: center; gap: 8px;
+        padding: 6px 8px; border-radius: 6px; background: var(--surface-2, rgba(255,255,255,.04));
+        font-size: 13px;
+      }
+      .cam-slot { font-weight: 700; min-width: 64px; }
+      .cam-state { margin-left: auto; }
+      .cam-row.is-recording .cam-state { color: var(--success); }
+      .cam-row.is-idle .cam-state { color: var(--muted); }
+      .cam-row.is-warn { outline: 1px solid var(--warning); }
+      .cam-row.is-warn .cam-state { color: var(--warning); }
+
       /* 세션 CSV 저장 상태 · 저장 CSV 목록 */
       .rec-status { font-size: 12px; min-height: 1.2em; color: var(--muted); }
       .rec-status.ok { color: var(--success); }
@@ -1427,10 +1467,18 @@
         <div class="ah-right">
           <nav class="ah-nav" aria-label="Modules">
             <button type="button" class="active" data-module="measure" aria-current="page" data-i18n="nav_measure">측정</button>
-            <button type="button" data-module="files" data-i18n="nav_files">파일 다운</button>
             <button type="button" data-module="verify" data-i18n="nav_verify">데이터 검증</button>
-            <button type="button" data-module="upload" data-i18n="nav_upload">직접 분석</button>
-            <button type="button" data-module="report" data-i18n="nav_report">리포트</button>
+            <button type="button" data-module="results" data-i18n="nav_results">결과 보기</button>
+            <button type="button" data-module="review" data-i18n="nav_completed">완료된 분석</button>
+            <details class="ah-menu">
+              <summary data-i18n-title="nav_more" title="더보기" aria-label="더보기">≡</summary>
+              <div class="ah-menu-list">
+                <button type="button" data-module="files" data-i18n="nav_files">파일 다운</button>
+                <button type="button" data-module="upload" data-i18n="nav_upload">직접 분석</button>
+                <button type="button" data-module="report" data-i18n="nav_report">리포트</button>
+                <button type="button" data-module="storage" data-i18n="nav_storage">서버 조회</button>
+              </div>
+            </details>
           </nav>
           <select id="langSelect" class="ah-lang" aria-label="Language">
             <option value="ko">한국어</option>
@@ -1574,6 +1622,26 @@
             <div class="mc-stat"><span data-i18n="stat_recording">Recording</span><b id="statRec" class="off">–</b></div>
           </div>
           <p class="pad-hint" data-i18n="pad_connect_hint">USB로 압력 패드를 연결한 뒤 버튼을 누르세요. 연결 후 보정을 권장합니다.</p>
+        </section>
+
+        <!--
+          연결된 카메라 — 대수만이 아니라 **지금 찍고 있는지**를 본다.
+          폰이 붙고 빠지는 것은 peer_update 로 실시간 갱신되므로 조회 버튼이 없다.
+          헤더 줄만 늘 보이고, 기기별 상세는 눌러서 편다.
+        -->
+        <section class="mc-card mc-cams">
+          <div class="mc-head">
+            <div class="section" data-i18n="cams_title">연결된 카메라</div>
+            <div class="mc-pad-state">
+              <b id="syncHub" class="off" data-i18n="sync_hub_disconnected">동기화 서버 끊김</b>
+              <b id="syncStatus" class="off">–</b>
+            </div>
+            <div class="mc-pad-btns">
+              <button type="button" id="btnCamList" data-i18n="cams_toggle">기기 보기</button>
+            </div>
+          </div>
+          <ul id="camList" class="cam-list" hidden></ul>
+          <p class="pad-hint" id="camHint" data-i18n="cams_hint">촬영을 시작하면 각 카메라가 실제로 녹화를 시작했는지 여기에 표시됩니다.</p>
         </section>
 
         <!-- 촬영 설정 -->
@@ -1805,6 +1873,36 @@
       </div>
     </section>
 
+    <section id="reportPage" hidden aria-label="Reports">
+      <div class="rp-toolbar">
+        <div class="rp-toolbar-text">
+          <h1 id="rlTitle" data-i18n="nav_report">리포트</h1>
+          <p id="rlSub" data-i18n="reports_page_sub">저장된 분석 리포트를 찾아보고 PDF 로 받습니다.</p>
+        </div>
+        <div class="fd-toolbar-extra">
+          <input id="rlSearch" type="search" autocomplete="off" data-i18n-title="reports_search_placeholder" placeholder="반려견 이름·날짜 검색" />
+          <input id="rlFrom" type="date" data-i18n-title="files_date_from" title="시작 날짜" />
+          <span class="fd-date-sep">~</span>
+          <input id="rlTo" type="date" data-i18n-title="files_date_to" title="끝 날짜" />
+          <button type="button" id="rlRefresh" data-i18n="btn_results_refresh">새로고침</button>
+        </div>
+      </div>
+      <p id="rlStatus" class="fd-status"></p>
+      <div class="fd-actions">
+        <label class="fd-selectall">
+          <input type="checkbox" id="rlAll" />
+          <span id="rlAllLabel" data-i18n="files_select_all">모두 선택</span>
+        </label>
+        <span id="rlCount" class="fd-col-count"></span>
+        <span id="rlSel" class="fd-sel"></span>
+        <button type="button" id="rlPrint" class="fd-zip" disabled data-i18n="reports_print_button">선택 리포트 PDF 받기</button>
+      </div>
+      <div class="fd-scroll">
+        <p id="rlEmpty" class="fd-empty" data-i18n="results_empty">저장된 분석 결과가 없습니다</p>
+        <ul id="rlList" class="fd-list"></ul>
+      </div>
+    </section>
+
     <section id="uploadPage" hidden aria-label="Direct analysis">
       <div class="rp-toolbar">
         <div class="rp-toolbar-text">
@@ -1868,11 +1966,11 @@
       </div>
     </section>
 
-    <section id="reportPage" hidden aria-label="Reports">
+    <section id="resultsPage" hidden aria-label="Results">
       <div class="rp-toolbar">
         <div class="rp-toolbar-text">
           <div id="rpCrumbs" data-i18n="results_list">결과</div>
-          <h1 id="rpTitle" data-i18n="report_page_title">분석 목록</h1>
+          <h1 id="rpTitle" data-i18n="nav_results">결과 보기</h1>
           <p id="rpSub" data-i18n="results_dates_hint">날짜를 선택하세요</p>
         </div>
         <div class="rp-toolbar-actions">
@@ -1885,42 +1983,13 @@
         <div id="rpEmpty" class="hidden" data-i18n="results_empty">저장된 분석 결과가 없습니다</div>
         <div id="rpList" class="rp-grid"></div>
         <div id="rpDetail" class="hidden">
-          <div id="rpDetailVideo" class="video-panel">
-            <div class="video-viewport">
-              <video id="rpCyclogramVideo" muted loop playsinline></video>
-              <div class="camera-placeholder" data-i18n="video_placeholder">AI 분석 영상</div>
-            </div>
-          </div>
-          <div class="rp-detail-main">
-            <div id="rpDetailActions">
-              <div class="rp-lang-toggle" role="group" aria-label="Report language">
-                <button type="button" id="rpLangKo" class="active">한국어 버전</button>
-                <button type="button" id="rpLangEn">영어 버전</button>
-              </div>
-              <button type="button" id="rpViewMedia" data-i18n="report_view_media">영상보기</button>
-              <p id="rpLangHint" class="hidden"></p>
-            </div>
-            <div id="rpDetailLoading" class="hidden">…</div>
-            <div id="rpDetailBody"></div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <div id="rpReviewOverlay" aria-hidden="true">
-      <div id="rpReviewShell">
-        <div id="rpReviewTop">
-          <div>
-            <div id="rpReviewBadge">ARCHIVE</div>
-            <h2 id="rpReviewTitle" data-i18n="report_review_title">저장된 세션 다시보기</h2>
-            <p id="rpReviewSub" data-i18n="report_review_sub">메인과 같은 5개 패널</p>
-          </div>
-          <div class="rp-review-actions">
+          <div id="rpDetailActions">
             <button type="button" id="rpReviewInfo" data-i18n="btn_dog_info">ⓘ 정보</button>
-            <button type="button" id="rpReviewClose" data-i18n="report_review_close">닫기</button>
+            <button type="button" id="rpOpenReport" data-i18n="report_open">리포트 보기</button>
           </div>
-        </div>
-        <div id="rpReviewStage">
+          <div id="rpDetailLoading" class="hidden">…</div>
+          <div id="rpReviewPanel">
+            <div id="rpReviewStage">
           <section class="ws-pane ws-pane-1">
             <div class="ws-label" data-i18n="ws_label_1">1 · 압력패드</div>
             <div class="ws-body is-empty" id="rpBody1" data-empty="">
@@ -1987,6 +2056,27 @@
               </div>
             </div>
           </section>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div id="rpReportModal" aria-hidden="true">
+      <div id="rpReportShell">
+        <div id="rpReportTop">
+          <div class="rp-lang-toggle" role="group" aria-label="Report language">
+            <button type="button" id="rpLangKo" class="active">한국어 버전</button>
+            <button type="button" id="rpLangEn">영어 버전</button>
+          </div>
+          <button type="button" id="rpReportClose" data-i18n="report_review_close">닫기</button>
+        </div>
+        <div id="rpReportScroll">
+          <p id="rpLangHint" class="hidden"></p>
+          <div id="rpDetailBody"></div>
+        </div>
+        <div id="rpReportFoot">
+          <button type="button" id="rpReportDownload" data-i18n="report_download">PDF 다운로드</button>
         </div>
       </div>
     </div>

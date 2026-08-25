@@ -1,17 +1,20 @@
 /**
  * Session file naming.
  *
- * Every artifact of one measurement carries the dog it belongs to, so a file
- * pulled off disk months later still identifies its subject:
+ * Field order is `stamp - role - dogName - weight - kind`:
  *
- *     대박이-5.2kg-main-260819-144204.mp4
- *     대박이-5.2kg-sub1-260819-144204.mp4
- *     대박이-5.2kg-260819-144204.csv
+ *     260819-144204-main-대박이-5.2kg.mp4
+ *     260819-144204-sub1-대박이-5.2kg.mp4
+ *     260819-144204-대박이-5.2kg.csv
  *
- * The `role-stamp` tail is unchanged from the previous `main-260819-144204`
- * scheme. That matters: the backend recognises its own files by matching that
- * tail, so keeping it intact lets old and new names coexist. Anything that
- * parses these names must anchor on the tail, never on the start of the string.
+ * The stamp leads so that sorting a folder by name keeps one capture's files
+ * together, with `main` before `sub1` before `sub2` inside it. Everything that
+ * parses these names therefore anchors on the START of the string. The old
+ * tail-anchored scheme (`대박이-5.2kg-main-260819-144204.mp4`) is not read at
+ * all — that data was dropped rather than migrated.
+ *
+ * The backend's copy of these rules lives in `back/src/naming.js`. A change to
+ * one has to land in the same release as the other.
  */
 
 import type { StoredCsvFile, StoredVideoFile } from "../api/storedFilesApi.js";
@@ -97,13 +100,16 @@ export function videoBaseName(opts: {
   const role = opts.role === "sub" ? `sub${opts.subIndex ?? 1}` : "main";
   const stamp = opts.stamp ?? stampFrom(opts.when);
   const prefix = dogPrefix(opts.dog);
-  return prefix ? `${prefix}-${role}-${stamp}` : `${role}-${stamp}`;
+  return prefix ? `${stamp}-${role}-${prefix}` : `${stamp}-${role}`;
 }
 
 /**
  * Pressure CSV filename.
  *
- * There is only ever one mat, so the CSV carries no capture role.
+ * There is only ever one mat, so the CSV carries no capture role. The `.csv`
+ * extension already says what kind of file this is, so there is no prefix —
+ * which makes the name exactly `taskName + ".csv"` whether or not the dog is
+ * known.
  */
 export function pressureCsvName(opts: {
   dog: DogIdentity;
@@ -112,7 +118,7 @@ export function pressureCsvName(opts: {
 }): string {
   const stamp = opts.stamp ?? stampFrom(opts.when);
   const prefix = dogPrefix(opts.dog);
-  return prefix ? `${prefix}-${stamp}.csv` : `pressure-${stamp}.csv`;
+  return prefix ? `${stamp}-${prefix}.csv` : `${stamp}.csv`;
 }
 
 export interface ParsedCaptureName {
@@ -120,28 +126,26 @@ export interface ParsedCaptureName {
   /** 1-based sub-camera number, or null for the main camera. */
   subIndex: number | null;
   stamp: string;
-  /** The dog prefix as stored, or an empty string on a legacy name. */
+  /** The dog part as stored, or an empty string when the dog was unknown. */
   dog: string;
 }
 
 /**
  * Pull the role and stamp back out of a filename.
  *
- * Anchored on the tail so it reads both the legacy `main-260819-144204.mp4` and
- * the current `대박이-5.2kg-main-260819-144204.mp4`.
+ * Anchored on the start of the string, where the stamp now lives. The trailing
+ * `-2` the backend appends on a name collision is not part of the dog.
  */
 export function parseCaptureName(filename: string): ParsedCaptureName | null {
-  const match = /(?:^|-)(main|sub(\d+))-(\d{6}-\d{6})(?:-\d+)?(?:\.[^.]+)?$/.exec(filename);
+  const match =
+    /^(\d{6}-\d{6})-(main|sub(\d+))(?:-(.*?))??(?:-\d+)?(?:\.[^.]+)?$/.exec(filename);
   if (!match) return null;
-  const [, roleToken, subDigits, stamp] = match;
-  // match.index points at the separator before the role, so everything before
-  // it is the dog prefix (empty for a legacy name).
-  const dog = match.index > 0 ? filename.slice(0, match.index) : "";
+  const [, stamp, roleToken, subDigits, dog] = match;
   return {
     role: roleToken.startsWith("sub") ? "sub" : "main",
     subIndex: subDigits ? Number(subDigits) : null,
     stamp,
-    dog,
+    dog: dog ?? "",
   };
 }
 
@@ -182,30 +186,19 @@ export function parseStamp(stamp: string): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-/**
- * 개명 이전 CSV 이름. `pressure-20260818-131402-danbi-7e35bfeb.csv`
- *
- * 서버에 쌓인 CSV 의 대부분(2026-08 기준 272개 중 225개)이 아직 이 모양이다.
- * 안 읽으면 그 촬영들이 이 화면에서 통째로 사라진다.
- */
-const LEGACY_CSV_RE = /^pressure-\d{2}(\d{6})-(\d{6})-(.+)-[0-9a-f]{8}\.csv$/i;
-
-/** CSV 파일명의 도장. 현행 `제니-9.8kg-260820-150920.csv` 와 개명 이전 이름 둘 다 읽는다. */
+/** CSV 파일명의 도장. `260820-150920-제니-9.8kg.csv` → `260820-150920`. */
 export function csvStamp(name: string): string | null {
-  const tail = /(?:^|-)(\d{6}-\d{6})\.csv$/i.exec(name);
-  if (tail) return tail[1];
-  // 개명 이전 이름은 `20260818` 처럼 네 자리 연도라 앞 두 자리를 떼어 `260818` 로 맞춘다.
-  const legacy = LEGACY_CSV_RE.exec(name);
-  return legacy ? `${legacy[1]}-${legacy[2]}` : null;
+  const m = /^(\d{6}-\d{6})(?:-.*)?\.csv$/i.exec(name);
+  return m ? m[1] : null;
 }
 
-/** 도장 앞의 개 이름 부분. `제니-9.8kg-260820-150920.csv` → `제니-9.8kg`. */
+/** 도장 뒤의 개 이름 부분. `260820-150920-제니-9.8kg.csv` → `제니-9.8kg`. */
 export function csvDog(name: string, stamp: string): string {
-  const legacy = LEGACY_CSV_RE.exec(name);
-  // 개명 이전 이름의 `dog` 는 이름을 모를 때 넣던 자리표시자다.
-  if (legacy) return legacy[3] === "dog" ? "" : legacy[3];
-  const head = name.slice(0, name.length - `-${stamp}.csv`.length);
-  return head === "pressure" ? "" : head;
+  // 충돌 회피본(`…-2.csv`)의 꼬리는 개 이름이 아니다 — `parseCaptureName` 과 같은 규칙.
+  return name
+    .slice(stamp.length, name.length - ".csv".length)
+    .replace(/-\d+$/, "")
+    .replace(/^-/, "");
 }
 
 /** main → sub1 → sub2 … 순서. 못 읽으면 맨 뒤. */
@@ -242,7 +235,7 @@ export function groupSessions(
     if (!parsed) continue;
     const s = ensure(parsed.stamp);
     s.videos.push(row);
-    if (!s.dog && parsed.dog) s.dog = parsed.dog.replace(/-$/, "");
+    if (!s.dog && parsed.dog) s.dog = parsed.dog;
   }
 
   for (const s of byStamp.values()) {
@@ -270,5 +263,5 @@ export function ungroupedFiles(
 
 /** zip 폴더명이자 태스크의 표시 이름. 개 이름이 없으면 도장만. */
 export function taskName(session: CaptureSession): string {
-  return session.dog ? `${session.dog}-${session.stamp}` : session.stamp;
+  return session.dog ? `${session.stamp}-${session.dog}` : session.stamp;
 }

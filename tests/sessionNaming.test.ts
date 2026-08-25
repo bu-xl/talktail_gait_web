@@ -17,17 +17,17 @@ const STAMP = "260819-144204";
 test("the documented example round-trips exactly", () => {
   assert.equal(
     videoBaseName({ dog: DOG, role: "main", stamp: STAMP }),
-    "대박이-5.2kg-main-260819-144204",
+    "260819-144204-main-대박이-5.2kg",
   );
   assert.equal(
     videoBaseName({ dog: DOG, role: "sub", subIndex: 1, stamp: STAMP }),
-    "대박이-5.2kg-sub1-260819-144204",
+    "260819-144204-sub1-대박이-5.2kg",
   );
   assert.equal(
     videoBaseName({ dog: DOG, role: "sub", subIndex: 2, stamp: STAMP }),
-    "대박이-5.2kg-sub2-260819-144204",
+    "260819-144204-sub2-대박이-5.2kg",
   );
-  assert.equal(pressureCsvName({ dog: DOG, stamp: STAMP }), "대박이-5.2kg-260819-144204.csv");
+  assert.equal(pressureCsvName({ dog: DOG, stamp: STAMP }), "260819-144204-대박이-5.2kg.csv");
 });
 
 test("weight drops trailing zeros but keeps real decimals", () => {
@@ -59,7 +59,7 @@ test("names that would break a filesystem are cleaned, not rejected", () => {
 test("hyphens are stripped from names so the separator stays unambiguous", () => {
   assert.equal(sanitizeDogName("대-박-이"), "대박이");
   const base = videoBaseName({ dog: { name: "대-박-이", weightKg: 5.2 }, role: "main", stamp: STAMP });
-  assert.equal(base, "대박이-5.2kg-main-260819-144204");
+  assert.equal(base, "260819-144204-main-대박이-5.2kg");
   assert.deepEqual(parseCaptureName(`${base}.mp4`), {
     role: "main",
     subIndex: null,
@@ -68,18 +68,18 @@ test("hyphens are stripped from names so the separator stays unambiguous", () =>
   });
 });
 
-test("an unnamed dog falls back to the legacy name", () => {
+test("an unnamed dog is simply left out of the name", () => {
   assert.equal(sanitizeDogName(""), "");
   assert.equal(sanitizeDogName(null), "");
   assert.equal(sanitizeDogName("///"), "");
   assert.equal(dogPrefix({ name: null, weightKg: 5.2 }), "");
   assert.equal(
     videoBaseName({ dog: { name: null, weightKg: 5.2 }, role: "main", stamp: STAMP }),
-    "main-260819-144204",
+    "260819-144204-main",
   );
   assert.equal(
     pressureCsvName({ dog: { name: "", weightKg: null }, stamp: STAMP }),
-    "pressure-260819-144204.csv",
+    "260819-144204.csv",
   );
 });
 
@@ -94,16 +94,14 @@ test("the stamp matches the backend's YYMMDD-HHMMSS", () => {
   assert.match(stampFrom(), /^\d{6}-\d{6}$/);
 });
 
-test("parseCaptureName still reads legacy filenames", () => {
-  // This is what protects the backend: its file matching anchors on this tail,
-  // so files written before the rename keep resolving.
-  assert.deepEqual(parseCaptureName("main-260812-143022.mp4"), {
+test("parseCaptureName reads a capture with no dog on it", () => {
+  assert.deepEqual(parseCaptureName("260812-143022-main.mp4"), {
     role: "main",
     subIndex: null,
     stamp: "260812-143022",
     dog: "",
   });
-  assert.deepEqual(parseCaptureName("sub2-260812-143022.mp4"), {
+  assert.deepEqual(parseCaptureName("260812-143022-sub2.mp4"), {
     role: "sub",
     subIndex: 2,
     stamp: "260812-143022",
@@ -112,13 +110,13 @@ test("parseCaptureName still reads legacy filenames", () => {
 });
 
 test("parseCaptureName handles the collision suffix the backend appends", () => {
-  assert.deepEqual(parseCaptureName("대박이-5.2kg-main-260819-144204-2.mp4"), {
+  assert.deepEqual(parseCaptureName("260819-144204-main-대박이-5.2kg-2.mp4"), {
     role: "main",
     subIndex: null,
     stamp: "260819-144204",
     dog: "대박이-5.2kg",
   });
-  assert.deepEqual(parseCaptureName("main-260812-143022-3.mp4"), {
+  assert.deepEqual(parseCaptureName("260812-143022-main-3.mp4"), {
     role: "main",
     subIndex: null,
     stamp: "260812-143022",
@@ -129,16 +127,16 @@ test("parseCaptureName handles the collision suffix the backend appends", () => 
 test("parseCaptureName rejects names that are not capture files", () => {
   assert.equal(parseCaptureName("notes.txt"), null);
   assert.equal(parseCaptureName("main.mp4"), null, "no stamp");
-  assert.equal(parseCaptureName("main-2608-1430.mp4"), null, "malformed stamp");
+  assert.equal(parseCaptureName("2608-1430-main.mp4"), null, "malformed stamp");
   assert.equal(parseCaptureName(""), null);
 });
 
 test("a dog literally named main or sub does not confuse the parser", () => {
   const base = videoBaseName({ dog: { name: "main", weightKg: 4 }, role: "sub", subIndex: 1, stamp: STAMP });
-  assert.equal(base, "main-4kg-sub1-260819-144204");
+  assert.equal(base, "260819-144204-sub1-main-4kg");
   const parsed = parseCaptureName(`${base}.mp4`);
   assert.ok(parsed);
-  assert.equal(parsed.role, "sub", "the trailing role wins, not the name");
+  assert.equal(parsed.role, "sub", "the role right after the stamp wins, not the name");
   assert.equal(parsed.subIndex, 1);
   assert.equal(parsed.dog, "main-4kg");
 });

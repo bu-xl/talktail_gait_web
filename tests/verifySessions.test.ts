@@ -15,11 +15,11 @@ const vid = (name: string, role: "main" | "sub") => ({
 
 test("한 촬영의 CSV 와 영상이 도장 하나로 묶인다", () => {
   const sessions = groupSessions(
-    [csv("제니-9.8kg-260820-150920.csv")],
+    [csv("260820-150920-제니-9.8kg.csv")],
     [
-      vid("제니-9.8kg-sub3-260820-150920.mp4", "sub"),
-      vid("제니-9.8kg-main-260820-150920.mp4", "main"),
-      vid("제니-9.8kg-sub1-260820-150920.mp4", "sub"),
+      vid("260820-150920-sub3-제니-9.8kg.mp4", "sub"),
+      vid("260820-150920-main-제니-9.8kg.mp4", "main"),
+      vid("260820-150920-sub1-제니-9.8kg.mp4", "sub"),
     ],
   );
   assert.equal(sessions.length, 1);
@@ -38,8 +38,8 @@ test("한 촬영의 CSV 와 영상이 도장 하나로 묶인다", () => {
 
 test("도장이 다르면 다른 촬영이고, 최신이 앞에 온다", () => {
   const sessions = groupSessions(
-    [csv("제니-9.8kg-260820-150920.csv"), csv("제니-9.8kg-260820-151530.csv")],
-    [vid("제니-9.8kg-main-260820-150920.mp4", "main")],
+    [csv("260820-150920-제니-9.8kg.csv"), csv("260820-151530-제니-9.8kg.csv")],
+    [vid("260820-150920-main-제니-9.8kg.mp4", "main")],
   );
   assert.deepEqual(
     sessions.map((s) => s.stamp),
@@ -48,14 +48,14 @@ test("도장이 다르면 다른 촬영이고, 최신이 앞에 온다", () => {
 });
 
 test("CSV 만 있거나 영상만 있는 촬영도 목록에 남는다", () => {
-  const sessions = groupSessions([csv("pressure-260820-140000.csv")], [
-    vid("main-260820-130000.mp4", "main"),
+  const sessions = groupSessions([csv("260820-140000.csv")], [
+    vid("260820-130000-main.mp4", "main"),
   ]);
   assert.equal(sessions.length, 2);
   const onlyCsv = sessions.find((s) => s.stamp === "260820-140000");
   assert.ok(onlyCsv?.csv);
   assert.equal(onlyCsv?.videos.length, 0);
-  assert.equal(onlyCsv?.dog, "", "pressure- 접두사는 개 이름이 아니다");
+  assert.equal(onlyCsv?.dog, "", "신원을 모르면 도장만 남는다");
   const onlyVideo = sessions.find((s) => s.stamp === "260820-130000");
   assert.equal(onlyVideo?.csv, null);
   assert.equal(onlyVideo?.videos.length, 1);
@@ -88,23 +88,21 @@ test("fetchCsvSpan 은 앞뒤 조각만 받아 길이를 계산한다", async ()
   }
 });
 
-test("개명 이전 CSV 이름도 같은 도장으로 읽는다", () => {
-  // 서버 CSV 의 대부분이 아직 이 이름이다. 못 읽으면 화면에서 통째로 사라진다.
+test("충돌 회피 접미사가 붙어도 같은 촬영으로 묶인다", () => {
   const sessions = groupSessions(
-    [csv("pressure-20260817-165803-danbi-7e35bfeb.csv"), csv("pressure-20260818-131402-dog-0b806187.csv")],
-    [vid("danbi-main-260817-165803.mp4", "main")],
+    [csv("260817-165803-danbi-2.csv")],
+    [vid("260817-165803-main-danbi.mp4", "main")],
   );
-  const joined = sessions.find((s) => s.stamp === "260817-165803");
-  assert.ok(joined?.csv, "네 자리 연도를 두 자리로 맞춰 영상과 묶여야 한다");
-  assert.equal(joined?.videos.length, 1);
-  assert.equal(joined?.dog, "danbi");
-  const placeholder = sessions.find((s) => s.stamp === "260818-131402");
-  assert.equal(placeholder?.dog, "", "`dog` 는 이름이 아니라 자리표시자다");
+  assert.equal(sessions.length, 1);
+  const s = sessions[0];
+  assert.ok(s.csv);
+  assert.equal(s.videos.length, 1);
+  assert.equal(s.dog, "danbi", "`-2` 는 개 이름의 일부가 아니다");
 });
 
 test("도장이 없는 파일은 묶이지 않고 '분류 안 됨' 으로 남는다", () => {
   const loose = ungroupedFiles(
-    [csv("메모.csv"), csv("제니-9.8kg-260820-150920.csv")],
+    [csv("메모.csv"), csv("260820-150920-제니-9.8kg.csv")],
     [vid("옛날영상.mp4", "main")],
   );
   assert.deepEqual(
@@ -114,8 +112,8 @@ test("도장이 없는 파일은 묶이지 않고 '분류 안 됨' 으로 남는
 });
 
 test("태스크명은 zip 폴더명이자 서버가 받는 키다", () => {
-  const [withDog] = groupSessions([csv("제니-9.8kg-260820-150920.csv")], []);
-  const [noDog] = groupSessions([], [vid("main-260820-150920.mp4", "main")]);
-  assert.equal(taskName(withDog), "제니-9.8kg-260820-150920");
+  const [withDog] = groupSessions([csv("260820-150920-제니-9.8kg.csv")], []);
+  const [noDog] = groupSessions([], [vid("260820-150920-main.mp4", "main")]);
+  assert.equal(taskName(withDog), "260820-150920-제니-9.8kg");
   assert.equal(taskName(noDog), "260820-150920");
 });
