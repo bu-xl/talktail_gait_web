@@ -658,7 +658,7 @@
         gap: 10px; padding: 12px;
       }
       /* —— 측정 화면 —— 결과 패널(2·3)은 "완료된 분석"이 소유한다. 여기는 좌 압력패드
-         (라이브) · 우 측정 컨트롤 2단이고, 컨트롤은 스크롤 없이 한 화면에 들어와야 한다. */
+         (라이브) · 우 측정 컨트롤 2단. 카드가 넘치면 오른쪽 열만 스크롤한다. */
       body[data-module="measure"] #wsPane2,
       body[data-module="measure"] #wsPane3 { display: none; }
       /* 압력패드 폭은 원래 3단 배치에서 1열이 잡던 정도로 되돌린다(세로로 긴 실물 비율). */
@@ -673,10 +673,14 @@
       body[data-module="measure"] #stage > .rs-transport { display: none !important; }
 
       #measureControls { display: none; }
-      /* 현장 화면이다 — 손이 가는 순서(연결 → 신원 → 해상도 → 시작)로 위에서 아래로
-         깔고, 가장 자주 누르는 시작/종료가 남는 높이를 전부 먹게 한다. */
+      /* 현장 화면이다 — 손이 가는 순서(패드 → 해상도 → 신원 → 카메라 → 시작).
+         시작 버튼이 잘리지 않게 이 열만 스크롤한다. */
       body[data-module="measure"] #measureControls {
         display: flex; flex-direction: column; gap: 10px; min-height: 0;
+        max-height: 100%;
+        overflow-x: hidden; overflow-y: auto;
+        -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+        padding-right: 4px;
       }
       .mc-card {
         display: flex; flex-direction: column; gap: 10px; min-width: 0;
@@ -716,14 +720,17 @@
 
       /* 촬영 설정 — 라벨과 선택을 한 줄로 */
       .mc-capture { flex-shrink: 0; }
+      .mc-cams { flex-shrink: 0; }
       body[data-module="measure"] .mc-capture .capture-preset {
-        display: grid; grid-template-columns: auto minmax(0, 1fr);
-        align-items: center; gap: 8px 12px; margin: 0;
+        display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0;
       }
       body[data-module="measure"] .mc-capture .capture-preset select {
-        min-height: 42px; font-size: 15px;
+        width: max-content; min-width: 12ch; max-width: 16ch;
+        min-height: 42px; font-size: 15px; padding: 8px 28px 8px 10px;
       }
-      body[data-module="measure"] .mc-capture .capture-preset .pad-hint { grid-column: 1 / -1; }
+      body[data-module="measure"] .mc-capture .capture-preset .pad-hint {
+        flex-basis: 100%;
+      }
 
       /* 시작/종료 — 오른쪽 열을 통째로 쓰는 독립 블록 */
       /* 빠른 입력 — 한 줄에 5장. 현장에서 손가락으로 누르는 카드라 넉넉하게. */
@@ -733,28 +740,28 @@
         font-weight: 700; border-radius: 10px;
       }
       .dp-empty { margin: 0; font-size: 12px; color: var(--muted); }
-      .dp-list { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
-      @media (max-width: 1100px) { .dp-list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+      .dp-list { display: flex; flex-wrap: wrap; gap: 8px; }
       .dp-card {
-        position: relative; display: flex; min-width: 0;
+        position: relative; display: flex; width: 110px; min-width: 0;
         border: 1px solid var(--border); border-radius: 10px; background: var(--surface);
       }
       .dp-card:hover { border-color: var(--border-strong); background: var(--surface-hover); }
       .dp-pick {
         flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;
-        align-items: flex-start; text-align: left; padding: 10px 12px;
+        align-items: center; justify-content: center; text-align: center;
+        padding: 10px 22px 10px 8px;
         background: none; border: none; color: inherit; cursor: pointer;
       }
       .dp-name {
         font-size: 14px; font-weight: 700; max-width: 100%;
-        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center;
       }
       .dp-meta {
         font-size: 11px; color: var(--muted); max-width: 100%;
-        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center;
       }
       .dp-del {
-        flex-shrink: 0; align-self: flex-start; padding: 6px 8px; line-height: 1;
+        position: absolute; top: 2px; right: 2px; padding: 4px 6px; line-height: 1;
         background: none; border: none; color: var(--muted); font-size: 12px; cursor: pointer;
       }
       .dp-del:hover { color: var(--danger); }
@@ -1018,22 +1025,31 @@
         opacity: .4; cursor: not-allowed;
       }
 
-      /* Session status overlay (recording / analyzing) — no live A/V stream */
+      /* Session status overlay — 컨트롤을 가리지 않는 가운데 배지 */
       #sessionOverlay {
-        position: absolute; inset: 12px; z-index: 30;
+        position: absolute; inset: 12px; z-index: 20;
         display: none; align-items: center; justify-content: center;
-        background: rgba(5, 7, 10, 0.92); border: 1px solid var(--border); border-radius: 10px;
+        background: transparent; border: none;
         pointer-events: none;
       }
-      #sessionOverlay.show { display: flex; }
-      .session-overlay-card { text-align: center; color: #fff; padding: 24px; max-width: 420px; }
-      .session-overlay-card .so-title {
-        font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 8px;
+      body[data-module="measure"] #sessionOverlay {
+        /* 오른쪽 측정 컨트롤(시작/종료) 위에 덮이지 않게 패드 열만 쓴다. */
+        right: auto;
+        width: calc((100cqh - 47px) / 2.3014);
       }
-      .session-overlay-card .so-sub { font-size: 13px; color: rgba(255,255,255,.65); line-height: 1.45; margin: 0; }
+      #sessionOverlay.show { display: flex; }
+      .session-overlay-card {
+        text-align: center; color: var(--fg); padding: 14px 22px;
+        background: rgba(255, 251, 248, 0.92); border: 1px solid var(--border);
+        border-radius: 12px; max-width: 280px;
+      }
+      .session-overlay-card .so-title {
+        font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin: 0;
+      }
+      .session-overlay-card .so-sub { display: none; }
       .session-overlay-card .so-pulse {
         width: 10px; height: 10px; border-radius: 50%; background: var(--primary);
-        margin: 0 auto 14px; animation: soPulse 1.1s ease-in-out infinite;
+        margin: 0 auto 10px; animation: soPulse 1.1s ease-in-out infinite;
       }
       @keyframes soPulse {
         0%, 100% { opacity: 1; transform: scale(1); }
@@ -1227,7 +1243,7 @@
       }
       .capture-preset label { font-size: 12px; color: var(--muted); }
       .capture-preset select {
-        width: 100%; box-sizing: border-box; background: var(--surface); color: var(--fg);
+        width: auto; min-width: 11.5em; box-sizing: border-box; background: var(--surface); color: var(--fg);
         border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font: inherit;
       }
       .capture-preset .pad-hint { margin: 0; }
@@ -1330,15 +1346,19 @@
       #syncStatus.wait, #syncHub.wait { color: var(--warning); }
       #syncStatus.off, #syncHub.off { color: var(--muted); }
 
-      /* 연결된 카메라 목록 — 한 줄에 한 대. 상태 점으로 촬영 여부를 본다. */
-      .cam-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
-      .cam-row {
-        display: flex; align-items: center; gap: 8px;
-        padding: 6px 8px; border-radius: 6px; background: var(--surface-2, rgba(255,255,255,.04));
-        font-size: 13px;
+      /* 연결된 카메라 목록 — 작은 카드를 가로로 붙인다. */
+      .cam-list {
+        list-style: none; margin: 8px 0 0; padding: 0;
+        display: flex; flex-wrap: wrap; gap: 6px;
       }
-      .cam-slot { font-weight: 700; min-width: 64px; }
-      .cam-state { margin-left: auto; }
+      .cam-row {
+        display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+        min-width: 88px; max-width: 148px; padding: 6px 10px;
+        border-radius: 8px; background: var(--surface); border: 1px solid var(--border);
+        font-size: 12px;
+      }
+      .cam-slot { font-weight: 700; min-width: 0; }
+      .cam-state { margin-left: 0; font-size: 11px; line-height: 1.25; color: var(--muted); }
       .cam-row.is-recording .cam-state { color: var(--success); }
       .cam-row.is-idle .cam-state { color: var(--muted); }
       .cam-row.is-warn { outline: 1px solid var(--warning); }
@@ -1624,26 +1644,6 @@
           <p class="pad-hint" data-i18n="pad_connect_hint">USB로 압력 패드를 연결한 뒤 버튼을 누르세요. 연결 후 보정을 권장합니다.</p>
         </section>
 
-        <!--
-          연결된 카메라 — 대수만이 아니라 **지금 찍고 있는지**를 본다.
-          폰이 붙고 빠지는 것은 peer_update 로 실시간 갱신되므로 조회 버튼이 없다.
-          헤더 줄만 늘 보이고, 기기별 상세는 눌러서 편다.
-        -->
-        <section class="mc-card mc-cams">
-          <div class="mc-head">
-            <div class="section" data-i18n="cams_title">연결된 카메라</div>
-            <div class="mc-pad-state">
-              <b id="syncHub" class="off" data-i18n="sync_hub_disconnected">동기화 서버 끊김</b>
-              <b id="syncStatus" class="off">–</b>
-            </div>
-            <div class="mc-pad-btns">
-              <button type="button" id="btnCamList" data-i18n="cams_toggle">기기 보기</button>
-            </div>
-          </div>
-          <ul id="camList" class="cam-list" hidden></ul>
-          <p class="pad-hint" id="camHint" data-i18n="cams_hint">촬영을 시작하면 각 카메라가 실제로 녹화를 시작했는지 여기에 표시됩니다.</p>
-        </section>
-
         <!-- 촬영 설정 -->
         <section class="mc-card mc-capture">
           <div class="capture-preset">
@@ -1687,7 +1687,23 @@
           </div>
         </section>
 
-        <!-- 시작/종료 — 손이 마지막에 가는 자리. 측정 화면의 유일한 주 동작이다. -->
+        <!--
+          연결된 카메라 — 반려견 입력 아래, 시작 버튼 바로 위.
+          폰이 붙고 빠지는 것은 peer_update 로 실시간 갱신된다.
+        -->
+        <section class="mc-card mc-cams">
+          <div class="mc-head">
+            <div class="section" data-i18n="cams_title">연결된 카메라</div>
+            <div class="mc-pad-state">
+              <b id="syncHub" class="off" data-i18n="sync_hub_disconnected">동기화 서버 끊김</b>
+              <b id="syncStatus" class="off">–</b>
+            </div>
+          </div>
+          <ul id="camList" class="cam-list"></ul>
+          <p class="pad-hint" id="camHint" data-i18n="cams_hint">촬영을 시작하면 각 카메라가 실제로 녹화를 시작했는지 여기에 표시됩니다.</p>
+        </section>
+
+        <!-- 시작/종료 — 카메라 카드 바로 아래. -->
         <section class="mc-card mc-start">
           <button type="button" id="btnSession" class="primary" data-i18n="btn_session_start">시작</button>
           <div id="pressureRecStatus" class="rec-status"></div>

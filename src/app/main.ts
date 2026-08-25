@@ -999,16 +999,6 @@ async function boot(): Promise<void> {
    */
   const recordingDevices = new Set<string>();
 
-  // 목록 펼치기. 데이터는 peer_update 로 이미 실시간으로 오므로 이 버튼은 **조회가 아니라
-  // 표시 토글**이다 — 눌러야 갱신되는 게 아니다.
-  onClick("btnCamList", () => {
-    const listEl = $opt("camList");
-    if (!listEl) return;
-    listEl.hidden = !listEl.hidden;
-    const btn = $opt("btnCamList");
-    if (btn) btn.textContent = listEl.hidden ? t("cams_toggle") : t("cams_toggle_hide");
-  });
-
   /** 기기 한 대를 가리키는 키. deviceId 가 정본이고 자리는 폴백이다. */
   const camKey = (deviceId: string | null, role: string, subIndex: number | null): string =>
     deviceId || (role === "main" ? "main" : `sub${subIndex ?? "?"}`);
@@ -1488,6 +1478,10 @@ async function boot(): Promise<void> {
     if (msg.type === "record_started") {
       // 폰이 실제로 찍기 시작했다. 지난 촬영의 표시가 남지 않도록 sync_start 에서 비운다.
       recordingDevices.add(camKey(msg.deviceId, msg.captureRole, msg.subIndex));
+      renderCamList(gaitSync.peers);
+    }
+    if (msg.type === "record_stopped") {
+      recordingDevices.delete(camKey(msg.deviceId, msg.captureRole, msg.subIndex));
       renderCamList(gaitSync.peers);
     }
     if (msg.type === "sync_start") {

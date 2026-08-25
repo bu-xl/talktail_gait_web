@@ -58,6 +58,15 @@ export type SyncMessage =
       serverNow: number;
     }
   | {
+      type: "record_stopped";
+      roomId: string;
+      sessionId: string | null;
+      deviceId: string | null;
+      captureRole: "main" | "sub";
+      subIndex: number | null;
+      serverNow: number;
+    }
+  | {
       type: "capture_settings";
       presetId: string;
       videoQuality: string;
