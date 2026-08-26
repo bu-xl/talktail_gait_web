@@ -998,9 +998,44 @@ async function boot(): Promise<void> {
    */
   const camStates = new Map<string, CamState>();
 
+  /**
+   * 자리별 **실제** 촬영 시작 시각 — `record_started` 가 도착한 순간의 `performance.now()`.
+   *
+   * `cam_state:'recording'` 은 폰의 화면 단계가 바뀔 때 나가므로 녹화 API 가 뜨기 **전**에
+   * 온다. 경과시간의 기준으로 쓰면 실제보다 길게 나온다. 그래서 시작 사실은 폰이 녹화를
+   * 올린 뒤에 보내는 `record_started` 만 믿는다.
+   *
+   * 서버의 `serverNow` 로 시계를 맞추지 않는다 — 소켓 지연은 수십 ms 인데 여기서 보려는
+   * 것은 폰 사이의 초 단위 편차라 보정이 값을 바꾸지 못한다. 필요해지면 `serverNow` 가
+   * 이미 페이로드에 있으므로 그때 갈아탄다.
+   */
+  const camRecStartedAt = new Map<string, number>();
+
   /** 자리 한 칸을 가리키는 키. 목록의 줄과 같은 규칙이어야 한다. */
   const camKey = (role: string, subIndex: number | null): string =>
     role === "main" ? "main" : `sub${subIndex ?? "?"}`;
+
+  const fmtElapsed = (ms: number): string => {
+    const s = Math.max(0, Math.floor(ms / 1000));
+    return s < 60 ? `${s}s` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  };
+
+  /**
+   * 경과시간 갱신 틱 — **폰마다 하나씩 두지 않는다.**
+   *
+   * 폰이 몇 대든 틱은 초당 2회로 고정이고, 시작 시점이 제각각인 것은 줄마다 기준 시각이
+   * 다를 뿐 틱과 무관하다. 찍는 폰이 없으면 아예 돌지 않는다.
+   */
+  let camTickTimer: ReturnType<typeof setInterval> | null = null;
+  const syncCamTick = (): void => {
+    const needed = camRecStartedAt.size > 0;
+    if (needed && camTickTimer == null) {
+      camTickTimer = setInterval(() => renderCamList(gaitSync.peers), 500);
+    } else if (!needed && camTickTimer != null) {
+      clearInterval(camTickTimer);
+      camTickTimer = null;
+    }
+  };
 
   /**
    * 연결된 카메라 목록을 그린다.
@@ -1022,6 +1057,7 @@ async function boot(): Promise<void> {
     const row = (slot: string, key: string | null, warn?: string): void => {
       const li = document.createElement("li");
       const state: CamState = (key != null && camStates.get(key)) || "idle";
+      const startedAt = key != null ? camRecStartedAt.get(key) : undefined;
       const mod = warn ? "is-warn" : state === "recording" ? "is-recording" : state === "uploading" ? "is-uploading" : "is-idle";
       li.className = `cam-row ${mod}`;
       const slotEl = document.createElement("span");
@@ -1029,14 +1065,21 @@ async function boot(): Promise<void> {
       slotEl.textContent = slot;
       const stateEl = document.createElement("span");
       stateEl.className = "cam-state";
+      // 경과시간은 `record_started` 를 받은 줄에만 붙는다. 아직 못 받았으면 초 없이
+      // "촬영 중" 만 — 신호를 놓쳤을 때 대기로 잘못 보이는 것보다 낫다.
+      const base = t(state === "recording" ? "cam_recording" : state === "uploading" ? "cam_uploading" : "cam_idle");
       stateEl.textContent =
-        warn ?? t(state === "recording" ? "cam_recording" : state === "uploading" ? "cam_uploading" : "cam_idle");
+        warn ?? (startedAt != null ? `${base} ${fmtElapsed(performance.now() - startedAt)}` : base);
       li.append(slotEl, stateEl);
       listEl.appendChild(li);
     };
 
     if (hasMain) row("MAIN", "main");
     for (const n of subIndexes) row(`SUB${n}`, `sub${n}`);
+    // 방을 떠난 폰의 타이머는 줄이 사라져도 계속 돈다 — 여기서 같이 걷는다.
+    const live = new Set<string>([...(hasMain ? ["main"] : []), ...subIndexes.map((n) => `sub${n}`)]);
+    for (const key of camRecStartedAt.keys()) if (!live.has(key)) camRecStartedAt.delete(key);
+    syncCamTick();
     // 번호 미지정 폰은 촬영을 하지 않는다(앱이 막는다) — 경고로 표시한다.
     for (let i = 0; i < unnumbered; i += 1) row("SUB ?", null, t("cam_no_slot"));
 
@@ -1478,7 +1521,25 @@ async function boot(): Promise<void> {
     }
     if (msg.type === "cam_state") {
       // 폰이 말하는 상태를 그대로 쓴다 — 사건을 모아 추측하지 않는다.
-      camStates.set(camKey(msg.captureRole, msg.subIndex), msg.state);
+      const key = camKey(msg.captureRole, msg.subIndex);
+      camStates.set(key, msg.state);
+      // 촬영에서 벗어나면 경과시간도 같이 끝난다. `record_stopped` 를 못 받아도
+      // 업로드/대기 전이는 반드시 오므로 타이머가 남지 않는다.
+      if (msg.state !== "recording") camRecStartedAt.delete(key);
+      syncCamTick();
+      renderCamList(gaitSync.peers);
+    }
+    if (msg.type === "record_started") {
+      // "찍고 있다" 의 근거는 이 신호다 — 폰이 녹화를 올린 뒤에 보낸다.
+      const key = camKey(msg.captureRole, msg.subIndex);
+      camStates.set(key, "recording");
+      if (!camRecStartedAt.has(key)) camRecStartedAt.set(key, performance.now());
+      syncCamTick();
+      renderCamList(gaitSync.peers);
+    }
+    if (msg.type === "record_stopped") {
+      camRecStartedAt.delete(camKey(msg.captureRole, msg.subIndex));
+      syncCamTick();
       renderCamList(gaitSync.peers);
     }
     if (msg.type === "sync_start") {
