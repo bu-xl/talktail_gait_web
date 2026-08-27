@@ -24,6 +24,7 @@ import { clockSync } from "../transport/clockSync.js";
 import { loadConfig } from "../core/config.js";
 import { GRID_COLS, GRID_ROWS, aspectHeight } from "../core/constants.js";
 import { checkDogIdentity } from "../core/dogIdentity.js";
+import { camKey, countCamsInState } from "../core/camState.js";
 import { framesToCanineGaitCsv } from "../core/csvExport.js";
 import { dogPrefix, pressureCsvName, stampFrom } from "../core/sessionNaming.js";
 import {
@@ -92,6 +93,7 @@ import { ResultsPage } from "../ui/resultsPage.js";
 import { ReportsPage } from "../ui/reportsPage.js";
 import { UploadPage } from "../ui/uploadPage.js";
 import { FilesPage } from "../ui/filesPage.js";
+import { CsvPage } from "../ui/csvPage.js";
 import { VerifyPage } from "../ui/verifyPage.js";
 import { StoragePage } from "../ui/storagePage.js";
 import {
@@ -320,9 +322,28 @@ function placeholderUrl(file: string): string {
   return `${window.location.origin}/placeholders/${file}`;
 }
 
-type AppModule = "measure" | "results" | "report" | "upload" | "files" | "verify" | "review" | "storage";
+type AppModule =
+  | "measure"
+  | "results"
+  | "report"
+  | "upload"
+  | "files"
+  | "csv"
+  | "verify"
+  | "review"
+  | "storage";
 
-const APP_MODULES: readonly AppModule[] = ["measure", "results", "report", "upload", "files", "verify", "review", "storage"];
+const APP_MODULES: readonly AppModule[] = [
+  "measure",
+  "results",
+  "report",
+  "upload",
+  "files",
+  "csv",
+  "verify",
+  "review",
+  "storage",
+];
 
 /** 헤더 nav 를 연결하고, 코드에서 모듈을 바꿀 수 있는 함수를 돌려준다. */
 const MODULE_STORAGE_KEY = "gait.activeModule";
@@ -459,7 +480,17 @@ async function boot(): Promise<void> {
   /** 재촬영한 job 의 analyze_done 은 웹 리뷰 칸을 채우지 않는다. */
   let ignoreDoneJobId: string | null = null;
   /** 업로드보다 재촬영을 먼저 누른 경우, job 이 생기면 그때 AI 를 건너뛴다. */
-  let retakeRequested = false;
+  /**
+   * 재촬영을 누른 세션.
+   *
+   * 예전엔 불리언 하나였다. 재촬영 뒤 다음 테이크를 찍었는데 이전 테이크의
+   * `upload_started` 가 늦게 오면 플래그를 **새 테이크가 소비**해, 방금 찍은 것이
+   * 취소되는 일이 생길 수 있었다(폰이 여러 대면 도착 순서가 뒤바뀐다).
+   * 세션으로 들고 있으면 취소는 언제나 원래 그 테이크에만 걸린다.
+   */
+  let retakeSessionId: string | null = null;
+  /** 직전 테이크의 세션 — `record_stop` 이 syncSessionId 를 비운 뒤에도 남아야 한다. */
+  let lastTakeSessionId: string | null = null;
 
   const resultsPageEl = $opt("resultsPage");
   const resultsPage = resultsPageEl ? new ResultsPage(resultsPageEl) : null;
@@ -470,6 +501,9 @@ async function boot(): Promise<void> {
   const filesPageEl = $opt("filesPage");
   const filesPage = filesPageEl ? new FilesPage(filesPageEl) : null;
   filesPage?.setApiBase(apiBase);
+  const csvPageEl = $opt("csvPage");
+  const csvPage = csvPageEl ? new CsvPage(csvPageEl) : null;
+  csvPage?.setApiBase(apiBase);
   const verifyPageEl = $opt("verifyPage");
   const verifyPage = verifyPageEl ? new VerifyPage(verifyPageEl) : null;
   verifyPage?.setApiBase(apiBase);
@@ -542,6 +576,8 @@ async function boot(): Promise<void> {
 
   const showConfirmModal = (): void => {
     syncConfirmModal();
+    // 열리는 순간의 상태로 채운다. 이후 갱신은 cam_state 가 renderCamList 로 밀어 넣는다.
+    renderCamList(gaitSync.peers);
     confirmModal.classList.add("open");
     document.body.classList.add("modal-open");
   };
@@ -655,7 +691,7 @@ async function boot(): Promise<void> {
       return;
     }
     confirmBusy = true;
-    retakeRequested = false;
+    retakeSessionId = null;
     syncConfirmModal();
     void confirmAnalyzeJob(apiBase, jobId)
       .then((resp) => {
@@ -686,6 +722,7 @@ async function boot(): Promise<void> {
   const finishRetakeUi = (): void => {
     pendingAnalyzeJob = null;
     clinicSessionActive = false;
+    retakeSessionId = null;
     cameraPlayer.setLoading(false);
     hideConfirmModal();
     clearReviewPanes();
@@ -703,7 +740,9 @@ async function boot(): Promise<void> {
     if (confirmBusy) return;
     const jobId = pendingAnalyzeJob;
     confirmBusy = true;
-    retakeRequested = true;
+    retakeSessionId = lastTakeSessionId;
+    // 폰에 먼저 알린다 — jobId 를 기다리면 그동안 버릴 영상이 계속 올라간다.
+    if (gaitSync.connected) gaitSync.requestRetake(lastTakeSessionId);
     syncConfirmModal();
     if (!jobId) {
       finishRetakeUi();
@@ -720,8 +759,34 @@ async function boot(): Promise<void> {
       });
   };
 
+  /**
+   * 재촬영 클릭 — 카메라 상태에 따라 한 번 되묻는다.
+   *
+   * 재촬영 자체를 **막지는 않는다.** 이건 "이번 판을 버린다"는 탈출구라, 폰 하나가
+   * 응답을 잃었을 때 잠가 버리면 분석하기(업로드 대기로 이미 잠김)와 함께 모달에
+   * 갇힌다. 대신 지금 무슨 일이 벌어지는지 알리고 사용자가 정하게 한다.
+   */
+  const onRetakeClick = (): void => {
+    if (confirmBusy) return;
+    const peers = gaitSync.peers;
+
+    // 아직 찍고 있는 폰 — 종료가 씹힌 경우다. 재촬영보다 종료 재전송이 먼저다.
+    const recording = camsInState("recording", peers);
+    if (recording > 0) {
+      if (!window.confirm(t("retake_confirm_recording", { n: recording }))) return;
+      if (gaitSync.connected) gaitSync.stopRecord(lastTakeSessionId);
+      setSyncStatus(t("retake_stop_sent"), "wait");
+      // 모달은 그대로 둔다 — 상태 줄이 대기/업로드로 바뀌는 것을 보고 다시 누르면 된다.
+      return;
+    }
+
+    const uploading = camsInState("uploading", peers);
+    if (uploading > 0 && !window.confirm(t("retake_confirm_uploading", { n: uploading }))) return;
+    onCancelAnalyze();
+  };
+
   confirmAnalyzeBtn.addEventListener("click", () => onConfirmAnalyze());
-  confirmCancelBtn.addEventListener("click", () => onCancelAnalyze());
+  confirmCancelBtn.addEventListener("click", () => onRetakeClick());
 
 
   /**
@@ -924,6 +989,8 @@ async function boot(): Promise<void> {
       else uploadPage?.hide();
       if (mod === "files") filesPage?.show();
       else filesPage?.hide();
+      if (mod === "csv") csvPage?.show();
+      else csvPage?.hide();
       if (mod === "verify") verifyPage?.show();
       else verifyPage?.hide();
       if (mod === "storage") storagePage?.show();
@@ -1012,8 +1079,6 @@ async function boot(): Promise<void> {
   const camRecStartedAt = new Map<string, number>();
 
   /** 자리 한 칸을 가리키는 키. 목록의 줄과 같은 규칙이어야 한다. */
-  const camKey = (role: string, subIndex: number | null): string =>
-    role === "main" ? "main" : `sub${subIndex ?? "?"}`;
 
   const fmtElapsed = (ms: number): string => {
     const s = Math.max(0, Math.floor(ms / 1000));
@@ -1091,7 +1156,17 @@ async function boot(): Promise<void> {
     }
     // 힌트는 아직 아무 카메라도 안 붙었을 때만 쓸모가 있다.
     if (hintEl) hintEl.hidden = hasMain || subIndexes.length > 0 || unnumbered > 0;
+
+    // 확인 모달에도 같은 줄을 띄운다. 모달 딤 뒤의 사이드바는 읽히지 않는데,
+    // 재촬영을 누를지 판단하려면 바로 이 상태가 필요하다. 두 번 그리지 않고 복제한다.
+    const modalListEl = $opt("confirmCamList");
+    if (modalListEl) {
+      modalListEl.replaceChildren(...[...listEl.children].map((node) => node.cloneNode(true)));
+    }
   };
+
+  const camsInState = (state: CamState, peers?: SyncPeers): number =>
+    countCamsInState(camStates, peers, state);
 
   const renderSyncedMatFrame = (raw: import("../core/types.js").Matrix): void => {
     const processed = pipeline.process(raw);
@@ -1545,6 +1620,7 @@ async function boot(): Promise<void> {
     if (msg.type === "sync_start") {
       syncRecordPending = false;
       syncSessionId = msg.sessionId;
+      lastTakeSessionId = msg.sessionId;
       syncDock.hide();
       syncPlaybackActive = false;
       clearReviewPanes();
@@ -1557,6 +1633,7 @@ async function boot(): Promise<void> {
     if (msg.type === "record_stop") {
       syncRecordPending = false;
       if (recorder.isRecording) stopLocalRecording();
+      lastTakeSessionId = msg.sessionId ?? syncSessionId ?? lastTakeSessionId;
       syncSessionId = null;
       if (clinicSessionActive || sessionPhase === "recording") {
         setSessionPhase("confirm");
@@ -1566,8 +1643,9 @@ async function boot(): Promise<void> {
     if (msg.type === "upload_started") {
       pendingAnalyzeJob = msg.jobId;
       cameraPlayer.setLoading(false);
-      if (retakeRequested) {
-        retakeRequested = false;
+      // 취소는 **재촬영을 누른 그 테이크**에만 건다. 세션이 다르면 새로 찍은 것이다.
+      if (retakeSessionId && (!msg.sessionId || msg.sessionId === retakeSessionId)) {
+        retakeSessionId = null;
         void skipAiForJob(msg.jobId)
           .catch((err) => {
             setSyncStatus(err instanceof Error ? err.message : String(err), "bad");
@@ -1664,7 +1742,7 @@ async function boot(): Promise<void> {
       return;
     }
     clinicSessionActive = true;
-    retakeRequested = false;
+    retakeSessionId = null;
     ignoreDoneJobId = null;
     pendingAnalyzeJob = null;
     clearReviewPanes();
@@ -1680,10 +1758,11 @@ async function boot(): Promise<void> {
     if (gaitSync.connected && gaitSync.peers.mobile) {
       gaitSync.stopRecord(syncSessionId);
     }
+    lastTakeSessionId = syncSessionId ?? lastTakeSessionId;
     syncSessionId = null;
     syncRecordPending = false;
     pendingAnalyzeJob = null;
-    retakeRequested = false;
+    retakeSessionId = null;
     setSessionPhase("confirm");
     setSyncStatus(t("confirm_analyze_waiting_upload"), "wait");
     updateSyncUi(gaitSync.peers, gaitSync.connected);

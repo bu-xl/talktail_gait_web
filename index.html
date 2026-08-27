@@ -123,6 +123,7 @@
       body[data-module="report"] #appBody,
       body[data-module="upload"] #appBody,
       body[data-module="files"] #appBody,
+      body[data-module="csv"] #appBody,
       body[data-module="verify"] #appBody,
       body[data-module="storage"] #appBody { display: none !important; }
 
@@ -493,6 +494,16 @@
         background: var(--bg); overflow: hidden;
       }
       body[data-module="report"] #reportPage { display: flex; }
+      #csvPage {
+        flex: 1; min-height: 0; display: none; flex-direction: column;
+        background: var(--bg); overflow: hidden;
+      }
+      body[data-module="csv"] #csvPage { display: flex; }
+      /* 태스크 안이 아니라 평면 목록이라 왼쪽 들여쓰기를 걷어낸다. */
+      #cdList .fd-file {
+        padding: 10px 16px; background: var(--surface);
+        border: 1px solid var(--border); border-radius: 10px; margin-bottom: 6px;
+      }
       #rlList .fd-file { padding: 10px 12px; }
       .fd-toolbar-extra {
         display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end;
@@ -1077,6 +1088,13 @@
       #confirmAnalyzeModal .dialog-head p {
         margin: 0; font-size: 13px; color: var(--muted); line-height: 1.45;
       }
+      #confirmAnalyzeModal .dialog-body {
+        padding: 12px 18px; border-bottom: 1px solid var(--divider);
+      }
+      #confirmAnalyzeModal .dialog-body .cam-list { margin-top: 6px; }
+      /* 모달 안에서는 이게 판단 근거다 — 사이드바 카드보다 크게 읽히게 한다. */
+      #confirmAnalyzeModal .cam-row { min-width: 104px; font-size: 13px; padding: 8px 12px; }
+      #confirmAnalyzeModal .cam-state { font-size: 12px; }
       #confirmAnalyzeModal .dialog-foot {
         display: flex; gap: 8px; justify-content: flex-end;
         padding: 12px 18px;
@@ -1491,6 +1509,7 @@
               <summary data-i18n-title="nav_more" title="더보기" aria-label="더보기">≡</summary>
               <div class="ah-menu-list">
                 <button type="button" data-module="files" data-i18n="nav_files">파일 다운</button>
+              <button type="button" data-module="csv" data-i18n="nav_csv">CSV 다운</button>
                 <button type="button" data-module="upload" data-i18n="nav_upload">직접 분석</button>
                 <button type="button" data-module="report" data-i18n="nav_report">리포트</button>
                 <button type="button" data-module="storage" data-i18n="nav_storage">서버 조회</button>
@@ -1885,6 +1904,36 @@
       </div>
     </section>
 
+    <section id="csvPage" hidden aria-label="CSV download">
+      <div class="rp-toolbar">
+        <div class="rp-toolbar-text">
+          <h1 id="cdTitle" data-i18n="csv_page_title">CSV 다운</h1>
+          <p id="cdSub" data-i18n="csv_page_sub">기간을 정해 압력 CSV 만 골라 한 번에 받습니다.</p>
+        </div>
+        <div class="fd-toolbar-extra">
+          <input id="cdSearch" type="search" autocomplete="off" data-i18n-title="files_search_placeholder" placeholder="반려견 이름·파일명 검색" />
+          <input id="cdFrom" type="date" data-i18n-title="files_date_from" title="시작 날짜" />
+          <span class="fd-date-sep">~</span>
+          <input id="cdTo" type="date" data-i18n-title="files_date_to" title="끝 날짜" />
+          <button type="button" id="cdRefresh" data-i18n="btn_results_refresh">새로고침</button>
+        </div>
+      </div>
+      <p id="cdStatus" class="fd-status"></p>
+      <div class="fd-actions">
+        <label class="fd-selectall">
+          <input type="checkbox" id="cdAll" />
+          <span id="cdAllLabel" data-i18n="files_select_all">모두 선택</span>
+        </label>
+        <span id="cdCount" class="fd-col-count"></span>
+        <span id="cdSel" class="fd-sel"></span>
+        <button type="button" id="cdZip" class="fd-zip" disabled data-i18n="csv_zip_button">선택 CSV ZIP 받기</button>
+      </div>
+      <div class="fd-scroll">
+        <p id="cdEmpty" class="fd-empty" data-i18n="csv_empty">해당 기간의 CSV 가 없습니다.</p>
+        <ul id="cdList" class="fd-list"></ul>
+      </div>
+    </section>
+
     <section id="reportPage" hidden aria-label="Reports">
       <div class="rp-toolbar">
         <div class="rp-toolbar-text">
@@ -2159,6 +2208,14 @@
         <div class="dialog-head">
           <h2 id="confirmAnalyzeTitle" data-i18n="confirm_analyze_title">이 촬영을 분석할까요?</h2>
           <p id="confirmAnalyzeHint" data-i18n="confirm_analyze_hint">분석하기를 누르면 AI 서버로 보냅니다. 재촬영을 누르면 분석을 건너뜁니다.</p>
+        </div>
+        <!--
+          카메라 상태 — 딤 뒤의 목록은 읽히지 않는다. 판단에 필요한 정보를 판단하는 자리에 둔다.
+          내용은 measure 화면의 #camList 를 그대로 복제한다(renderCamList).
+        -->
+        <div class="dialog-body">
+          <div class="section" id="confirmCamHeading" data-i18n="confirm_cams_heading">카메라 상태</div>
+          <ul id="confirmCamList" class="cam-list"></ul>
         </div>
         <div class="dialog-foot">
           <button type="button" id="confirmCancelBtn" data-i18n="confirm_analyze_no">재촬영</button>

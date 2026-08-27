@@ -475,7 +475,7 @@ export function localDay(iso: string): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
-function formatWhen(iso: string): string {
+export function formatWhen(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   const p = (n: number): string => String(n).padStart(2, "0");

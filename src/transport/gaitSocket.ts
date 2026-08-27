@@ -45,7 +45,8 @@ export type SyncMessage =
       syncLeadMs: number;
       captureSettings?: CaptureSettingsPayload | null;
     }
-  | { type: "record_stop"; roomId: string; sessionId: string | null; from: string; serverNow: number }
+  | { type: "record_stop"; roomId: string; sessionId: string | null; from: string; serverNow: number; retry?: boolean }
+  | { type: "retake"; roomId: string; sessionId: string | null; serverNow: number }
   /**
    * 폰이 **실제로** 녹화를 시작했다. `sync_start` 는 지시일 뿐이고 폰마다 카메라를 올리는
    * 시간이 달라, 이 신호가 있어야 "몇 대 중 몇 대가 찍고 있나" 를 웹에서 알 수 있다.
@@ -244,6 +245,18 @@ export class GaitSyncSocket {
   stopRecord(sessionId?: string | null): void {
     if (this.isViewer) return;
     this.send({ type: "record_stop", sessionId: sessionId ?? null });
+  }
+
+  /**
+   * 재촬영 — 방금 찍은 것을 버린다고 폰에 알린다.
+   *
+   * HTTP 취소(`DELETE /api/analyze/:jobId`)는 업로드가 끝나 jobId 가 생긴 뒤에만 쓸 수
+   * 있다. 그런데 재촬영을 누르는 시점은 대개 업로드 중이고, 그동안 폰은 버릴 영상을
+   * 끝까지 올리느라 다음 촬영을 못 받는다. 이 신호가 그 대기를 없앤다.
+   */
+  requestRetake(sessionId?: string | null): void {
+    if (this.isViewer) return;
+    this.send({ type: "retake", sessionId: sessionId ?? null });
   }
 
   private open(): void {
