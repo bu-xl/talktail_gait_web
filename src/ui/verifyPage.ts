@@ -20,6 +20,7 @@ import {
   deleteStoredFiles,
   fetchCsvSpan,
   listStoredFiles,
+  setStampDiscarded,
   storedFileUrl,
   type CsvSpan,
   type StoredCsvFile,
@@ -68,7 +69,16 @@ export class VerifyPage {
   private pendingDelete: Session | null = null;
   private deleting = false;
 
+  private readonly tabLiveBtn: HTMLButtonElement;
+  private readonly tabDiscardedBtn: HTMLButtonElement;
+  private readonly purgeBtn: HTMLButtonElement;
+
   private apiBase = "";
+  /** 서버가 준 전체 목록. 화면에는 탭으로 걸러 낸 것만 보인다. */
+  private allSessions: Session[] = [];
+  /** 버려진 촬영의 도장. 소프트 삭제라 파일은 그대로 있고 표시만 다르다. */
+  private discarded = new Set<string>();
+  private tab: "live" | "discarded" = "live";
   private sessions: Session[] = [];
   private selected: string | null = null;
   private loading = false;
@@ -90,6 +100,13 @@ export class VerifyPage {
     this.modalListEl = root.querySelector("#dvDelList") as HTMLElement;
     this.modalCancelBtn = root.querySelector("#dvDelCancel") as HTMLButtonElement;
     this.modalConfirmBtn = root.querySelector("#dvDelConfirm") as HTMLButtonElement;
+
+    this.tabLiveBtn = root.querySelector("#dvTabLive") as HTMLButtonElement;
+    this.tabDiscardedBtn = root.querySelector("#dvTabDiscarded") as HTMLButtonElement;
+    this.purgeBtn = root.querySelector("#dvPurge") as HTMLButtonElement;
+    this.tabLiveBtn.addEventListener("click", () => this.setTab("live"));
+    this.tabDiscardedBtn.addEventListener("click", () => this.setTab("discarded"));
+    this.purgeBtn.addEventListener("click", () => void this.purgeDiscarded());
 
     this.refreshBtn.addEventListener("click", () => void this.reload());
     this.modalCancelBtn.addEventListener("click", () => this.closeDeleteModal());
@@ -124,7 +141,6 @@ export class VerifyPage {
   private syncCopy(): void {
     this.subEl.textContent = t("verify_page_sub");
     this.refreshBtn.textContent = t("btn_results_refresh");
-    this.emptyEl.textContent = t("verify_empty");
     this.render();
   }
 
@@ -140,7 +156,9 @@ export class VerifyPage {
     this.setStatus(t("files_loading"));
     try {
       const list = await listStoredFiles(this.apiBase);
-      this.sessions = groupSessions(list.csv, list.videos);
+      this.allSessions = groupSessions(list.csv, list.videos);
+      this.discarded = new Set(list.discarded);
+      this.applyTab();
       this.spans.clear();
       if (this.selected && !this.sessions.some((s) => s.stamp === this.selected)) this.selected = null;
       if (!this.selected && this.sessions.length > 0) this.selected = this.sessions[0].stamp;
@@ -155,7 +173,78 @@ export class VerifyPage {
     }
   }
 
+  /** 탭을 바꾼다 — 목록만 갈린다(서버를 다시 부르지 않는다). */
+  private setTab(tab: "live" | "discarded"): void {
+    if (this.tab === tab) return;
+    this.tab = tab;
+    this.selected = null;
+    this.applyTab();
+    this.render();
+  }
+
+  private applyTab(): void {
+    const wantDiscarded = this.tab === "discarded";
+    this.sessions = this.allSessions.filter((s) => this.discarded.has(s.stamp) === wantDiscarded);
+    if (this.selected && !this.sessions.some((s) => s.stamp === this.selected)) this.selected = null;
+    if (!this.selected && this.sessions.length > 0) this.selected = this.sessions[0].stamp;
+  }
+
+  /** 버린 촬영의 파일을 영구 삭제한다. 되돌릴 수 없으므로 개수를 박아 되묻는다. */
+  private async purgeDiscarded(): Promise<void> {
+    const targets = this.allSessions.filter((s) => this.discarded.has(s.stamp));
+    if (targets.length === 0 || this.deleting) return;
+    if (!window.confirm(t("verify_purge_ask", { n: String(targets.length) }))) return;
+    this.deleting = true;
+    this.purgeBtn.disabled = true;
+    try {
+      let deleted = 0;
+      let failed = 0;
+      // 서버는 한 번에 32개까지 받는다 — 촬영 단위로 끊어 보낸다.
+      for (const s of targets) {
+        const result = await deleteStoredFiles(this.apiBase, {
+          csv: s.csv ? [s.csv.name] : [],
+          videos: s.videos.map((v) => `${"role" in v ? v.role : "main"}/${v.name}`),
+        });
+        deleted += result.deleted.length;
+        failed += result.failed.length;
+        // 파일이 사라졌으면 버림 표시도 같이 걷는다 — 안 걷으면 목록에 유령이 남는다.
+        await setStampDiscarded(this.apiBase, s.stamp, false).catch(() => undefined);
+      }
+      this.deleting = false;
+      await this.reload();
+      this.setStatus(
+        t("verify_purge_done", { n: String(deleted) }) +
+          (failed ? ` ${t("verify_del_failed_n", { n: String(failed) })}` : ""),
+        failed > 0,
+      );
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      this.setStatus(`${t("verify_del_failed")}: ${detail}`, true);
+    } finally {
+      this.deleting = false;
+      this.purgeBtn.disabled = false;
+    }
+  }
+
+  /** 촬영 한 건의 버림 표시를 켜고 끈다. */
+  private async toggleDiscard(s: Session): Promise<void> {
+    const next = !this.discarded.has(s.stamp);
+    try {
+      await setStampDiscarded(this.apiBase, s.stamp, next);
+      if (next) this.discarded.add(s.stamp);
+      else this.discarded.delete(s.stamp);
+      this.applyTab();
+      this.render();
+    } catch (err) {
+      this.setStatus(err instanceof Error ? err.message : String(err), true);
+    }
+  }
+
   private render(): void {
+    this.tabLiveBtn.classList.toggle("is-active", this.tab === "live");
+    this.tabDiscardedBtn.classList.toggle("is-active", this.tab === "discarded");
+    this.purgeBtn.hidden = this.tab !== "discarded" || this.sessions.length === 0;
+    this.emptyEl.textContent = this.tab === "discarded" ? t("verify_discarded_empty") : t("verify_empty");
     this.countEl.textContent = t("verify_count", { n: this.sessions.length });
     this.emptyEl.hidden = this.sessions.length > 0;
     this.listEl.replaceChildren();
@@ -181,6 +270,7 @@ export class VerifyPage {
     btn.type = "button";
     btn.className = "dv-item";
     if (s.stamp === this.selected) btn.classList.add("is-active");
+    if (this.discarded.has(s.stamp)) btn.classList.add("is-discarded");
 
     const time = document.createElement("span");
     time.className = "dv-item-time";
@@ -235,9 +325,15 @@ export class VerifyPage {
     delBtn.className = "dv-del-btn";
     delBtn.textContent = t("verify_del_button");
     delBtn.addEventListener("click", () => this.openDeleteModal(s));
+    // 소프트 삭제 토글 — 현장에서 버린 것을 여기서 되살릴 수 있다.
+    const discardBtn = document.createElement("button");
+    discardBtn.type = "button";
+    discardBtn.className = "dv-del-btn";
+    discardBtn.textContent = this.discarded.has(s.stamp) ? t("verify_restore_btn") : t("verify_discard_btn");
+    discardBtn.addEventListener("click", () => void this.toggleDiscard(s));
     const headRow = document.createElement("div");
     headRow.className = "dv-detail-head";
-    headRow.append(head, delBtn);
+    headRow.append(head, discardBtn, delBtn);
     this.detailEl.appendChild(headRow);
 
     this.detailEl.appendChild(this.csvBlock(s));

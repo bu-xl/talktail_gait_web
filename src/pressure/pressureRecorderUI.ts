@@ -10,6 +10,7 @@
  */
 
 import { onLangChange, t } from "../i18n/index.js";
+import { showToast } from "../ui/toast.js";
 import {
   listPressureRecords,
   pressureCsvUrl,
@@ -147,16 +148,72 @@ export function createPressureCsvController(deps: PressureCsvDeps): PressureCsvC
   };
 
   let busy = false;
+
+  /**
+   * 업로드에 실패한 CSV — **버리지 않고 여기에 들고 있는다.**
+   *
+   * 예전에는 실패해도 상태줄 한 줄만 바뀌고 CSV 는 그대로 사라졌다. 다음 촬영이
+   * recorder 를 초기화하면 그 회차의 압력 데이터는 복구할 방법이 없다.
+   */
+  let pendingUpload: Parameters<typeof uploadPressureCsv>[1] | null = null;
+
+  /** 실패한 CSV 를 다시 올리는 버튼 — 실패했을 때만 나타난다. */
+  const retryBtn = document.createElement("button");
+  retryBtn.type = "button";
+  retryBtn.id = "btnPressureRetry";
+  retryBtn.className = "rec-retry";
+  retryBtn.hidden = true;
+  statusEl?.insertAdjacentElement("afterend", retryBtn);
+  const renderRetryBtn = (): void => {
+    retryBtn.textContent = t("csv_retry");
+    retryBtn.hidden = pendingUpload === null;
+  };
+  renderRetryBtn();
+  onLangChange(renderRetryBtn);
+
+  const send = async (payload: Parameters<typeof uploadPressureCsv>[1]): Promise<void> => {
+    busy = true;
+    setStatus(t("csv_uploading", { n: payload.recording?.frames ?? 0 }), "warn");
+    try {
+      const record = await uploadPressureCsv(deps.apiBase, payload);
+      pendingUpload = null;
+      setStatus(t("csv_upload_done", { name: record.csv.filename }), "ok");
+      await refresh();
+    } catch (err) {
+      // 실패한 CSV 는 들고 있는다 — 사람이 [다시 올리기] 로 되살릴 수 있다.
+      pendingUpload = payload;
+      const msg = err instanceof Error ? err.message : String(err);
+      setStatus(t("csv_retry_pending"), "bad");
+      showToast({ kind: "bad", title: t("csv_upload_failed_title"), message: msg });
+    } finally {
+      busy = false;
+      renderRetryBtn();
+    }
+  };
+
+  retryBtn.addEventListener("click", () => {
+    if (busy || !pendingUpload) return;
+    void send(pendingUpload);
+  });
+
   const uploadRecorded = async (): Promise<void> => {
     if (busy) return;
     const frames = deps.frameCount();
-    if (frames < 2) return; // 데이터가 없으면 조용히 무시(기존 흐름 방해 금지).
+    // 데이터가 없으면 **크게 알린다.** 조용히 넘어가면 그 회차는 CSV 가 없다는 사실이
+    // 나중에 파일 목록을 볼 때에야 드러난다 — 현장에서는 이미 늦다.
+    if (frames < 2) {
+      setStatus(t("csv_no_frames"), "bad");
+      showToast({ kind: "bad", title: t("csv_no_frames_title"), message: t("csv_no_frames_msg") });
+      return;
+    }
 
     // CSV 문자열/메타데이터는 recorder 가 다음 녹화로 초기화되기 전에 즉시 확보한다.
     let csv: string;
     try {
       csv = deps.buildCsv();
     } catch {
+      setStatus(t("csv_no_frames"), "bad");
+      showToast({ kind: "bad", title: t("csv_no_frames_title"), message: t("csv_no_frames_msg") });
       return;
     }
     const dog = readDogInfo();
@@ -191,23 +248,7 @@ export function createPressureCsvController(deps: PressureCsvDeps): PressureCsvC
       );
     }
 
-    busy = true;
-    setStatus(t("csv_uploading", { n: frames }), "warn");
-    try {
-      const record = await uploadPressureCsv(deps.apiBase, {
-        csv,
-        dog,
-        recording,
-        sessionId,
-        timebase,
-      });
-      setStatus(t("csv_upload_done", { name: record.csv.filename }), "ok");
-      await refresh();
-    } catch (err) {
-      setStatus(t("csv_upload_failed", { msg: err instanceof Error ? err.message : String(err) }), "bad");
-    } finally {
-      busy = false;
-    }
+    await send({ csv, dog, recording, sessionId, timebase });
   };
 
   refreshBtn?.addEventListener("click", () => void refresh());

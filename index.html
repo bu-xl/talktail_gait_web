@@ -439,6 +439,15 @@
       #dvDelModal .dialog-foot {
         display: flex; gap: 8px; justify-content: flex-end; padding: 12px 18px;
       }
+      /* 데이터 검증 — 살아있는 촬영 / 버린 촬영 탭 */
+      .dv-tabs { display: inline-flex; gap: 4px; margin-right: 8px; }
+      .dv-tab {
+        padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border);
+        background: var(--surface); color: var(--muted); font-size: 13px;
+      }
+      .dv-tab.is-active { color: var(--fg); border-color: var(--primary); font-weight: 700; }
+      .dv-purge { color: var(--danger, #eb463c); border-color: var(--danger, #eb463c); }
+      .dv-item.is-discarded .dv-item-dog { text-decoration: line-through; opacity: .7; }
       #dvDelModal .dialog-foot button { min-width: 104px; }
       #dvDelModal .dialog-foot button.danger {
         background: var(--danger); border-color: var(--danger); color: #fff;
@@ -1100,6 +1109,11 @@
         padding: 12px 18px;
       }
       #confirmAnalyzeModal .dialog-foot button { min-width: 104px; }
+      /* 버리기는 왼쪽 끝에 떼어 둔다 — 저장/분석 옆에 붙으면 잘못 누른다. */
+      #confirmAnalyzeModal .dialog-foot button.danger {
+        margin-right: auto;
+        background: var(--danger, #eb463c); border-color: var(--danger, #eb463c); color: #fff;
+      }
       #confirmAnalyzeModal .dialog-foot button.primary {
         background: var(--primary); border-color: var(--primary); color: #fff;
       }
@@ -1365,14 +1379,19 @@
         list-style: none; margin: 8px 0 0; padding: 0;
         display: flex; flex-wrap: wrap; gap: 6px;
       }
+      /*
+        한눈에 들어와야 하는 카드다 — 시작을 누른 뒤 "모든 폰이 촬영 중인가" 를 이걸로
+        보고 견주에게 출발 신호를 준다. 안내문과 상태줄을 걷어낸 자리를 여기에 쓴다.
+      */
       .cam-row {
-        display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
-        min-width: 88px; max-width: 148px; padding: 6px 10px;
-        border-radius: 8px; background: var(--surface); border: 1px solid var(--border);
-        font-size: 12px;
+        display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+        min-width: 120px; max-width: 190px; padding: 10px 14px;
+        border-radius: 10px; background: var(--surface); border: 1px solid var(--border);
+        font-size: 16px;
       }
-      .cam-slot { font-weight: 700; min-width: 0; }
-      .cam-state { margin-left: 0; font-size: 11px; line-height: 1.25; color: var(--muted); }
+      .cam-slot { font-weight: 800; min-width: 0; letter-spacing: .02em; }
+      .cam-state { margin-left: 0; font-size: 15px; font-weight: 700; line-height: 1.25; color: var(--muted); }
+      .cam-row.is-recording { border-color: var(--success); }
       .cam-row.is-recording .cam-state { color: var(--success); }
       .cam-row.is-idle .cam-state { color: var(--muted); }
       .cam-row.is-uploading .cam-state { color: var(--primary); }
@@ -1384,6 +1403,12 @@
       .rec-status.ok { color: var(--success); }
       .rec-status.warn { color: var(--warning); }
       .rec-status.bad { color: var(--danger, #eb463c); }
+      /* 업로드에 실패한 CSV 를 되살리는 버튼 — 실패했을 때만 나타난다. */
+      .rec-retry {
+        margin-top: 6px; padding: 6px 14px; font-size: 13px; font-weight: 700;
+        border-radius: 8px; border: 1px solid var(--danger, #eb463c); color: var(--danger, #eb463c);
+        background: var(--surface);
+      }
 
       /* Report modal — light clinic surface for video + metrics */
       body.modal-open { overflow: hidden; }
@@ -1665,6 +1690,8 @@
           <div class="capture-preset">
             <label for="capturePreset" data-i18n="capture_preset">촬영 해상도</label>
             <select id="capturePreset" aria-label="Capture quality"></select>
+            <label for="maxRecordSec" data-i18n="capture_max_duration">최대 촬영시간</label>
+            <select id="maxRecordSec" aria-label="Max recording duration"></select>
           </div>
         </section>
 
@@ -1709,13 +1736,15 @@
         <section class="mc-card mc-cams">
           <div class="mc-head">
             <div class="section" data-i18n="cams_title">연결된 카메라</div>
+            <!--
+              상태 문구는 **문제가 있을 때만** 나타난다(setSyncStatus). 평소 대기 중에
+              "연결됨 / 대기중" 을 늘 띄워 두면 정작 봐야 할 카드가 그만큼 작아진다.
+            -->
             <div class="mc-pad-state">
-              <b id="syncHub" class="off" data-i18n="sync_hub_disconnected">동기화 서버 끊김</b>
-              <b id="syncStatus" class="off">–</b>
+              <b id="syncStatus" class="off" hidden>–</b>
             </div>
           </div>
           <ul id="camList" class="cam-list"></ul>
-          <p class="pad-hint" id="camHint" data-i18n="cams_hint">촬영을 시작하면 각 카메라가 실제로 녹화를 시작했는지 여기에 표시됩니다.</p>
         </section>
 
         <!-- 시작/종료 — 카메라 카드 바로 아래. -->
@@ -1807,7 +1836,13 @@
           <p id="dvSub" data-i18n="verify_page_sub">촬영 한 번에 저장된 CSV와 영상을 함께 확인합니다.</p>
         </div>
         <div class="fd-toolbar-extra">
+          <!-- 살아있는 촬영 / 버린 촬영. 섞어 두면 목록이 길어질수록 다시 눈으로 골라야 한다. -->
+          <div class="dv-tabs">
+            <button type="button" id="dvTabLive" class="dv-tab is-active" data-i18n="verify_tab_live">살아있는 촬영</button>
+            <button type="button" id="dvTabDiscarded" class="dv-tab" data-i18n="verify_tab_discarded">버린 촬영</button>
+          </div>
           <span id="dvCount" class="fd-col-count"></span>
+          <button type="button" id="dvPurge" class="dv-purge" data-i18n="verify_purge_btn" hidden>버린 촬영 전체 삭제</button>
           <button type="button" id="dvRefresh" data-i18n="btn_results_refresh">새로고침</button>
         </div>
       </div>
@@ -2218,7 +2253,8 @@
           <ul id="confirmCamList" class="cam-list"></ul>
         </div>
         <div class="dialog-foot">
-          <button type="button" id="confirmCancelBtn" data-i18n="confirm_analyze_no">재촬영</button>
+          <button type="button" id="confirmDiscardBtn" class="danger" data-i18n="confirm_discard">버리기</button>
+          <button type="button" id="confirmCancelBtn" data-i18n="confirm_analyze_no">저장하기</button>
           <button type="button" class="primary" id="confirmAnalyzeBtn" data-i18n="confirm_analyze_yes">분석하기</button>
         </div>
       </div>

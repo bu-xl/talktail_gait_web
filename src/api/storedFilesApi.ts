@@ -19,6 +19,8 @@ export type StoredFilesList = {
   source: string;
   csv: StoredCsvFile[];
   videos: StoredVideoFile[];
+  /** 버려진 촬영의 도장 목록 — 검증 화면이 "살아있는 것 / 버려진 것" 을 이걸로 가른다. */
+  discarded: string[];
 };
 
 export async function listStoredFiles(apiBaseUrl: string): Promise<StoredFilesList> {
@@ -29,7 +31,34 @@ export async function listStoredFiles(apiBaseUrl: string): Promise<StoredFilesLi
     source: json.source || "fs",
     csv: Array.isArray(json.csv) ? json.csv : [],
     videos: Array.isArray(json.videos) ? json.videos : [],
+    discarded: Array.isArray(json.discarded) ? json.discarded : [],
   };
+}
+
+/**
+ * 이번 촬영을 버린다(소프트 삭제) — 파일은 남고 표시만 붙는다.
+ * 도장에 표시하므로 **버린 뒤 늦게 도착한 업로드도** 같은 취급을 받는다.
+ */
+export async function discardSession(apiBaseUrl: string, sessionId: string): Promise<{ stamp: string }> {
+  const res = await fetch(joinApiUrl(apiBaseUrl, `/api/sessions/${encodeURIComponent(sessionId)}/discard`), {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error(`discard HTTP ${res.status}`);
+  return (await res.json()) as { stamp: string };
+}
+
+/** 도장 단위 버림 표시/해제 — 검증 화면의 되살리기에 쓴다. */
+export async function setStampDiscarded(
+  apiBaseUrl: string,
+  stamp: string,
+  discarded: boolean,
+): Promise<void> {
+  const res = await fetch(joinApiUrl(apiBaseUrl, "/api/files/discarded"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ stamp, discarded }),
+  });
+  if (!res.ok) throw new Error(`discard flag HTTP ${res.status}`);
 }
 
 /** 목록의 상대 경로를 절대 URL 로. `download=1` 이면 첨부 저장. */

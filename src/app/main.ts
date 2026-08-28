@@ -59,6 +59,10 @@ import {
   patchUserSettings,
   saveUserSettings,
   scheduleSaveSettings,
+  clampRecordSec,
+  MIN_RECORD_SEC,
+  MAX_RECORD_SEC,
+  RECORD_SEC_STEP,
   type UserSettings,
 } from "../settings/persist.js";
 import { drawPawOverlay } from "../render/pawOverlayRenderer.js";
@@ -89,6 +93,7 @@ import { DogPresetsCard } from "../ui/dogPresetsCard.js";
 import type { CompletedSessionRef } from "../ui/completedPage.js";
 import { getResultDetail, listResultDates, listResultSessions } from "../api/resultsApi.js";
 import { getSessionNotes, saveSessionNotes } from "../api/sessionNotesApi.js";
+import { discardSession } from "../api/storedFilesApi.js";
 import { ResultsPage } from "../ui/resultsPage.js";
 import { ReportsPage } from "../ui/reportsPage.js";
 import { UploadPage } from "../ui/uploadPage.js";
@@ -305,11 +310,20 @@ function onClick(id: string, handler: (ev: MouseEvent) => void): void {
   $opt(id)?.addEventListener("click", handler as EventListener);
 }
 
+/**
+ * 촬영 흐름 안내문 — **문제가 있을 때만 보인다.**
+ *
+ * 정상 대기 상태의 "연결됨 / 대기중" 같은 줄은 읽히지 않으면서 카드 자리만 먹는다.
+ * 경고(warn) · 오류(bad) · 대기(wait)일 때만 나타나게 해서, 이 줄이 보이면 곧
+ * "지금 뭔가 확인해야 한다" 는 뜻이 되게 한다.
+ */
 function setSyncStatus(text: string, className?: string): void {
   const el = $opt("syncStatus");
   if (!el) return;
   el.textContent = text;
   if (className !== undefined) el.className = className;
+  const cls = className ?? el.className;
+  el.hidden = !text || cls === "ok" || cls === "off" || cls === "";
 }
 
 /** Local UI simulation when ai-server is unavailable. `.env`: VITE_SIMULATE_AI=1 */
@@ -538,6 +552,7 @@ async function boot(): Promise<void> {
   const confirmModal = $("confirmAnalyzeModal");
   const confirmAnalyzeBtn = $("confirmAnalyzeBtn") as HTMLButtonElement;
   const confirmCancelBtn = $("confirmCancelBtn") as HTMLButtonElement;
+  const confirmDiscardBtn = $("confirmDiscardBtn") as HTMLButtonElement;
 
   /** 우측 레일 "반려견" 입력값 — 촬영 세션의 결과에 붙일 정보. */
   const readSideDogInfo = (): ManualDogInfo => {
@@ -566,12 +581,16 @@ async function boot(): Promise<void> {
     $("confirmAnalyzeTitle").textContent = t("confirm_analyze_title");
     confirmAnalyzeBtn.textContent = t("confirm_analyze_yes");
     confirmCancelBtn.textContent = t("confirm_analyze_no");
+    confirmDiscardBtn.textContent = t("confirm_discard");
     const uploaded = Boolean(pendingAnalyzeJob);
     $("confirmAnalyzeHint").textContent = uploaded
       ? t("confirm_analyze_hint")
       : t("confirm_analyze_waiting_upload");
     confirmAnalyzeBtn.disabled = confirmBusy || !uploaded;
     confirmCancelBtn.disabled = confirmBusy;
+    // 버리기는 업로드가 끝나기를 기다리지 않는다 — 도장에 표시해 두면 늦게 도착한
+    // 파일도 같은 취급을 받는다. 기다리게 하는 순간 7번을 만든 이유가 사라진다.
+    confirmDiscardBtn.disabled = confirmBusy;
   };
 
   const showConfirmModal = (): void => {
@@ -736,13 +755,19 @@ async function boot(): Promise<void> {
     return cancelAnalyzeJob(apiBase, jobId).then(() => undefined);
   };
 
+  /**
+   * "저장하기" — 파일은 남기고 AI 분석만 건너뛴다.
+   *
+   * ai-server 의 분석이 아직 못 미더워서, 현장에서는 결과를 보는 것보다 **로우데이터를
+   * 모으는 것**이 목적이다. 분석으로 보내면 서버·큐에서 생길 수 있는 오류가 반복 시행을
+   * 끊는다. 그래서 업로드는 끝까지 두고(폰에 `retake` 를 보내지 않는다) 잡만 취소한다.
+   * 파일까지 버리는 것은 "버리기"(`onDiscardTake`)다.
+   */
   const onCancelAnalyze = (): void => {
     if (confirmBusy) return;
     const jobId = pendingAnalyzeJob;
     confirmBusy = true;
-    retakeSessionId = lastTakeSessionId;
-    // 폰에 먼저 알린다 — jobId 를 기다리면 그동안 버릴 영상이 계속 올라간다.
-    if (gaitSync.connected) gaitSync.requestRetake(lastTakeSessionId);
+    retakeSessionId = null;
     syncConfirmModal();
     if (!jobId) {
       finishRetakeUi();
@@ -780,13 +805,56 @@ async function boot(): Promise<void> {
       return;
     }
 
-    const uploading = camsInState("uploading", peers);
-    if (uploading > 0 && !window.confirm(t("retake_confirm_uploading", { n: uploading }))) return;
+    // 업로드 중이어도 되묻지 않는다 — "저장하기" 는 업로드를 끊지 않고 끝까지 둔다.
     onCancelAnalyze();
+  };
+
+  /**
+   * "버리기" — 이번 촬영을 통째로 버린다(소프트 삭제).
+   *
+   * 개가 안 뛰거나 딴 데로 새면 그 회차는 쓸모가 없다. 나중에 파일 목록에서 찾아
+   * 지우려면 반복 시행이 끊기므로 그 자리에서 버린다. 파일은 지우지 않고 도장에
+   * 표시만 하며, 되살리기·영구 삭제는 데이터 검증 화면에서 한다.
+   *
+   * ★ 업로드가 진행 중이어도 막지 않는다. 폰에는 `retake` 로 업로드를 끊으라고 알리고,
+   *   그래도 늦게 도착하는 파일은 서버가 도장을 보고 같은 취급을 한다.
+   */
+  const onDiscardTake = (): void => {
+    if (confirmBusy) return;
+    const sessionId = lastTakeSessionId;
+    if (!window.confirm(t("confirm_discard_ask"))) return;
+    const jobId = pendingAnalyzeJob;
+    confirmBusy = true;
+    retakeSessionId = lastTakeSessionId;
+    if (gaitSync.connected) {
+      // 종료가 씹혀 아직 찍고 있는 폰이 있으면 먼저 멈춘다. 버릴 회차를 계속 찍고 있으면
+      // 그 시간이 그대로 다음 촬영의 지연이 된다.
+      if (camsInState("recording", gaitSync.peers) > 0) gaitSync.stopRecord(lastTakeSessionId);
+      gaitSync.requestRetake(lastTakeSessionId);
+    }
+    syncConfirmModal();
+    void (async () => {
+      try {
+        if (jobId) await skipAiForJob(jobId);
+      } catch {
+        /* 잡 취소 실패는 버리기를 막지 않는다 — 도장 표시가 본체다 */
+      }
+      try {
+        if (sessionId) await discardSession(apiBase, sessionId);
+        setSyncStatus(t("confirm_discard_done"), "ok");
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        showToast({ kind: "bad", title: t("confirm_discard"), message: t("confirm_discard_failed", { msg }) });
+      } finally {
+        finishRetakeUi();
+        confirmBusy = false;
+      }
+    })();
   };
 
   confirmAnalyzeBtn.addEventListener("click", () => onConfirmAnalyze());
   confirmCancelBtn.addEventListener("click", () => onRetakeClick());
+  confirmDiscardBtn.addEventListener("click", () => onDiscardTake());
 
 
   /**
@@ -1007,23 +1075,11 @@ async function boot(): Promise<void> {
 
 
   const updateSyncUi = (peers?: SyncPeers, hubConnected?: boolean): void => {
-    const mobileEl = $opt("syncStatus");
-    const hubEl = $opt("syncHub");
     if (hubConnected === false) {
-      if (hubEl) {
-        hubEl.textContent = t("sync_hub_disconnected");
-        hubEl.className = "off";
-      }
-      if (mobileEl) {
-        mobileEl.textContent = "–";
-        mobileEl.className = "off";
-      }
+      // 허브가 끊긴 것은 문제다 — 이때는 반드시 보여야 한다.
+      setSyncStatus(t("sync_hub_disconnected"), "bad");
       if (!syncPlaybackActive) cameraPlayer.clearPreview();
       return;
-    }
-    if (hubEl) {
-      hubEl.textContent = t("sync_hub_connected");
-      hubEl.className = "ok";
     }
     const mobile = peers?.mobile ?? false;
     const camCount = peers?.mobileCount ?? (mobile ? 1 : 0);
@@ -1032,22 +1088,16 @@ async function boot(): Promise<void> {
     // 현장에서 맞춰 둔 자리와 어긋난다 — 촬영 버튼을 누르기 전에 알려야 한다.
     const unnumbered =
       peers?.subIndexes === undefined ? 0 : (peers.subCount ?? 0) - peers.subIndexes.length;
-    if (mobileEl) {
-      if (!mobile) {
-        mobileEl.textContent = t("sync_mobile_waiting");
-        mobileEl.className = "wait";
-      } else if (hasMain === false) {
-        // 카메라는 있으나 Main 없음 → 분석 대상 없음 경고.
-        mobileEl.textContent = t("sync_no_main", { n: camCount });
-        mobileEl.className = "wait";
-      } else if (unnumbered > 0) {
-        mobileEl.textContent = t("sync_sub_unnumbered", { n: camCount, u: unnumbered });
-        mobileEl.className = "wait";
-      } else {
-        mobileEl.textContent =
-          camCount > 1 ? t("sync_mobile_connected_n", { n: camCount }) : t("sync_mobile_connected");
-        mobileEl.className = "ok";
-      }
+    if (!mobile) {
+      setSyncStatus(t("sync_mobile_waiting"), "wait");
+    } else if (hasMain === false) {
+      // 카메라는 있으나 Main 없음 → 분석 대상 없음 경고.
+      setSyncStatus(t("sync_no_main", { n: camCount }), "wait");
+    } else if (unnumbered > 0) {
+      setSyncStatus(t("sync_sub_unnumbered", { n: camCount, u: unnumbered }), "wait");
+    } else {
+      // 정상 — 카메라 카드가 이미 몇 대인지 보여준다. 문구는 숨는다.
+      setSyncStatus(camCount > 1 ? t("sync_mobile_connected_n", { n: camCount }) : t("sync_mobile_connected"), "ok");
     }
     if (mobile && !syncPlaybackActive && cameraPlayer.getMode() === "idle") {
       cameraPlayer.showIdle(t("camera_preview_receiving"));
@@ -1111,7 +1161,6 @@ async function boot(): Promise<void> {
    */
   const renderCamList = (peers?: SyncPeers): void => {
     const listEl = $opt("camList") as HTMLUListElement | null;
-    const hintEl = $opt("camHint");
     if (!listEl) return;
     listEl.innerHTML = "";
 
@@ -1154,8 +1203,6 @@ async function boot(): Promise<void> {
       li.textContent = t("cams_empty");
       listEl.appendChild(li);
     }
-    // 힌트는 아직 아무 카메라도 안 붙었을 때만 쓸모가 있다.
-    if (hintEl) hintEl.hidden = hasMain || subIndexes.length > 0 || unnumbered > 0;
 
     // 확인 모달에도 같은 줄을 띄운다. 모달 딤 뒤의 사이드바는 읽히지 않는데,
     // 재촬영을 누를지 판단하려면 바로 이 상태가 필요하다. 두 번 그리지 않고 복제한다.
@@ -1224,6 +1271,23 @@ async function boot(): Promise<void> {
   let peakHold: Float64Array | null = null; // per-cell max of processed pressure
   let holdToken = 0; // cancels a pending hold->live timer when state changes
 
+  /**
+   * 좌측 시각화를 실시간 보기로 되돌린다.
+   *
+   * 종료를 눌렀는데 매트 녹화가 (여러 이유로) 시작되지 않았던 회차에서는
+   * `stopLocalRecording` 이 안 불려 `displayMode` 가 "recording" 에 갇히고, 그러면
+   * peakHold 가 계속 쌓여 화면이 영영 초기화되지 않았다. 종료 경로는 녹화 여부와
+   * 무관하게 반드시 여기를 지난다.
+   */
+  const resetLiveView = (): void => {
+    displayMode = "live";
+    peakHold = null;
+    holdToken++;
+    latestOverlay = null;
+    liveTracker.reset();
+    clearOverlay();
+  };
+
   // Processing runs at full input rate; the render loop only paints the latest
   // processed frame. `frameSeq` marks a new frame so the paint loop knows when
   // there is something fresh to draw (and when to fall back to fade-out).
@@ -1271,6 +1335,31 @@ async function boot(): Promise<void> {
   };
   wireCapturePresetSelect();
 
+  /**
+   * 최대 촬영시간 — 폰이 종료 신호를 못 받았을 때 스스로 멈추는 상한이다.
+   * 실제 값은 서버가 다시 clamp 해서 `sync_start` 로 폰에 내려보낸다.
+   */
+  let maxRecordSec = clampRecordSec(userSettings.maxRecordSec);
+  const maxRecordSelect = $opt("maxRecordSec") as HTMLSelectElement | null;
+  const wireMaxRecordSelect = (): void => {
+    if (!maxRecordSelect) return;
+    maxRecordSelect.innerHTML = "";
+    for (let sec = MIN_RECORD_SEC; sec <= MAX_RECORD_SEC; sec += RECORD_SEC_STEP) {
+      const opt = document.createElement("option");
+      opt.value = String(sec);
+      opt.textContent = t("capture_max_duration_unit", { n: sec });
+      maxRecordSelect.appendChild(opt);
+    }
+    maxRecordSelect.value = String(maxRecordSec);
+    maxRecordSelect.onchange = () => {
+      maxRecordSec = clampRecordSec(maxRecordSelect.value);
+      maxRecordSelect.value = String(maxRecordSec);
+      persistSettings();
+    };
+  };
+  wireMaxRecordSelect();
+  onLangChange(wireMaxRecordSelect);
+
   const applySharpMode = (idx: number): void => {
     sharpIdx = idx % sharpModes.length;
     const m = sharpModes[sharpIdx];
@@ -1291,6 +1380,7 @@ async function boot(): Promise<void> {
     showGrid: config.render.show_grid,
     sharpIdx,
     capturePresetId: selectedCapturePreset.id,
+    maxRecordSec,
   });
 
   const persistSettings = (): void => scheduleSaveSettings(collectSettings);
@@ -1513,6 +1603,12 @@ async function boot(): Promise<void> {
     clockRttP50Ns: () => clockSync.result?.rttP50Ns ?? null,
   });
 
+  /** 매트 녹화의 하드 상한 타이머. 폰의 자체 상한과 같은 값을 쓴다. */
+  let matCapTimer: number | null = null;
+  /** 서버가 확정해 `sync_start` 로 내려준 상한. 없으면 화면에서 고른 값. */
+  let syncMaxRecordMs: number | null = null;
+  const activeMaxRecordMs = (): number => syncMaxRecordMs ?? maxRecordSec * 1000;
+
   const startLocalRecording = (wallAnchorMs?: number): void => {
     syncDock.stop();
     syncDock.hide();
@@ -1548,6 +1644,13 @@ async function boot(): Promise<void> {
     recordingStartServerNs = clockSync.perfMsToServerNs(t0);
     recordingStartedAt = new Date();
     recorder.start(t0);
+    // ★ 매트에도 폰과 같은 상한을 건다. 안 걸면 종료가 씹혔을 때 폰만 멈추고 매트는
+    //   계속 쌓여, 영상보다 훨씬 긴 CSV 가 남는다.
+    if (matCapTimer != null) window.clearTimeout(matCapTimer);
+    matCapTimer = window.setTimeout(() => {
+      matCapTimer = null;
+      if (recorder.isRecording) stopLocalRecording();
+    }, activeMaxRecordMs());
     setExportsEnabled(false);
     cachedTrack = null;
     displayMode = "recording";
@@ -1558,6 +1661,10 @@ async function boot(): Promise<void> {
   };
 
   const stopLocalRecording = (): void => {
+    if (matCapTimer != null) {
+      window.clearTimeout(matCapTimer);
+      matCapTimer = null;
+    }
     recorder.stop();
     // 세션 종료 → 캡처된 압력 프레임을 CSV 로 서버에 저장(프레임 없으면 내부에서 무시).
     void pressureCsv.uploadRecorded();
@@ -1626,13 +1733,20 @@ async function boot(): Promise<void> {
       clearReviewPanes();
       setSessionPhase("recording");
       setSyncStatus(t("sync_pending"));
+      // ★ 걸어 둔 회차가 아직 유효할 때만 시작한다. 대기 중에 종료가 지나갔는데도
+      //   그대로 시작하면 그 녹화는 아무도 멈추지 않는다 — CSV 가 안 올라가고(4번)
+      //   좌측 시각화도 "recording" 에 갇힌다(5번).
+      syncMaxRecordMs = msg.maxDurationMs && msg.maxDurationMs > 0 ? msg.maxDurationMs : null;
+      const armedSession = msg.sessionId;
       void waitUntilRecordAt(msg.recordAt).then(() => {
+        if (syncSessionId !== armedSession) return;
         if (!recorder.isRecording) startLocalRecording(msg.recordAt);
       });
     }
     if (msg.type === "record_stop") {
       syncRecordPending = false;
       if (recorder.isRecording) stopLocalRecording();
+      else resetLiveView();
       lastTakeSessionId = msg.sessionId ?? syncSessionId ?? lastTakeSessionId;
       syncSessionId = null;
       if (clinicSessionActive || sessionPhase === "recording") {
@@ -1729,7 +1843,7 @@ async function boot(): Promise<void> {
       setSessionPhase("recording");
       if (gaitSync.connected && gaitSync.peers.mobile) {
         syncRecordPending = true;
-        gaitSync.requestRecord(readSideDogInfo(), captureSettingsPayload(selectedCapturePreset));
+        gaitSync.requestRecord(readSideDogInfo(), captureSettingsPayload(selectedCapturePreset), maxRecordSec * 1000);
       }
       return;
     }
@@ -1749,7 +1863,7 @@ async function boot(): Promise<void> {
     syncRecordPending = true;
     setSyncStatus(t("sync_pending"), "wait");
     setSessionPhase("recording");
-    gaitSync.requestRecord(readSideDogInfo(), captureSettingsPayload(selectedCapturePreset));
+    gaitSync.requestRecord(readSideDogInfo(), captureSettingsPayload(selectedCapturePreset), maxRecordSec * 1000);
   };
 
   const stopClinicSession = (): void => {
@@ -1857,7 +1971,7 @@ async function boot(): Promise<void> {
       syncRecordPending = true;
       setSyncStatus(t("sync_pending"));
       setSessionPhase("recording");
-      gaitSync.requestRecord(readSideDogInfo(), captureSettingsPayload(selectedCapturePreset));
+      gaitSync.requestRecord(readSideDogInfo(), captureSettingsPayload(selectedCapturePreset), maxRecordSec * 1000);
       return;
     }
 

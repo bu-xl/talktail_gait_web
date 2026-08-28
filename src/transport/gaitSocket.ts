@@ -4,6 +4,7 @@
  */
 
 import { joinApiUrl } from "../config/apiUrl.js";
+import { clockSync } from "./clockSync.js";
 
 export type SyncPeers = {
   web: boolean;
@@ -43,6 +44,8 @@ export type SyncMessage =
       serverNow: number;
       recordAt: number;
       syncLeadMs: number;
+      /** 촬영 하드 상한(ms) — 서버가 clamp 한 값. 매트 녹화도 이 상한을 따른다. */
+      maxDurationMs?: number;
       captureSettings?: CaptureSettingsPayload | null;
     }
   | { type: "record_stop"; roomId: string; sessionId: string | null; from: string; serverNow: number; retry?: boolean }
@@ -226,7 +229,7 @@ export class GaitSyncSocket {
   requestRecord(dog?: {
     name?: string | null;
     weightKg?: number | null;
-  } | null, captureSettings?: CaptureSettingsPayload | null): void {
+  } | null, captureSettings?: CaptureSettingsPayload | null, maxDurationMs?: number | null): void {
     if (this.isViewer) return;
     this.send({
       type: "record_request",
@@ -234,6 +237,8 @@ export class GaitSyncSocket {
         ? { dogName: dog.name ?? null, dogWeightKg: dog.weightKg ?? null }
         : null,
       ...(captureSettings ? { captureSettings } : {}),
+      // 촬영 하드 상한. 서버가 10~180초로 clamp 한 뒤 sync_start 로 폰에 내려보낸다.
+      ...(maxDurationMs != null ? { maxDurationMs } : {}),
     });
   }
 
@@ -299,18 +304,17 @@ export class GaitSyncSocket {
   }
 }
 
-export function waitUntilRecordAt(recordAt: number): Promise<void> {
-  return new Promise((resolve) => {
-    const tick = () => {
-      const remain = recordAt - Date.now();
-      if (remain <= 0) {
-        resolve();
-        return;
-      }
-      setTimeout(tick, Math.min(remain, 50));
-    };
-    tick();
-  });
+export function waitUntilRecordAt(recordAt: number, maxWaitMs = 3000): Promise<void> {
+  let remain: number;
+  try {
+    // performance.now() 축으로 환산 — 이 PC 의 벽시계가 서버와 얼마나 어긋났든 무관하다.
+    remain = Number(clockSync.toDeviceNs(BigInt(Math.round(recordAt)) * 1_000_000n)) / 1e6 - performance.now();
+  } catch {
+    remain = recordAt - Date.now();
+  }
+  const waitMs = Math.min(Math.max(0, remain), maxWaitMs);
+  if (waitMs <= 0) return Promise.resolve();
+  return new Promise((resolve) => window.setTimeout(resolve, waitMs));
 }
 
 export function absolutizeResultUrl(apiBaseUrl: string, resultUrl: string): string {
