@@ -1199,7 +1199,7 @@ async function boot(): Promise<void> {
 
     if (!listEl.children.length) {
       const li = document.createElement("li");
-      li.className = "cam-row is-idle";
+      li.className = "cam-empty";
       li.textContent = t("cams_empty");
       listEl.appendChild(li);
     }

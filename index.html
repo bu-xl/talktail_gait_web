@@ -742,10 +742,11 @@
       .mc-capture { flex-shrink: 0; }
       .mc-cams { flex-shrink: 0; }
       body[data-module="measure"] .mc-capture .capture-preset {
-        display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0;
+        display: grid; grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr);
+        align-items: center; gap: 8px 12px; margin: 0;
       }
       body[data-module="measure"] .mc-capture .capture-preset select {
-        width: max-content; min-width: 18ch;
+        width: 100%; min-width: 0;
         min-height: 42px; font-size: 15px; padding: 8px 32px 8px 12px;
       }
 
@@ -1389,6 +1390,7 @@
         border-radius: 10px; background: var(--surface); border: 1px solid var(--border);
         font-size: 16px;
       }
+      .cam-empty { padding: 2px 0; font-size: 13px; color: var(--muted); }
       .cam-slot { font-weight: 800; min-width: 0; letter-spacing: .02em; }
       .cam-state { margin-left: 0; font-size: 15px; font-weight: 700; line-height: 1.25; color: var(--muted); }
       .cam-row.is-recording { border-color: var(--success); }
