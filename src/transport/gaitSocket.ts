@@ -160,6 +160,9 @@ export interface GaitSyncOptions {
   role?: SyncRole;
 }
 
+/** 끊겨 있는 동안 쌓아 둘 제어판 사건 기록의 최대 개수. */
+const MAX_PENDING_LOGS = 200;
+
 export class GaitSyncSocket {
   private ws: WebSocket | null = null;
   private handler: Handler = () => {};
@@ -171,6 +174,10 @@ export class GaitSyncSocket {
   readonly role: SyncRole;
   peers: SyncPeers = { web: false, mobile: false };
   connected = false;
+  /** 끊겨 있는 동안 쌓아 두는 사건 기록. `log()` / `flushLogs()` 참고. */
+  private pendingLogs: Array<Record<string, unknown>> = [];
+  /** 마지막으로 끊긴 시각 — 재연결 때 공백 길이를 서버에 알린다. */
+  private disconnectedAt = 0;
 
   constructor(opts: GaitSyncOptions) {
     this.wsUrl = opts.wsUrl;
@@ -216,6 +223,37 @@ export class GaitSyncSocket {
 
   join(): void {
     this.send({ type: "join", role: this.role, roomId: this.roomId });
+  }
+
+  /**
+   * 제어판의 사건을 **서버 로그로** 보낸다.
+   *
+   * 이 화면의 `console.log` 는 브라우저/Electron 안에만 남아, 현장에서 문제가 나도
+   * 나중에 볼 수 없다. 확인 가능한 것은 배포된 back 의 pm2 로그뿐이라, 웹이 무엇을
+   * 눌렀고 어떤 신호에 어떻게 반응했는지를 서버로 밀어 넣어야 촬영 한 회차의 앞뒤가
+   * 이어진다. 폰의 `capture_log` 와 같은 통로를 쓰고 서버가 `[web]` 로 구분해 찍는다.
+   *
+   * 끊겨 있으면 쌓아 뒀다가 재연결 직후 몰아 보낸다 — 사고가 나는 순간이 대개 그
+   * 끊긴 순간이라, 그때 로그를 버리면 정작 필요한 것만 사라진다.
+   */
+  log(label: string, detail?: Record<string, unknown> | null): void {
+    const entry = { type: "capture_log", label, detail: detail ?? null, clientTs: Date.now() };
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.send(entry);
+      return;
+    }
+    this.pendingLogs.push(entry);
+    if (this.pendingLogs.length > MAX_PENDING_LOGS) {
+      this.pendingLogs.splice(0, this.pendingLogs.length - MAX_PENDING_LOGS);
+    }
+  }
+
+  private flushLogs(): void {
+    if (!this.pendingLogs.length) return;
+    const queued = this.pendingLogs;
+    this.pendingLogs = [];
+    this.send({ type: "capture_log", label: "log_flush_begin", detail: { count: queued.length }, clientTs: Date.now() });
+    for (const entry of queued) this.send({ ...entry, buffered: true });
   }
 
   /**
@@ -273,10 +311,15 @@ export class GaitSyncSocket {
     this.ws = ws;
 
     ws.onopen = () => {
+      const downMs = this.disconnectedAt ? Date.now() - this.disconnectedAt : 0;
       this.connected = true;
       console.log("[gait-sync] open");
       this.connectionHandler(true);
       this.join();
+      // join 이 먼저 나가야 서버가 이 소켓을 web 으로 인식한다. 그 뒤에 밀린 로그를 흘린다.
+      if (downMs > 0) this.log("ws_reconnected", { downMs });
+      this.disconnectedAt = 0;
+      this.flushLogs();
     };
 
     ws.onmessage = (ev) => {
@@ -292,10 +335,13 @@ export class GaitSyncSocket {
     };
 
     ws.onerror = () => console.warn("[gait-sync] error");
-    ws.onclose = () => {
+    ws.onclose = (ev) => {
       this.connected = false;
       this.ws = null;
-      console.log("[gait-sync] closed");
+      this.disconnectedAt = Date.now();
+      console.log("[gait-sync] closed", ev?.code);
+      // 끊긴 사실을 버퍼에 남긴다 — 재연결 뒤 서버가 이 공백을 알 수 있다.
+      if (!this.closedByUser) this.log("ws_closed", { code: ev?.code ?? null, reason: ev?.reason || null });
       this.connectionHandler(false);
       if (!this.closedByUser) {
         this.reconnectTimer = setTimeout(() => this.open(), 1500);

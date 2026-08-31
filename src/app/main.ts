@@ -601,7 +601,15 @@ async function boot(): Promise<void> {
     document.body.classList.add("modal-open");
   };
 
-  const setSessionPhase = (phase: SessionPhase): void => {
+  const setSessionPhase = (phase: SessionPhase, cause = "-"): void => {
+    // ★ 페이즈 전환은 전부 서버에 남긴다.
+    //
+    //   "안 눌렀는데 종료됐다" 의 정체는 결국 누가 이 함수를 불렀느냐다. 부르는 곳이
+    //   여러 곳(버튼 · record_stop 수신 · upload_started 수신 · 분석 확정)인데 화면만
+    //   보면 구분이 안 된다. 호출자가 `cause` 를 대도록 해서 서버 로그에서 갈리게 한다.
+    if (phase !== sessionPhase) {
+      gaitSync.log("phase", { from: sessionPhase, to: phase, cause, session: syncSessionId, lastTake: lastTakeSessionId });
+    }
     sessionPhase = phase;
     document.body.classList.toggle("session-recording", phase === "recording");
     document.body.classList.toggle("session-analyzing", phase === "saving" || phase === "confirm");
@@ -718,7 +726,7 @@ async function boot(): Promise<void> {
         hideConfirmModal();
         pendingAnalyzeJob = null;
         clinicSessionActive = false;
-        setSessionPhase("idle");
+        setSessionPhase("idle", "분석확정");
         setSyncStatus(t("sync_analyzing"), "wait");
         const behind = (resp?.queuePosition ?? 0) > 0;
         showToast({
@@ -730,7 +738,7 @@ async function boot(): Promise<void> {
       })
       .catch((err) => {
         setSyncStatus(err instanceof Error ? err.message : String(err), "bad");
-        setSessionPhase("confirm");
+        setSessionPhase("confirm", "분석확정 실패");
       })
       .finally(() => {
         confirmBusy = false;
@@ -745,7 +753,7 @@ async function boot(): Promise<void> {
     cameraPlayer.setLoading(false);
     hideConfirmModal();
     clearReviewPanes();
-    setSessionPhase("idle");
+    setSessionPhase("idle", "재촬영/취소 완료");
     setSyncStatus(t("confirm_analyze_cancelled"), "ok");
     updateSyncUi(gaitSync.peers, gaitSync.connected);
   };
@@ -799,7 +807,10 @@ async function boot(): Promise<void> {
     const recording = camsInState("recording", peers);
     if (recording > 0) {
       if (!window.confirm(t("retake_confirm_recording", { n: recording }))) return;
-      if (gaitSync.connected) gaitSync.stopRecord(lastTakeSessionId);
+      if (gaitSync.connected) {
+        gaitSync.log("stop_send", { sessionId: lastTakeSessionId, nullSession: lastTakeSessionId == null, from: "재촬영" });
+        gaitSync.stopRecord(lastTakeSessionId);
+      }
       setSyncStatus(t("retake_stop_sent"), "wait");
       // 모달은 그대로 둔다 — 상태 줄이 대기/업로드로 바뀌는 것을 보고 다시 누르면 된다.
       return;
@@ -829,7 +840,10 @@ async function boot(): Promise<void> {
     if (gaitSync.connected) {
       // 종료가 씹혀 아직 찍고 있는 폰이 있으면 먼저 멈춘다. 버릴 회차를 계속 찍고 있으면
       // 그 시간이 그대로 다음 촬영의 지연이 된다.
-      if (camsInState("recording", gaitSync.peers) > 0) gaitSync.stopRecord(lastTakeSessionId);
+      if (camsInState("recording", gaitSync.peers) > 0) {
+        gaitSync.log("stop_send", { sessionId: lastTakeSessionId, nullSession: lastTakeSessionId == null, from: "버리기" });
+        gaitSync.stopRecord(lastTakeSessionId);
+      }
       gaitSync.requestRetake(lastTakeSessionId);
     }
     syncConfirmModal();
@@ -1649,7 +1663,10 @@ async function boot(): Promise<void> {
     if (matCapTimer != null) window.clearTimeout(matCapTimer);
     matCapTimer = window.setTimeout(() => {
       matCapTimer = null;
-      if (recorder.isRecording) stopLocalRecording();
+      if (recorder.isRecording) {
+        gaitSync.log("mat_cap_reached", { capMs: activeMaxRecordMs(), session: syncSessionId });
+        stopLocalRecording();
+      }
     }, activeMaxRecordMs());
     setExportsEnabled(false);
     cachedTrack = null;
@@ -1704,6 +1721,7 @@ async function boot(): Promise<void> {
     if (msg.type === "cam_state") {
       // 폰이 말하는 상태를 그대로 쓴다 — 사건을 모아 추측하지 않는다.
       const key = camKey(msg.captureRole, msg.subIndex);
+      if (camStates.get(key) !== msg.state) gaitSync.log("cam_state", { cam: key, state: msg.state });
       camStates.set(key, msg.state);
       // 촬영에서 벗어나면 경과시간도 같이 끝난다. `record_stopped` 를 못 받아도
       // 업로드/대기 전이는 반드시 오므로 타이머가 남지 않는다.
@@ -1725,13 +1743,14 @@ async function boot(): Promise<void> {
       renderCamList(gaitSync.peers);
     }
     if (msg.type === "sync_start") {
+      gaitSync.log("rx_sync_start", { sessionId: msg.sessionId, recordAt: msg.recordAt, maxDurationMs: msg.maxDurationMs ?? null });
       syncRecordPending = false;
       syncSessionId = msg.sessionId;
       lastTakeSessionId = msg.sessionId;
       syncDock.hide();
       syncPlaybackActive = false;
       clearReviewPanes();
-      setSessionPhase("recording");
+      setSessionPhase("recording", "sync_start 수신");
       setSyncStatus(t("sync_pending"));
       // ★ 걸어 둔 회차가 아직 유효할 때만 시작한다. 대기 중에 종료가 지나갔는데도
       //   그대로 시작하면 그 녹화는 아무도 멈추지 않는다 — CSV 가 안 올라가고(4번)
@@ -1744,17 +1763,31 @@ async function boot(): Promise<void> {
       });
     }
     if (msg.type === "record_stop") {
+      // 다른 제어판이 눌렀거나 지난 회차의 재전송일 수 있다. 회차 일치 여부를 남긴다.
+      gaitSync.log("rx_record_stop", {
+        sessionId: msg.sessionId,
+        current: syncSessionId,
+        mine: msg.sessionId != null && msg.sessionId === syncSessionId,
+        retry: Boolean(msg.retry),
+        phase: sessionPhase,
+      });
       syncRecordPending = false;
       if (recorder.isRecording) stopLocalRecording();
       else resetLiveView();
       lastTakeSessionId = msg.sessionId ?? syncSessionId ?? lastTakeSessionId;
       syncSessionId = null;
       if (clinicSessionActive || sessionPhase === "recording") {
-        setSessionPhase("confirm");
+        setSessionPhase("confirm", "record_stop 수신");
         setSyncStatus(t("confirm_analyze_waiting_upload"), "wait");
       }
     }
     if (msg.type === "upload_started") {
+      // ★ 지금 찍고 있는 회차가 아닌데 이걸로 세션이 끝나면, 그게 바로 "안 눌렀는데 종료"다.
+      //   판단은 아직 바꾸지 않는다(수정은 별건) — 일어나는지부터 기록으로 확인한다.
+      if (sessionPhase === "recording" && msg.sessionId && msg.sessionId !== syncSessionId) {
+        gaitSync.log("upload_started_stale", { got: msg.sessionId, current: syncSessionId, jobId: msg.jobId });
+      }
+      gaitSync.log("rx_upload_started", { jobId: msg.jobId, sessionId: msg.sessionId, phase: sessionPhase });
       pendingAnalyzeJob = msg.jobId;
       cameraPlayer.setLoading(false);
       // 취소는 **재촬영을 누른 그 테이크**에만 건다. 세션이 다르면 새로 찍은 것이다.
@@ -1770,7 +1803,7 @@ async function boot(): Promise<void> {
         return;
       }
       setSyncStatus(t("confirm_analyze_hint"), "wait");
-      setSessionPhase("confirm");
+      setSessionPhase("confirm", "upload_started 수신");
       syncConfirmModal();
     }
     if (msg.type === "analyze_done") {
@@ -1840,7 +1873,7 @@ async function boot(): Promise<void> {
       clearReviewPanes();
       syncRecordPending = false;
       setSyncStatus(t("sim_recording"), "wait");
-      setSessionPhase("recording");
+      setSessionPhase("recording", "시작버튼(시뮬)");
       if (gaitSync.connected && gaitSync.peers.mobile) {
         syncRecordPending = true;
         gaitSync.requestRecord(readSideDogInfo(), captureSettingsPayload(selectedCapturePreset), maxRecordSec * 1000);
@@ -1862,22 +1895,31 @@ async function boot(): Promise<void> {
     clearReviewPanes();
     syncRecordPending = true;
     setSyncStatus(t("sync_pending"), "wait");
-    setSessionPhase("recording");
+    setSessionPhase("recording", "시작버튼");
+    gaitSync.log("record_request", { maxRecordSec, preset: selectedCapturePreset?.id ?? null });
     gaitSync.requestRecord(readSideDogInfo(), captureSettingsPayload(selectedCapturePreset), maxRecordSec * 1000);
   };
 
   const stopClinicSession = (): void => {
-    if (sessionPhase !== "recording" && !recorder.isRecording) return;
+    if (sessionPhase !== "recording" && !recorder.isRecording) {
+      gaitSync.log("stop_ignored", { phase: sessionPhase, matRecording: recorder.isRecording });
+      return;
+    }
     if (recorder.isRecording) stopLocalRecording();
     if (gaitSync.connected && gaitSync.peers.mobile) {
+      // ★ sessionId 가 null 이면 서버가 회차 없는 종료를 뿌리고, 폰의 stale 검사가
+      //   통째로 무력화된다. 그 자체가 사고 신호이므로 반드시 남긴다.
+      gaitSync.log("stop_send", { sessionId: syncSessionId, nullSession: syncSessionId == null });
       gaitSync.stopRecord(syncSessionId);
+    } else {
+      gaitSync.log("stop_not_sent", { connected: gaitSync.connected, mobile: gaitSync.peers.mobile });
     }
     lastTakeSessionId = syncSessionId ?? lastTakeSessionId;
     syncSessionId = null;
     syncRecordPending = false;
     pendingAnalyzeJob = null;
     retakeSessionId = null;
-    setSessionPhase("confirm");
+    setSessionPhase("confirm", "종료버튼");
     setSyncStatus(t("confirm_analyze_waiting_upload"), "wait");
     updateSyncUi(gaitSync.peers, gaitSync.connected);
   };
@@ -1924,6 +1966,15 @@ async function boot(): Promise<void> {
   };
 
   const onSessionButtonClick = (): void => {
+    // 사용자가 "시작"을 눌렀는지 "종료"를 눌렀는지는 이 순간의 페이즈가 결정한다.
+    // 현장 증언("시작을 눌렀는데 종료됐다")과 대조할 수 있어야 한다.
+    gaitSync.log("btn_session", {
+      phase: sessionPhase,
+      label: sessionPhase === "recording" ? "종료" : "시작",
+      cams: gaitSync.peers.mobileCount ?? null,
+      camStates: [...camStates.entries()].map(([k, v]) => `${k}:${v}`),
+      connected: gaitSync.connected,
+    });
     if (sessionPhase === "recording") {
       stopClinicSession();
       return;
@@ -1957,7 +2008,7 @@ async function boot(): Promise<void> {
       if (gaitSync.connected && gaitSync.peers.mobile) {
         gaitSync.stopRecord(syncSessionId);
         setSyncStatus(t("session_saving_sub"), "wait");
-        setSessionPhase("saving");
+        setSessionPhase("saving", "btnRecord(구)");
       }
       syncSessionId = null;
       syncRecordPending = false;
@@ -1970,7 +2021,7 @@ async function boot(): Promise<void> {
       clearReviewPanes();
       syncRecordPending = true;
       setSyncStatus(t("sync_pending"));
-      setSessionPhase("recording");
+      setSessionPhase("recording", "btnRecord(구)");
       gaitSync.requestRecord(readSideDogInfo(), captureSettingsPayload(selectedCapturePreset), maxRecordSec * 1000);
       return;
     }
