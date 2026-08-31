@@ -46,9 +46,70 @@ function notifyExpired(): void {
   }
 }
 
+/**
+ * 마스터가 "지금 보고 있는 계정".
+ *
+ * 마스터는 남의 결과를 조회할 수 있고, 그 대상은 `?userId=` 로 전달한다.
+ * 호출 지점마다 인자를 늘리면 `main.ts` 의 수십 곳을 고쳐야 하므로 여기 한 벌 둔다.
+ *
+ * ★ 일반 계정에는 아무 영향이 없다 — 서버가 무엇을 받든 자기 계정으로 되돌린다.
+ *   화면이 아니라 서버가 경계를 지킨다.
+ */
+const SCOPE_KEY = "gait.viewScope";
+
+/** 계정 전환은 새로고침을 동반하므로 저장해 두지 않으면 즉시 잃는다. */
+function loadScope(): string | null {
+  try {
+    return localStorage.getItem(SCOPE_KEY);
+  } catch {
+    return null; // 시크릿 모드 등 — 이번 세션에서만 유지된다
+  }
+}
+
+let viewScope: string | null = loadScope();
+
+export function setViewScope(userId: string | null): void {
+  viewScope = userId && userId.trim() ? userId.trim() : null;
+  try {
+    if (viewScope) localStorage.setItem(SCOPE_KEY, viewScope);
+    else localStorage.removeItem(SCOPE_KEY);
+  } catch {
+    /* 저장이 막힌 환경 — 메모리 값으로 이번 세션은 동작한다 */
+  }
+}
+
+export function getViewScope(): string | null {
+  return viewScope;
+}
+
+/**
+ * 계정 스코프를 붙일 조회 경로. **명시 목록이다.**
+ * 자동으로 전부 붙이면 로그인·계정관리처럼 붙으면 안 되는 곳까지 딸려간다.
+ */
+const SCOPED_PATHS = [
+  "/results/",
+  "/results/dates",
+  "/pressure/records",
+  "/files",
+  "/storage",
+];
+
+function withScope(input: string): string {
+  if (!viewScope) return input;
+  // 절대 URL 도 상대 경로도 들어온다 — 경로 부분만 본다.
+  const qIndex = input.indexOf("?");
+  const pathPart = qIndex >= 0 ? input.slice(0, qIndex) : input;
+  if (!SCOPED_PATHS.some((p) => pathPart.includes(p))) return input;
+  if (/[?&]userId=/.test(input)) return input; // 호출측이 이미 지정했다
+  return `${input}${qIndex >= 0 ? "&" : "?"}userId=${encodeURIComponent(viewScope)}`;
+}
+
 /** 쿠키를 실은 fetch. 401 이면 로그인 게이트를 깨운다. */
 export async function apiFetch(input: string, init: RequestInit = {}): Promise<Response> {
-  const res = await fetch(input, { ...init, credentials: "include" });
+  const method = (init.method || "GET").toUpperCase();
+  // 스코프는 **조회에만** 붙인다. 쓰기·삭제까지 남의 계정으로 향하면 사고가 된다.
+  const url = method === "GET" ? withScope(input) : input;
+  const res = await fetch(url, { ...init, credentials: "include" });
   if (res.status === 401) notifyExpired();
   return res;
 }

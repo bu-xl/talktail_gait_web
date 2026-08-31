@@ -35,11 +35,17 @@ export type CaptureSettingsPayload = {
 };
 
 export type SyncMessage =
-  | { type: "joined"; role: string; roomId: string; peers: SyncPeers; serverNow: number }
-  | { type: "peer_update"; roomId: string; peers: SyncPeers }
+  | { type: "joined"; role: string; userId: string; peers: SyncPeers; serverNow: number }
+  /**
+   * 세션이 없거나 만료됐다. 서버는 이 메시지를 보낸 뒤 곧바로 끊는다.
+   * 조용히 재연결만 반복하면 현장에서 "버튼이 안 먹는다" 로만 보인다.
+   */
+  | { type: "auth_required"; message?: string }
+  | { type: "peer_update"; userId: string; peers: SyncPeers }
   | {
       type: "sync_start";
-      roomId: string;
+      /** @deprecated 서버가 토큰에서 정한다. 자리만 남겨 뒀다. */
+  userId?: string;
       sessionId: string;
       serverNow: number;
       recordAt: number;
@@ -48,8 +54,8 @@ export type SyncMessage =
       maxDurationMs?: number;
       captureSettings?: CaptureSettingsPayload | null;
     }
-  | { type: "record_stop"; roomId: string; sessionId: string | null; from: string; serverNow: number; retry?: boolean }
-  | { type: "retake"; roomId: string; sessionId: string | null; serverNow: number }
+  | { type: "record_stop"; userId: string; sessionId: string | null; from: string; serverNow: number; retry?: boolean }
+  | { type: "retake"; userId: string; sessionId: string | null; serverNow: number }
   /**
    * 폰이 **실제로** 녹화를 시작했다. `sync_start` 는 지시일 뿐이고 폰마다 카메라를 올리는
    * 시간이 달라, 이 신호가 있어야 "몇 대 중 몇 대가 찍고 있나" 를 웹에서 알 수 있다.
@@ -57,7 +63,7 @@ export type SyncMessage =
    */
   | {
       type: "record_started";
-      roomId: string;
+      userId: string;
       sessionId: string | null;
       deviceId: string | null;
       captureRole: "main" | "sub";
@@ -66,7 +72,7 @@ export type SyncMessage =
     }
   | {
       type: "record_stopped";
-      roomId: string;
+      userId: string;
       sessionId: string | null;
       deviceId: string | null;
       captureRole: "main" | "sub";
@@ -79,7 +85,7 @@ export type SyncMessage =
    */
   | {
       type: "cam_state";
-      roomId: string;
+      userId: string;
       state: CamState;
       deviceId: string | null;
       captureRole: "main" | "sub";
@@ -97,7 +103,7 @@ export type SyncMessage =
       serverNow: number;
     }
   | { type: "preview_frame"; mime: string; data: string; ts: number }
-  | { type: "upload_started"; jobId: string; sessionId: string | null; roomId: string }
+  | { type: "upload_started"; jobId: string; sessionId: string | null; userId: string }
   | {
       type: "analyze_done";
       jobId: string;
@@ -156,7 +162,6 @@ export type SyncRole = "web" | "viewer";
 
 export interface GaitSyncOptions {
   wsUrl: string;
-  roomId: string;
   role?: SyncRole;
 }
 
@@ -170,7 +175,8 @@ export class GaitSyncSocket {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private closedByUser = false;
   private readonly wsUrl: string;
-  private readonly roomId: string;
+  /** 서버가 `joined` 로 알려 주는 실제 방(=계정). 진단용이다. */
+  private userId = "";
   readonly role: SyncRole;
   peers: SyncPeers = { web: false, mobile: false };
   connected = false;
@@ -181,7 +187,7 @@ export class GaitSyncSocket {
 
   constructor(opts: GaitSyncOptions) {
     this.wsUrl = opts.wsUrl;
-    this.roomId = opts.roomId;
+
     this.role = opts.role ?? "web";
   }
 
@@ -222,7 +228,10 @@ export class GaitSyncSocket {
   }
 
   join(): void {
-    this.send({ type: "join", role: this.role, roomId: this.roomId });
+    // ★ 방 이름을 보내지 않는다. 서버가 **세션 쿠키**에서 계정을 확정해 방을 정한다 —
+    //   클라가 보낸 값을 서버가 믿으면 남의 방에 그냥 들어갈 수 있다.
+    //   (앱은 쿠키가 없어 join 에 token 을 싣는다. 웹은 핸드셰이크 쿠키로 충분하다.)
+    this.send({ type: "join", role: this.role });
   }
 
   /**
@@ -327,6 +336,14 @@ export class GaitSyncSocket {
         const msg = JSON.parse(String(ev.data)) as SyncMessage;
         if (msg.type === "joined" || msg.type === "peer_update") {
           this.peers = msg.peers;
+        }
+        // 서버가 쿠키에서 확정한 방(=계정). 클라가 정하지 않는다.
+        if (msg.type === "joined") this.userId = msg.userId;
+        if (msg.type === "auth_required") {
+          // 재연결을 멈춘다 — 세션이 죽은 채 무한 재시도하면 로그만 더럽힌다.
+          // 화면은 http 쪽 401 이 이미 로그인 게이트를 띄우므로 여기서는 멈추기만 한다.
+          this.closedByUser = true;
+          console.warn("[gait-sync] auth required — 로그인이 필요합니다");
         }
         this.handler(msg);
       } catch (err) {

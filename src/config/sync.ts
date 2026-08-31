@@ -78,7 +78,9 @@ export function resolveWsUrl(): string {
 }
 
 export function resolveRoomId(): string {
-  return runtime?.roomId || import.meta.env.VITE_SYNC_ROOM_ID || "gait-default";
+  // @deprecated 방은 이제 **로그인한 계정**이고 서버가 세션에서 확정한다.
+  // 클라이언트가 방 이름을 정하면 남의 방에 그냥 들어갈 수 있다.
+  return runtime?.roomId || import.meta.env.VITE_SYNC_ROOM_ID || "";
 }
 
 export function isSyncEnabled(): boolean {

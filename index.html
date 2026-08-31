@@ -1594,6 +1594,11 @@
             <option value="ko">한국어</option>
             <option value="en">English</option>
           </select>
+          <!--
+            마스터가 보는 계정을 고른다. 기본값은 **자기 것**이다 —
+            로그인하자마자 전 계정이 섞여 보이면 무엇을 보고 있는지 알 수 없다.
+          -->
+          <select id="acctScope" class="ah-lang master-only" aria-label="조회 계정"></select>
           <div class="ah-acct">
             <span id="acctName"></span>
             <button type="button" id="acctLogout" class="ah-logout">로그아웃</button>

@@ -102,7 +102,8 @@ import { CsvPage } from "../ui/csvPage.js";
 import { VerifyPage } from "../ui/verifyPage.js";
 import { StoragePage } from "../ui/storagePage.js";
 import { AccountsPage } from "../ui/accountsPage.js";
-import { fetchMe, logout, type AuthUser } from "../api/authApi.js";
+import { fetchMe, listUsers, logout, type AuthUser } from "../api/authApi.js";
+import { getViewScope, setViewScope } from "../api/http.js";
 import { requireLogin, watchSessionExpiry } from "../auth/loginGate.js";
 import { APP_VERSION } from "../version.js";
 import {
@@ -430,6 +431,37 @@ function wireAccountBar(apiBase: string, user: AuthUser): void {
   const logoutBtn = document.getElementById("acctLogout");
   logoutBtn?.addEventListener("click", () => {
     void logout(apiBase).then(() => window.location.reload());
+  });
+
+  // 마스터만 조회 계정을 바꾼다. 일반 계정에는 이 셀렉트가 아예 안 보이고,
+  // 보이더라도 서버가 무엇을 받든 자기 계정으로 되돌린다.
+  const scopeSel = document.getElementById("acctScope") as HTMLSelectElement | null;
+  if (!user.isMaster) {
+    // 일반 계정으로 로그인하면 남아 있던 스코프를 반드시 지운다 —
+    // 마스터로 쓰던 브라우저에서 그대로 이어지면 조회가 조용히 어긋난다.
+    setViewScope(null);
+    return;
+  }
+  if (!scopeSel) return;
+  const saved = getViewScope();
+  void listUsers(apiBase).then((users) => {
+    scopeSel.textContent = "";
+    for (const u of users) {
+      const opt = document.createElement("option");
+      opt.value = u.id;
+      opt.textContent = u.id === user.id ? `${u.id} (내 것)` : u.id;
+      scopeSel.append(opt);
+    }
+    // 새로고침을 건너온 선택을 복원한다. 없어졌거나 처음이면 **자기 것**이 기본이다.
+    const initial = saved && users.some((u) => u.id === saved) ? saved : user.id;
+    scopeSel.value = initial;
+    setViewScope(initial);
+  });
+  scopeSel.addEventListener("change", () => {
+    setViewScope(scopeSel.value || null);
+    // 목록·상세가 이미 그려져 있어 부분 갱신은 곳곳을 건드려야 한다.
+    // 계정 전환은 드문 동작이라 다시 그리는 쪽이 확실하고 싸다.
+    window.location.reload();
   });
 }
 
@@ -1081,7 +1113,6 @@ async function boot(): Promise<void> {
     if (!viewerSync) {
       viewerSync = new GaitSyncSocket({
         wsUrl: resolveWsUrl(),
-        roomId: resolveRoomId(),
         role: "viewer",
       });
       viewerSync.onMessage((msg) => {
@@ -1743,7 +1774,7 @@ async function boot(): Promise<void> {
     persistSettings();
   };
 
-  const gaitSync = new GaitSyncSocket({ wsUrl: resolveWsUrl(), roomId: resolveRoomId() });
+  const gaitSync = new GaitSyncSocket({ wsUrl: resolveWsUrl() });
   syncCapturePresetToPhones = (): void => {
     if (!isSyncEnabled() || !gaitSync.connected || gaitSync.isViewer) return;
     gaitSync.sendCaptureSettings(captureSettingsPayload(selectedCapturePreset));
