@@ -3,6 +3,7 @@
  */
 
 import { joinApiUrl } from "../config/apiUrl.js";
+import { apiFetch } from "./http.js";
 
 export type ResultDate = {
   date: string;
@@ -107,7 +108,7 @@ function absolutize(apiBaseUrl: string, url: string | null | undefined): string 
 }
 
 export async function listResultDates(apiBaseUrl: string): Promise<ResultDate[]> {
-  const res = await fetch(joinApiUrl(apiBaseUrl, "/api/results/dates"));
+  const res = await apiFetch(joinApiUrl(apiBaseUrl, "/api/results/dates"));
   if (!res.ok) throw new Error(`dates HTTP ${res.status}`);
   const json = (await res.json()) as { dates: ResultDate[] };
   return json.dates || [];
@@ -117,7 +118,7 @@ export async function listResultSessions(
   apiBaseUrl: string,
   date: string,
 ): Promise<{ date: string; displayDate: string; sessions: ResultSession[] }> {
-  const res = await fetch(
+  const res = await apiFetch(
     joinApiUrl(apiBaseUrl, `/api/results/${encodeURIComponent(date)}/sessions`),
   );
   if (!res.ok) throw new Error(`sessions HTTP ${res.status}`);
@@ -129,7 +130,7 @@ export async function getResultDetail(
   date: string,
   stem: string,
 ): Promise<ResultDetail> {
-  const res = await fetch(
+  const res = await apiFetch(
     joinApiUrl(
       apiBaseUrl,
       `/api/results/${encodeURIComponent(date)}/sessions/${encodeURIComponent(stem)}`,

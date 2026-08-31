@@ -455,6 +455,46 @@
       #dvDelModal .dialog-foot button.danger:disabled { opacity: .5; cursor: not-allowed; }
 
       /* —— 파일 다운 (디스크 CSV · 원본 영상) —— */
+      /* —— 계정 바 · 버전 —— */
+      .ah-version { color: var(--muted, #9fadbd); font-size: 11px; letter-spacing: .3px; }
+      .ah-acct { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted, #9fadbd); }
+      .ah-logout {
+        background: none; border: 1px solid var(--line, #2a3644); border-radius: 8px;
+        color: inherit; font-size: 12px; padding: 4px 8px; cursor: pointer;
+      }
+
+      /*
+        마스터는 촬영을 하지 않는다 — 촬영 관련 메뉴를 통째로 감춘다.
+        화면을 가리는 것과 별개로 **서버가 막는다**(URL 을 알아도 403/404).
+      */
+      body[data-role="master"] .capture-only { display: none; }
+      body[data-role="user"] .master-only { display: none; }
+      /* 역할이 아직 안 정해진 순간(부팅 중)에는 마스터 전용을 숨겨 깜빡임을 막는다. */
+      body:not([data-role]) .master-only { display: none; }
+
+      /* —— 계정 관리 (마스터) —— */
+      #accountsPage {
+        flex: 1; min-height: 0; display: none; flex-direction: column;
+        background: var(--bg); overflow: auto; padding: 20px 24px 32px;
+      }
+      body[data-module="accounts"] #accountsPage { display: flex; }
+      .acc-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+      .acc-head h2 { margin: 0; font-size: 20px; }
+      .acc-refresh, .acc-actions button {
+        background: none; border: 1px solid var(--line, #2a3644); border-radius: 8px;
+        color: inherit; font-size: 12px; padding: 5px 10px; cursor: pointer;
+      }
+      .acc-actions button.danger { border-color: #ff453a; color: #ff453a; }
+      .acc-note { color: #ffd60a; font-size: 13px; margin: 8px 0 0; }
+      .acc-status { color: var(--muted, #9fadbd); font-size: 13px; }
+      .acc-table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 13px; }
+      .acc-table th, .acc-table td {
+        text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line, #2a3644);
+        white-space: nowrap;
+      }
+      .acc-table th { color: var(--muted, #9fadbd); font-weight: 600; font-size: 11px; }
+      .acc-actions { display: flex; gap: 6px; }
+
       /* —— Server storage page —— */
       #storagePage {
         flex: 1; min-height: 0; display: none; flex-direction: column;
@@ -1526,9 +1566,16 @@
         <div class="ah-wordmark" aria-label="Talktail Gait">
           <span class="ah-wordmark-talk">Talktail</span><span class="ah-wordmark-gait">Gait</span>
         </div>
+        <!--
+          재배포가 실제로 반영됐는지 화면만 보고 가리기 위한 것이다.
+          값은 src/version.ts — 재배포 전에 올린다.
+        -->
+        <span id="appVersion" class="ah-version" aria-label="버전"></span>
         <div class="ah-right">
           <nav class="ah-nav" aria-label="Modules">
-            <button type="button" class="active" data-module="measure" aria-current="page" data-i18n="nav_measure">측정</button>
+            <!-- 마스터 전용. body[data-role] 로 갈린다 — URL 을 알아도 서버가 막는다. -->
+            <button type="button" class="master-only" data-module="accounts">계정 관리</button>
+            <button type="button" class="capture-only active" data-module="measure" aria-current="page" data-i18n="nav_measure">측정</button>
             <button type="button" data-module="verify" data-i18n="nav_verify">데이터 검증</button>
             <button type="button" data-module="results" data-i18n="nav_results">결과 보기</button>
             <button type="button" data-module="review" data-i18n="nav_completed">완료된 분석</button>
@@ -1547,6 +1594,10 @@
             <option value="ko">한국어</option>
             <option value="en">English</option>
           </select>
+          <div class="ah-acct">
+            <span id="acctName"></span>
+            <button type="button" id="acctLogout" class="ah-logout">로그아웃</button>
+          </div>
         </div>
       </div>
     </header>
@@ -1870,6 +1921,9 @@
         </div>
       </div>
     </section>
+
+    <!-- 계정 관리 — 마스터 전용. 일반 계정에서는 메뉴가 없고 API 도 403 이다. -->
+    <section id="accountsPage" hidden aria-label="Accounts"></section>
 
     <section id="storagePage" hidden aria-label="Server storage">
       <div class="rp-toolbar">

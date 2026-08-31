@@ -3,6 +3,7 @@
  */
 
 import { joinApiUrl } from "../config/apiUrl.js";
+import { apiFetch } from "./http.js";
 
 export type FolderUsage = {
   name: string;
@@ -21,8 +22,13 @@ export type StorageUsage = {
   folders: FolderUsage[];
 };
 
-export async function getStorageUsage(apiBaseUrl: string): Promise<StorageUsage> {
-  const res = await fetch(joinApiUrl(apiBaseUrl, "/api/storage"));
+/**
+ * @param userId 마스터가 남의 계정을 볼 때만 준다. 일반 계정은 무엇을 보내든
+ *   서버가 자기 것으로 되돌린다 — 화면이 아니라 서버가 경계를 지킨다.
+ */
+export async function getStorageUsage(apiBaseUrl: string, userId?: string): Promise<StorageUsage> {
+  const path = userId ? `/api/storage?userId=${encodeURIComponent(userId)}` : "/api/storage";
+  const res = await apiFetch(joinApiUrl(apiBaseUrl, path));
   if (!res.ok) throw new Error(`storage HTTP ${res.status}`);
   const json = (await res.json()) as StorageUsage;
   return { disk: json.disk, folders: Array.isArray(json.folders) ? json.folders : [] };

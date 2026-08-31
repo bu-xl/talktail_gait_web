@@ -7,6 +7,7 @@
  */
 
 import { joinApiUrl } from "../config/apiUrl.js";
+import { apiFetch } from "./http.js";
 
 export interface SessionNotes {
   date: string;
@@ -29,7 +30,7 @@ export async function getSessionNotes(
   date: string,
   stem: string,
 ): Promise<string> {
-  const res = await fetch(notesUrl(apiBaseUrl, date, stem));
+  const res = await apiFetch(notesUrl(apiBaseUrl, date, stem));
   // 한 번도 안 적은 세션은 404 다. 빈 메모와 같은 뜻이므로 예외로 만들지 않는다.
   if (res.status === 404) return "";
   if (!res.ok) throw new Error(`notes HTTP ${res.status}`);
@@ -43,7 +44,7 @@ export async function saveSessionNotes(
   stem: string,
   text: string,
 ): Promise<void> {
-  const res = await fetch(notesUrl(apiBaseUrl, date, stem), {
+  const res = await apiFetch(notesUrl(apiBaseUrl, date, stem), {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text }),

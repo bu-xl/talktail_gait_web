@@ -3,6 +3,7 @@
  */
 
 import { joinApiUrl } from "../config/apiUrl.js";
+import { apiFetch } from "./http.js";
 
 export type StoredCsvFile = {
   name: string;
@@ -24,7 +25,7 @@ export type StoredFilesList = {
 };
 
 export async function listStoredFiles(apiBaseUrl: string): Promise<StoredFilesList> {
-  const res = await fetch(joinApiUrl(apiBaseUrl, "/api/files"));
+  const res = await apiFetch(joinApiUrl(apiBaseUrl, "/api/files"));
   if (!res.ok) throw new Error(`files HTTP ${res.status}`);
   const json = (await res.json()) as StoredFilesList;
   return {
@@ -40,7 +41,7 @@ export async function listStoredFiles(apiBaseUrl: string): Promise<StoredFilesLi
  * 도장에 표시하므로 **버린 뒤 늦게 도착한 업로드도** 같은 취급을 받는다.
  */
 export async function discardSession(apiBaseUrl: string, sessionId: string): Promise<{ stamp: string }> {
-  const res = await fetch(joinApiUrl(apiBaseUrl, `/api/sessions/${encodeURIComponent(sessionId)}/discard`), {
+  const res = await apiFetch(joinApiUrl(apiBaseUrl, `/api/sessions/${encodeURIComponent(sessionId)}/discard`), {
     method: "POST",
   });
   if (!res.ok) throw new Error(`discard HTTP ${res.status}`);
@@ -53,7 +54,7 @@ export async function setStampDiscarded(
   stamp: string,
   discarded: boolean,
 ): Promise<void> {
-  const res = await fetch(joinApiUrl(apiBaseUrl, "/api/files/discarded"), {
+  const res = await apiFetch(joinApiUrl(apiBaseUrl, "/api/files/discarded"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ stamp, discarded }),
@@ -103,7 +104,7 @@ export async function createZipTicket(
   kind: ZipKind,
   files: string[],
 ): Promise<ZipTicket> {
-  const res = await fetch(joinApiUrl(apiBaseUrl, "/api/files/zip-ticket"), {
+  const res = await apiFetch(joinApiUrl(apiBaseUrl, "/api/files/zip-ticket"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ kind, files }),
@@ -159,7 +160,7 @@ const NEWLINE = /\r?\n/;
 export async function fetchCsvSpan(apiBaseUrl: string, rel: string): Promise<CsvSpan | null> {
   const url = joinApiUrl(apiBaseUrl, rel);
   const grab = async (range: string): Promise<string> => {
-    const res = await fetch(url, { headers: { Range: range } });
+    const res = await apiFetch(url, { headers: { Range: range } });
     if (!res.ok) throw new Error(`csv HTTP ${res.status}`);
     return res.text();
   };
@@ -234,7 +235,7 @@ export async function deleteStoredFiles(
   apiBaseUrl: string,
   files: { csv: string[]; videos: string[] },
 ): Promise<DeleteResult> {
-  const res = await fetch(joinApiUrl(apiBaseUrl, "/api/files/delete"), {
+  const res = await apiFetch(joinApiUrl(apiBaseUrl, "/api/files/delete"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(files),

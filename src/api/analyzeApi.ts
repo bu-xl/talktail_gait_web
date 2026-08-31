@@ -7,6 +7,7 @@
  */
 
 import { joinApiUrl } from "../config/apiUrl.js";
+import { apiFetch } from "./http.js";
 
 export type ManualDogInfo = {
   name?: string | null;
@@ -60,7 +61,7 @@ export async function uploadManualAnalysis(
     form.append("dogHeightCm", String(dog.heightCm));
   }
 
-  const res = await fetch(joinApiUrl(apiBaseUrl, "/api/analyze/manual"), {
+  const res = await apiFetch(joinApiUrl(apiBaseUrl, "/api/analyze/manual"), {
     method: "POST",
     body: form,
   });

@@ -101,6 +101,10 @@ import { FilesPage } from "../ui/filesPage.js";
 import { CsvPage } from "../ui/csvPage.js";
 import { VerifyPage } from "../ui/verifyPage.js";
 import { StoragePage } from "../ui/storagePage.js";
+import { AccountsPage } from "../ui/accountsPage.js";
+import { fetchMe, logout, type AuthUser } from "../api/authApi.js";
+import { requireLogin, watchSessionExpiry } from "../auth/loginGate.js";
+import { APP_VERSION } from "../version.js";
 import {
   clearReviewPanes,
   setAnalysisVideo,
@@ -337,6 +341,7 @@ function placeholderUrl(file: string): string {
 }
 
 type AppModule =
+  | "accounts"
   | "measure"
   | "results"
   | "report"
@@ -348,6 +353,7 @@ type AppModule =
   | "storage";
 
 const APP_MODULES: readonly AppModule[] = [
+  "accounts",
   "measure",
   "results",
   "report",
@@ -413,6 +419,20 @@ function wireAppHeader(opts: { onModuleChange: (mod: AppModule) => void }): (mod
   return setActive;
 }
 
+/** 헤더 가운데 버전 + 우측 계정/로그아웃. 재배포가 반영됐는지 화면으로 가린다. */
+function wireAccountBar(apiBase: string, user: AuthUser): void {
+  const verEl = document.getElementById("appVersion");
+  if (verEl) verEl.textContent = APP_VERSION;
+
+  const nameEl = document.getElementById("acctName");
+  if (nameEl) nameEl.textContent = user.isMaster ? `${user.id} (마스터)` : user.id;
+
+  const logoutBtn = document.getElementById("acctLogout");
+  logoutBtn?.addEventListener("click", () => {
+    void logout(apiBase).then(() => window.location.reload());
+  });
+}
+
 async function boot(): Promise<void> {
   const userSettings = loadUserSettings();
   const langParam = new URLSearchParams(window.location.search).get("lang");
@@ -425,6 +445,21 @@ async function boot(): Promise<void> {
   const config = await fetchConfig();
   configureSync(config.sync);
   const apiBase = resolveApiBase();
+
+  /**
+   * ★ 로그인이 본체보다 앞이다.
+   *
+   * 서버 미들웨어가 이미 모든 API 를 막고 있어 화면만 띄워도 데이터는 안 샌다.
+   * 그런데 로그인 전에 본체를 띄우면 **모든 패널이 401 을 받아 "데이터가 없다" 처럼
+   * 보인다** — 사용자는 그걸 로그인 문제로 읽지 못한다. 그래서 여기서 붙잡는다.
+   */
+  const me = await fetchMe(apiBase);
+  const { user: currentUser } = await requireLogin(apiBase, me);
+  // 세션이 도중에 끊기면 같은 화면을 다시 띄운다.
+  watchSessionExpiry(apiBase);
+  // 마스터냐 아니냐로 메뉴가 갈린다. CSS 가 이 속성을 보고 촬영 메뉴를 감춘다.
+  document.body.dataset.role = currentUser.isMaster ? "master" : "user";
+  document.body.dataset.account = currentUser.id;
 
   /**
    * 이번 녹화의 첫 프레임(time=0)에 해당하는 서버 시각(ns).
@@ -545,6 +580,13 @@ async function boot(): Promise<void> {
   const storagePageEl = $opt("storagePage");
   const storagePage = storagePageEl ? new StoragePage(storagePageEl) : null;
   storagePage?.setApiBase(apiBase);
+
+  // 마스터 전용. 일반 계정에서는 메뉴가 없고, URL 을 알아도 서버가 403 을 준다.
+  const accountsPageEl = $opt("accountsPage");
+  const accountsPage = accountsPageEl ? new AccountsPage(accountsPageEl) : null;
+  accountsPage?.setApiBase(apiBase);
+  accountsPage?.hide();
+  wireAccountBar(apiBase, currentUser);
   clearReviewPanes();
 
   const sessionBtn = $("btnSession") as HTMLButtonElement;
@@ -1077,6 +1119,8 @@ async function boot(): Promise<void> {
       else verifyPage?.hide();
       if (mod === "storage") storagePage?.show();
       else storagePage?.hide();
+      if (mod === "accounts") accountsPage?.show();
+      else accountsPage?.hide();
       if (mod === "review") enterViewerMode();
       else leaveViewerMode();
       // 측정 화면의 1·압력패드는 라이브 히트맵이다 — 열람이 덮어 둔 결과 미디어를 걷어낸다.

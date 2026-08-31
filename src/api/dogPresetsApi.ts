@@ -1,3 +1,4 @@
+import { apiFetch } from "./http.js";
 /** 빠른 입력용 반려견 프리셋 — back `/api/dog-presets`. */
 
 export interface DogPreset {
@@ -19,12 +20,12 @@ async function json<T>(res: Response): Promise<T> {
 }
 
 export async function listDogPresets(apiBase: string): Promise<DogPreset[]> {
-  const res = await fetch(`${apiBase}/api/dog-presets`);
+  const res = await apiFetch(`${apiBase}/api/dog-presets`);
   return (await json<{ presets: DogPreset[] }>(res)).presets;
 }
 
 export async function createDogPreset(apiBase: string, draft: DogPresetDraft): Promise<DogPreset> {
-  const res = await fetch(`${apiBase}/api/dog-presets`, {
+  const res = await apiFetch(`${apiBase}/api/dog-presets`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(draft),
@@ -33,7 +34,7 @@ export async function createDogPreset(apiBase: string, draft: DogPresetDraft): P
 }
 
 export async function deleteDogPreset(apiBase: string, id: string): Promise<void> {
-  const res = await fetch(`${apiBase}/api/dog-presets/${encodeURIComponent(id)}`, {
+  const res = await apiFetch(`${apiBase}/api/dog-presets/${encodeURIComponent(id)}`, {
     method: "DELETE",
   });
   await json<{ ok: true }>(res);

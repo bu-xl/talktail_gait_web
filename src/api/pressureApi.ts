@@ -7,6 +7,7 @@
 
 import { joinApiUrl } from "../config/apiUrl.js";
 import { pressureCsvName } from "../core/sessionNaming.js";
+import { apiFetch } from "./http.js";
 
 export type PressureDog = {
   name: string | null;
@@ -96,7 +97,7 @@ export async function uploadPressureCsv(
   if (tb?.clockOffsetNs) form.append("clock_offset_ns", tb.clockOffsetNs);
   if (tb?.clockRttP50Ns) form.append("clock_rtt_p50_ns", tb.clockRttP50Ns);
 
-  const res = await fetch(joinApiUrl(apiBaseUrl, "/api/pressure/records"), {
+  const res = await apiFetch(joinApiUrl(apiBaseUrl, "/api/pressure/records"), {
     method: "POST",
     body: form,
   });
@@ -116,7 +117,7 @@ export async function uploadPressureCsv(
 
 /** 저장된 압력 기록 목록 (백엔드에서 최신순 정렬). */
 export async function listPressureRecords(apiBaseUrl: string): Promise<PressureRecord[]> {
-  const res = await fetch(joinApiUrl(apiBaseUrl, "/api/pressure/records"));
+  const res = await apiFetch(joinApiUrl(apiBaseUrl, "/api/pressure/records"));
   if (!res.ok) throw new Error(`records HTTP ${res.status}`);
   const json = (await res.json()) as { records: PressureRecord[] };
   return json.records || [];
