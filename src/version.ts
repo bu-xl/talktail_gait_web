@@ -7,4 +7,4 @@
  * ★ 재배포 전에 이 값을 올린다. 안 올리면 목적 자체가 무너진다.
  *   앱은 `front_app/src/version.ts` 에 같은 규칙으로 따로 있다.
  */
-export const APP_VERSION = "ver 0.0.1";
+export const APP_VERSION = "ver 1.0.0";

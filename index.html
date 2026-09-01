@@ -125,7 +125,9 @@
       body[data-module="files"] #appBody,
       body[data-module="csv"] #appBody,
       body[data-module="verify"] #appBody,
-      body[data-module="storage"] #appBody { display: none !important; }
+      body[data-module="storage"] #appBody,
+      body[data-module="accounts"] #appBody,
+      body[data-module="mypage"] #appBody { display: none !important; }
 
       /* —— Report page —— */
       #resultsPage {
@@ -456,7 +458,19 @@
 
       /* —— 파일 다운 (디스크 CSV · 원본 영상) —— */
       /* —— 계정 바 · 버전 —— */
-      .ah-version { color: var(--muted, #9fadbd); font-size: 11px; letter-spacing: .3px; }
+      /* —— 하단 고정 푸터: 사업자 정보 | 약관 | 버전 —— */
+      #appFooter {
+        flex-shrink: 0; display: flex; flex-wrap: wrap; align-items: center;
+        justify-content: center; gap: 6px 14px; padding: 8px 20px;
+        background: var(--surface); border-top: 1px solid var(--border);
+        color: var(--muted, #9fadbd); font-size: 11px; line-height: 1.5;
+      }
+      #appFooter a { color: inherit; text-decoration: none; }
+      #appFooter a:hover { color: var(--primary-pressed, #d9502b); text-decoration: underline; }
+      #appVersion { letter-spacing: .3px; }
+      @media (max-width: 640px) {
+        #appFooter { gap: 4px 10px; padding: 8px 12px; font-size: 10px; }
+      }
       .ah-acct { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted, #9fadbd); }
       .ah-logout {
         background: none; border: 1px solid var(--line, #2a3644); border-radius: 8px;
@@ -472,28 +486,129 @@
       /* 역할이 아직 안 정해진 순간(부팅 중)에는 마스터 전용을 숨겨 깜빡임을 막는다. */
       body:not([data-role]) .master-only { display: none; }
 
+      /* —— 마이페이지 —— */
+      #myPage {
+        flex: 1; min-height: 0; display: none; flex-direction: column;
+        background: var(--bg); overflow: hidden;
+      }
+      body[data-module="mypage"] #myPage { display: flex; }
+      .mp-scroll { flex: 1; min-height: 0; overflow: auto; padding: 20px 24px 32px; }
+      .mp-head { margin: 0 0 18px; padding-bottom: 14px; border-bottom: 1px solid var(--divider); }
+      .mp-head h2 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+      .mp-head p { margin: 4px 0 0; font-size: 12px; line-height: 1.5; color: var(--muted); }
+      .mp-grid {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 14px; align-items: start; max-width: 900px;
+      }
+      .mp-card {
+        padding: 18px; border-radius: 8px;
+        background: var(--surface); border: 1px solid var(--border);
+      }
+      .mp-card h3 {
+        margin: 0 0 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.04em;
+        text-transform: uppercase; color: var(--muted);
+      }
+      /* 라벨 왼쪽 · 값 오른쪽. 구분은 선으로 — 칸을 채우지 않는다. */
+      .mp-row {
+        display: flex; align-items: baseline; justify-content: space-between; gap: 14px;
+        padding: 6px 0; border-top: 1px solid var(--divider);
+      }
+      .mp-row dt { font-size: 14px; color: var(--muted); }
+      .mp-row dd {
+        margin: 0; font-size: 14px; font-weight: 600; text-align: right;
+        font-feature-settings: 'tnum' 1;
+      }
+      .mp-field { display: flex; flex-direction: column; gap: 4px; margin-top: 14px; }
+      .mp-field label { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; color: var(--muted); }
+      .mp-field input, #myPage .ah-lang {
+        width: 100%; padding: 7px 8px; border: 1px solid var(--border); border-radius: 6px;
+        background: var(--surface); color: var(--fg); font: inherit; font-size: 14px;
+      }
+      .mp-field input:focus, #myPage .ah-lang:focus {
+        outline: none; border-color: var(--primary);
+        box-shadow: 0 0 0 3px var(--primary-light);
+      }
+      .mp-actions { display: flex; align-items: center; gap: 10px; margin-top: 18px; }
+      .mp-submit {
+        padding: 8px 10px; border-radius: 6px; cursor: pointer;
+        background: var(--primary); border: 1px solid var(--primary); color: #fff;
+        font: inherit; font-size: 14px; font-weight: 600;
+      }
+      .mp-submit:hover { background: var(--primary-hover, #f2764d); border-color: var(--primary-hover, #f2764d); }
+      .mp-submit:active { background: var(--primary-pressed); border-color: var(--primary-pressed); }
+      .mp-submit:disabled { opacity: .4; cursor: not-allowed; }
+      .mp-msg { font-size: 12px; line-height: 1.5; color: var(--muted); }
+      .mp-msg.ok { color: var(--success, #1a7f37); }
+      .mp-msg.bad { color: var(--danger, #cf222e); }
+      .mp-note { margin: 8px 0 0; font-size: 12px; line-height: 1.5; color: var(--muted); }
+
       /* —— 계정 관리 (마스터) —— */
+      /* 다른 화면과 같은 껍데기(rp-toolbar + 스크롤 본문)를 쓴다 — 여기만 다르게 보일 이유가 없다. */
       #accountsPage {
         flex: 1; min-height: 0; display: none; flex-direction: column;
-        background: var(--bg); overflow: auto; padding: 20px 24px 32px;
+        background: var(--bg); overflow: hidden;
       }
       body[data-module="accounts"] #accountsPage { display: flex; }
-      .acc-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-      .acc-head h2 { margin: 0; font-size: 20px; }
-      .acc-refresh, .acc-actions button {
-        background: none; border: 1px solid var(--line, #2a3644); border-radius: 8px;
-        color: inherit; font-size: 12px; padding: 5px 10px; cursor: pointer;
+      #accountsPage .rp-toolbar-text h1 {
+        margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em;
       }
-      .acc-actions button.danger { border-color: #ff453a; color: #ff453a; }
-      .acc-note { color: #ffd60a; font-size: 13px; margin: 8px 0 0; }
-      .acc-status { color: var(--muted, #9fadbd); font-size: 13px; }
-      .acc-table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 13px; }
+      #accountsPage .rp-toolbar-text p { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+      .acc-scroll { flex: 1; min-height: 0; overflow: auto; padding: 20px 24px 32px; }
+      .acc-cards {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 12px; margin-bottom: 18px;
+      }
+      .acc-card {
+        padding: 14px 16px; border-radius: 12px;
+        background: var(--surface); border: 1px solid var(--border);
+      }
+      .acc-card-label { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+      .acc-card-value {
+        font-size: 24px; font-weight: 700; letter-spacing: -0.02em;
+        font-feature-settings: 'tnum' 1;
+      }
+      /* 승인 대기가 0 이면 강조하지 않는다 — 항상 켜진 경고등은 아무도 안 본다. */
+      .acc-card-pending.is-on { border-color: var(--primary); background: var(--primary-light); }
+      .acc-card-pending.is-on .acc-card-value { color: var(--primary-pressed); }
+      .acc-table-wrap {
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: 12px; overflow: hidden;
+      }
+      .acc-table { width: 100%; border-collapse: collapse; font-size: 13px; }
       .acc-table th, .acc-table td {
-        text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line, #2a3644);
-        white-space: nowrap;
+        text-align: left; padding: 12px 16px; white-space: nowrap;
+        border-bottom: 1px solid var(--divider);
       }
-      .acc-table th { color: var(--muted, #9fadbd); font-weight: 600; font-size: 11px; }
-      .acc-actions { display: flex; gap: 6px; }
+      .acc-table thead th {
+        position: sticky; top: 0; z-index: 1; background: var(--surface);
+        color: var(--muted); font-weight: 600; font-size: 11px;
+        letter-spacing: .04em; text-transform: uppercase;
+      }
+      .acc-table tbody tr:last-child td { border-bottom: 0; }
+      .acc-table tbody tr:hover { background: var(--surface-hover); }
+      .acc-table tbody tr.is-pending { background: var(--primary-light); }
+      .acc-id { font-weight: 700; }
+      .acc-master-tag {
+        margin-left: 6px; padding: 1px 6px; border-radius: 999px;
+        background: var(--surface-hover); border: 1px solid var(--border);
+        font-size: 11px; font-weight: 600; color: var(--muted);
+      }
+      .acc-num { font-feature-settings: 'tnum' 1; }
+      .acc-dim { color: var(--muted); }
+      .acc-pill {
+        display: inline-block; padding: 3px 9px; border-radius: 999px;
+        font-size: 11px; font-weight: 700; border: 1px solid transparent;
+      }
+      .acc-pill.is-pending { background: var(--primary-light); color: var(--primary-pressed); border-color: var(--primary); }
+      .acc-pill.is-active { background: #E7F4EA; color: var(--success); border-color: #B6DFC0; }
+      .acc-pill.is-blocked { background: #FBE9EA; color: var(--danger); border-color: #F0BFC3; }
+      .acc-actions { display: flex; gap: 6px; justify-content: flex-end; }
+      .acc-actions button { padding: 5px 10px; font-size: 12px; border-radius: 6px; }
+      .acc-actions button.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+      .acc-actions button.primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+      .acc-actions button.danger { color: var(--danger); border-color: #F0BFC3; }
+      .acc-actions button.danger:hover { background: #FBE9EA; border-color: var(--danger); }
+      .acc-empty { padding: 40px 16px; text-align: center; color: var(--muted); font-size: 13px; }
 
       /* —— Server storage page —— */
       #storagePage {
@@ -1566,11 +1681,6 @@
         <div class="ah-wordmark" aria-label="Talktail Gait">
           <span class="ah-wordmark-talk">Talktail</span><span class="ah-wordmark-gait">Gait</span>
         </div>
-        <!--
-          재배포가 실제로 반영됐는지 화면만 보고 가리기 위한 것이다.
-          값은 src/version.ts — 재배포 전에 올린다.
-        -->
-        <span id="appVersion" class="ah-version" aria-label="버전"></span>
         <div class="ah-right">
           <nav class="ah-nav" aria-label="Modules">
             <!-- 마스터 전용. body[data-role] 로 갈린다 — URL 을 알아도 서버가 막는다. -->
@@ -1587,13 +1697,10 @@
                 <button type="button" data-module="upload" data-i18n="nav_upload">직접 분석</button>
                 <button type="button" data-module="report" data-i18n="nav_report">리포트</button>
                 <button type="button" data-module="storage" data-i18n="nav_storage">서버 조회</button>
+                <button type="button" data-module="mypage">마이페이지</button>
               </div>
             </details>
           </nav>
-          <select id="langSelect" class="ah-lang" aria-label="Language">
-            <option value="ko">한국어</option>
-            <option value="en">English</option>
-          </select>
           <!--
             마스터가 보는 계정을 고른다. 기본값은 **자기 것**이다 —
             로그인하자마자 전 계정이 섞여 보이면 무엇을 보고 있는지 알 수 없다.
@@ -1928,6 +2035,63 @@
     </section>
 
     <!-- 계정 관리 — 마스터 전용. 일반 계정에서는 메뉴가 없고 API 도 403 이다. -->
+    <section id="myPage" aria-label="My page">
+      <div class="mp-scroll">
+        <div class="mp-head">
+          <h2>마이페이지</h2>
+          <p>가입할 때 등록한 정보와 계정 설정입니다. 기관명·연락처 수정은 관리자에게 문의해 주세요.</p>
+        </div>
+
+        <div class="mp-grid">
+          <div class="mp-card">
+            <h3>내 정보</h3>
+            <dl class="mp-info">
+              <div class="mp-row"><dt>아이디</dt><dd id="myId">—</dd></div>
+              <div class="mp-row"><dt>기관명</dt><dd id="myOrg">—</dd></div>
+              <div class="mp-row"><dt>연락처</dt><dd id="myPhone">—</dd></div>
+              <div class="mp-row"><dt>상태</dt><dd id="myStatus">—</dd></div>
+              <div class="mp-row"><dt>가입일</dt><dd id="myCreatedAt">—</dd></div>
+              <div class="mp-row"><dt>최근 로그인</dt><dd id="myLastLoginAt">—</dd></div>
+            </dl>
+          </div>
+
+          <div class="mp-card">
+            <h3>언어</h3>
+            <div class="mp-field">
+              <label for="langSelect">화면 표시 언어</label>
+              <select id="langSelect" class="ah-lang" aria-label="Language">
+                <option value="ko">한국어</option>
+                <option value="en">English</option>
+              </select>
+            </div>
+            <p class="mp-note">선택은 이 브라우저에 저장되며 즉시 적용됩니다.</p>
+          </div>
+
+          <div class="mp-card">
+            <h3>비밀번호 변경</h3>
+            <form id="myPwForm" autocomplete="off">
+              <div class="mp-field">
+                <label for="myPwCurrent">현재 비밀번호</label>
+                <input id="myPwCurrent" name="current" type="password" required autocomplete="current-password" />
+              </div>
+              <div class="mp-field">
+                <label for="myPwNext">새 비밀번호</label>
+                <input id="myPwNext" name="next" type="password" required autocomplete="new-password" />
+              </div>
+              <div class="mp-field">
+                <label for="myPwConfirm">새 비밀번호 확인</label>
+                <input id="myPwConfirm" name="confirm" type="password" required autocomplete="new-password" />
+              </div>
+              <div class="mp-actions">
+                <button type="submit" class="mp-submit">변경</button>
+                <span id="myPwMsg" class="mp-msg" role="status"></span>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section id="accountsPage" hidden aria-label="Accounts"></section>
 
     <section id="storagePage" hidden aria-label="Server storage">
@@ -2365,6 +2529,19 @@
         </div>
       </div>
     </div>
+    <footer id="appFooter">
+      <span>주식회사 크림오프 · 대표자 권도혁 · 사업자등록번호 514-87-03021</span>
+      <span>경상북도 경산시 삼풍로 27, 309호</span>
+      <a href="mailto:creamoff2021@gmail.com">creamoff2021@gmail.com</a>
+      <a href="/legal/terms.html" target="_blank" rel="noopener">이용약관</a>
+      <a href="/legal/privacy.html" target="_blank" rel="noopener">개인정보처리방침</a>
+      <!--
+        재배포가 실제로 반영됐는지 화면만 보고 가리기 위한 것이다.
+        값은 src/version.ts — 재배포 전에 올린다.
+      -->
+      <span id="appVersion" aria-label="버전"></span>
+    </footer>
+
     <script type="module" src="/src/app/main.ts"></script>
 
   </body>

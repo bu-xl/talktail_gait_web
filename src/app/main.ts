@@ -102,6 +102,7 @@ import { CsvPage } from "../ui/csvPage.js";
 import { VerifyPage } from "../ui/verifyPage.js";
 import { StoragePage } from "../ui/storagePage.js";
 import { AccountsPage } from "../ui/accountsPage.js";
+import { wireMyPage } from "../ui/myPage.js";
 import { fetchMe, listUsers, logout, type AuthUser } from "../api/authApi.js";
 import { getViewScope, setViewScope } from "../api/http.js";
 import { requireLogin, watchSessionExpiry } from "../auth/loginGate.js";
@@ -351,7 +352,8 @@ type AppModule =
   | "csv"
   | "verify"
   | "review"
-  | "storage";
+  | "storage"
+  | "mypage";
 
 const APP_MODULES: readonly AppModule[] = [
   "accounts",
@@ -364,6 +366,7 @@ const APP_MODULES: readonly AppModule[] = [
   "verify",
   "review",
   "storage",
+  "mypage",
 ];
 
 /** 헤더 nav 를 연결하고, 코드에서 모듈을 바꿀 수 있는 함수를 돌려준다. */
@@ -420,7 +423,7 @@ function wireAppHeader(opts: { onModuleChange: (mod: AppModule) => void }): (mod
   return setActive;
 }
 
-/** 헤더 가운데 버전 + 우측 계정/로그아웃. 재배포가 반영됐는지 화면으로 가린다. */
+/** 푸터 버전 + 헤더 우측 계정/로그아웃. 재배포가 반영됐는지 화면으로 가린다. */
 function wireAccountBar(apiBase: string, user: AuthUser): void {
   const verEl = document.getElementById("appVersion");
   if (verEl) verEl.textContent = APP_VERSION;
@@ -619,6 +622,7 @@ async function boot(): Promise<void> {
   accountsPage?.setApiBase(apiBase);
   accountsPage?.hide();
   wireAccountBar(apiBase, currentUser);
+  wireMyPage(apiBase, currentUser);
   clearReviewPanes();
 
   const sessionBtn = $("btnSession") as HTMLButtonElement;

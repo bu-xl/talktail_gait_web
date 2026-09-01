@@ -103,6 +103,11 @@ function serveDashboardAnalysis(): Plugin {
   };
 }
 
+// dev 프록시가 향할 back. `/api` 로 끝나면 떼어낸다 — 프록시가 경로를 그대로 얹는다.
+const proxyTarget = (process.env.GAIT_PROXY_TARGET || process.env.VITE_API_BASE_URL || "http://localhost:3000")
+  .replace(/\/+$/, "")
+  .replace(/\/api$/i, "");
+
 // Plain TS + Canvas app; config.json is copied into dist for production/Electron.
 export default defineConfig({
   root: ".",
@@ -117,23 +122,14 @@ export default defineConfig({
       allow: [".", projectRoot, dashboardAnalysisRoot],
     },
     proxy: {
-      "/api": {
-        target: process.env.VITE_API_BASE_URL || "http://localhost:3000",
-        changeOrigin: true,
-      },
-      "/health": {
-        target: process.env.VITE_API_BASE_URL || "http://localhost:3000",
-        changeOrigin: true,
-      },
-      "/uploads": {
-        target: process.env.VITE_API_BASE_URL || "http://localhost:3000",
-        changeOrigin: true,
-      },
-      "/ws": {
-        target: process.env.VITE_API_BASE_URL || "http://localhost:3000",
-        ws: true,
-        changeOrigin: true,
-      },
+      // 프록시를 지나면 브라우저 기준 동일 출처가 된다 — 실서버(https)에 붙어도
+      // SameSite=Lax 세션 쿠키가 그대로 실린다. 클라이언트 base 는 비워 둘 것
+      // (.env.local 의 VITE_API_BASE_URL= / VITE_WS_URL=).
+      //   GAIT_PROXY_TARGET=https://gait.o-r.kr npm run dev
+      "/api": { target: proxyTarget, changeOrigin: true },
+      "/health": { target: proxyTarget, changeOrigin: true },
+      "/uploads": { target: proxyTarget, changeOrigin: true },
+      "/ws": { target: proxyTarget, ws: true, changeOrigin: true },
     },
   },
   plugins: [

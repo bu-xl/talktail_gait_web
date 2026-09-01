@@ -1,0 +1,39 @@
+/* 약관·방침 문서 공통 스타일 — 앱 토큰과 같은 톤(아이보리+코랄). */
+:root {
+  --bg: #FFFBF8; --surface: #ffffff; --border: #F3EFEC;
+  --fg: #1f2329; --muted: #7C7977; --primary: #f0663f; --brand-text: #D14E27;
+  --font-ui: 'Pretendard', 'Pretendard Variable', system-ui, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  --font-brand: 'Quicksand', 'Pretendard', sans-serif;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 15px/1.75 var(--font-ui); -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 760px; margin: 0 auto; padding: 32px 20px 80px; }
+.brand {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 28px;
+  font-family: var(--font-brand); font-weight: 700; font-size: 22px; letter-spacing: -0.03em;
+  text-decoration: none;
+}
+.brand .t { color: var(--primary); }
+.brand .g { color: var(--brand-text); font-weight: 600; }
+h1 { font-size: 26px; letter-spacing: -0.02em; margin: 0 0 6px; }
+.meta { color: var(--muted); font-size: 13px; margin: 0 0 28px; }
+h2 { font-size: 17px; margin: 32px 0 8px; letter-spacing: -0.01em; }
+p, li { color: var(--fg); }
+ul, ol { padding-left: 20px; margin: 8px 0; }
+li { margin: 4px 0; }
+table {
+  width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+}
+th, td { border-bottom: 1px solid var(--border); padding: 10px 12px; text-align: left; vertical-align: top; }
+th { background: #FEF4F0; font-weight: 700; white-space: nowrap; }
+tr:last-child th, tr:last-child td { border-bottom: 0; }
+.note {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 14px 16px; margin: 16px 0;
+}
+footer { margin-top: 48px; color: var(--muted); font-size: 13px; }
+a { color: var(--brand-text); }

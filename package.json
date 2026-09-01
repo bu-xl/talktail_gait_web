@@ -1,6 +1,6 @@
 {
   "name": "gait-pressure-viewer",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Real-time heatmap viewer for a 40x40 USB-serial pressure mat (90x180cm, 1:2).",
   "author": "TalkTail",
   "type": "module",
