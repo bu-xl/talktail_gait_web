@@ -109,7 +109,7 @@ export const LOCALES = {
     qi_save: "등록",
     qi_cancel: "취소",
     qi_delete: "삭제",
-    qi_need_name_weight: "이름과 몸무게를 입력하세요.",
+    qi_need_name_weight: "이름·몸무게·견종을 입력하세요.",
     qi_delete_confirm: "{name} 을(를) 빠른 입력에서 지울까요?",
     btn_dog_info_expand: "펼치기",
     btn_dog_info_collapse: "접기",
@@ -474,9 +474,7 @@ export const LOCALES = {
     rs_estimated: "{{n}}개 패널은 추정 정렬",
 
     /* 측정 시작 전 필수 입력 */
-    session_need_dog_name: "강아지 이름을 입력해야 측정을 시작할 수 있습니다.",
-    session_need_dog_weight: "강아지 몸무게를 입력해야 측정을 시작할 수 있습니다.",
-    session_need_dog_both: "강아지 이름과 몸무게를 입력해야 측정을 시작할 수 있습니다.",
+    session_need_dog: "강아지 이름·몸무게·견종을 모두 입력해야 측정을 시작할 수 있습니다.",
 
     nav_storage: "서버 조회",
     storage_page_title: "서버 조회",
@@ -617,7 +615,7 @@ export const LOCALES = {
     qi_save: "Add",
     qi_cancel: "Cancel",
     qi_delete: "Delete",
-    qi_need_name_weight: "Enter a name and a weight.",
+    qi_need_name_weight: "Enter a name, a weight and a breed.",
     qi_delete_confirm: "Remove {name} from quick fill?",
     btn_dog_info_expand: "Expand",
     btn_dog_info_collapse: "Collapse",
@@ -982,9 +980,7 @@ export const LOCALES = {
     rs_estimated: "{{n}} pane(s) aligned by estimate",
 
     /* Required before a measurement can start */
-    session_need_dog_name: "Enter the dog's name before starting a measurement.",
-    session_need_dog_weight: "Enter the dog's weight before starting a measurement.",
-    session_need_dog_both: "Enter the dog's name and weight before starting a measurement.",
+    session_need_dog: "Enter the dog's name, weight and breed before starting a measurement.",
 
     nav_storage: "Server",
     storage_page_title: "Server storage",

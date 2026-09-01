@@ -41,7 +41,7 @@ export class UploadPage {
     this.wireSlot("video", "upVideoInput", "upVideoBox", "upVideoName");
     this.analyzeBtn.addEventListener("click", () => void this.submit());
     // 이름·몸무게를 채우는 즉시 버튼이 풀려야 한다 — 안 그러면 왜 막혔는지 못 찾는다.
-    for (const id of ["upDogName", "upDogWeight"]) {
+    for (const id of ["upDogName", "upDogWeight", "upDogBreed"]) {
       this.root.querySelector(`#${id}`)?.addEventListener("input", () => this.syncUi());
     }
     onLangChange(() => this.syncUi());

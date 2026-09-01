@@ -1,5 +1,5 @@
 /**
- * 반려견 신원 게이트 — 이름과 몸무게가 없으면 분석을 시작할 수 없다.
+ * 반려견 신원 게이트 — 이름·몸무게·견종이 없으면 분석을 시작할 수 없다.
  *
  * 두 값은 나중에 붙이는 메타데이터가 아니라 **파일명(태스크명)에 들어간다.**
  * back 의 `dogPrefix()` 가 빠진 값을 조용히 버리므로 결과가 이렇게 갈린다.
@@ -15,14 +15,12 @@
  * 부르는 쪽에서 `t(gate.reasonKey)` 한다.
  */
 
-export type DogIdentityReasonKey =
-  | "session_need_dog_both"
-  | "session_need_dog_name"
-  | "session_need_dog_weight";
+export type DogIdentityReasonKey = "session_need_dog";
 
 export interface DogIdentity {
   name?: string | null;
   weightKg?: number | null;
+  breed?: string | null;
 }
 
 export interface DogIdentityGate {
@@ -35,10 +33,7 @@ export function checkDogIdentity(dog: DogIdentity | null | undefined): DogIdenti
   const hasName = Boolean(dog?.name && dog.name.trim());
   const weight = dog?.weightKg;
   const hasWeight = weight != null && Number.isFinite(weight) && weight > 0;
-  if (hasName && hasWeight) return { ok: true, reasonKey: null };
-  if (!hasName && !hasWeight) return { ok: false, reasonKey: "session_need_dog_both" };
-  return {
-    ok: false,
-    reasonKey: hasName ? "session_need_dog_weight" : "session_need_dog_name",
-  };
+  const hasBreed = Boolean(dog?.breed && dog.breed.trim());
+  if (hasName && hasWeight && hasBreed) return { ok: true, reasonKey: null };
+  return { ok: false, reasonKey: "session_need_dog" };
 }

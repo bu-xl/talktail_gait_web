@@ -118,8 +118,9 @@ export class DogPresetsCard {
 
     const name = value("dpName");
     const weightKg = num("dpWeight");
-    // 시작 게이트와 같은 규칙 — 이름과 몸무게는 파일명에 들어간다.
-    if (!name || weightKg == null) {
+    const breed = value("dpBreed");
+    // 시작 게이트와 같은 규칙 — 이 셋이 없으면 카드로 채워도 시작이 막힌다.
+    if (!name || weightKg == null || !breed) {
       this.errorEl.textContent = t("qi_need_name_weight");
       return;
     }
@@ -131,7 +132,7 @@ export class DogPresetsCard {
         name,
         weightKg,
         heightCm: num("dpHeight"),
-        breed: value("dpBreed") || null,
+        breed,
       });
       this.closeModal();
       await this.refresh();

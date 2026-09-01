@@ -2074,7 +2074,7 @@ async function boot(): Promise<void> {
       startClinicSession();
     });
   };
-  for (const id of ["dogName", "dogWeightInfo"]) {
+  for (const id of ["dogName", "dogWeightInfo", "dogBreed"]) {
     $opt(id)?.addEventListener("input", () => applyDogIdentityGate());
   }
   applyDogIdentityGate();
