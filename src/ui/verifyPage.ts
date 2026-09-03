@@ -15,6 +15,7 @@
  * 영상 길이와 CSV 길이가 크게 어긋나면 그 자리에서 티가 나는 것이 이 화면의 목적이다.
  */
 
+import { analyzeStoredCapture } from "../api/analyzeApi.js";
 import { onLangChange, t } from "../i18n/index.js";
 import {
   deleteStoredFiles,
@@ -60,6 +61,7 @@ export class VerifyPage {
   private readonly emptyEl: HTMLElement;
   private readonly detailEl: HTMLElement;
   private readonly refreshBtn: HTMLButtonElement;
+  private readonly analyzeBtn: HTMLButtonElement;
   private readonly modalEl: HTMLElement;
   private readonly modalHintEl: HTMLElement;
   private readonly modalListEl: HTMLElement;
@@ -84,6 +86,9 @@ export class VerifyPage {
   private loading = false;
   /** 도장 → CSV 길이. 한 번 읽으면 새로고침 전까지 다시 읽지 않는다. */
   private readonly spans = new Map<string, CsvSpan | null>();
+  /** 분석하기로 보낼 도장들. 탭을 바꾸거나 새로고침하면 비운다. */
+  private readonly picked = new Set<string>();
+  private analyzing = false;
 
   constructor(root: HTMLElement) {
     this.root = root;
@@ -94,6 +99,7 @@ export class VerifyPage {
     this.emptyEl = root.querySelector("#dvEmpty") as HTMLElement;
     this.detailEl = root.querySelector("#dvDetail") as HTMLElement;
     this.refreshBtn = root.querySelector("#dvRefresh") as HTMLButtonElement;
+    this.analyzeBtn = root.querySelector("#dvAnalyze") as HTMLButtonElement;
 
     this.modalEl = root.querySelector("#dvDelModal") as HTMLElement;
     this.modalHintEl = root.querySelector("#dvDelHint") as HTMLElement;
@@ -109,6 +115,7 @@ export class VerifyPage {
     this.purgeBtn.addEventListener("click", () => void this.purgeDiscarded());
 
     this.refreshBtn.addEventListener("click", () => void this.reload());
+    this.analyzeBtn.addEventListener("click", () => void this.runAnalyze());
     this.modalCancelBtn.addEventListener("click", () => this.closeDeleteModal());
     this.modalConfirmBtn.addEventListener("click", () => void this.runDelete());
     // 바깥을 눌러도 닫힌다. 지우는 중에는 닫지 않는다.
@@ -141,6 +148,7 @@ export class VerifyPage {
   private syncCopy(): void {
     this.subEl.textContent = t("verify_page_sub");
     this.refreshBtn.textContent = t("btn_results_refresh");
+    this.syncAnalyzeBtn();
     this.render();
   }
 
@@ -155,6 +163,7 @@ export class VerifyPage {
     this.refreshBtn.disabled = true;
     this.setStatus(t("files_loading"));
     try {
+      this.picked.clear();
       const list = await listStoredFiles(this.apiBase);
       this.allSessions = groupSessions(list.csv, list.videos);
       this.discarded = new Set(list.discarded);
@@ -177,6 +186,7 @@ export class VerifyPage {
   private setTab(tab: "live" | "discarded"): void {
     if (this.tab === tab) return;
     this.tab = tab;
+    this.picked.clear();
     this.selected = null;
     this.applyTab();
     this.render();
@@ -187,6 +197,45 @@ export class VerifyPage {
     this.sessions = this.allSessions.filter((s) => this.discarded.has(s.stamp) === wantDiscarded);
     if (this.selected && !this.sessions.some((s) => s.stamp === this.selected)) this.selected = null;
     if (!this.selected && this.sessions.length > 0) this.selected = this.sessions[0].stamp;
+  }
+
+  /**
+   * 체크한 촬영을 분석 대기열에 세운다.
+   *
+   * 서버가 도장으로 파일을 찾으므로 여기서 보낼 것은 도장뿐이다. 대기열은 back 의
+   * `analysisQueue` 가 직렬로 돌리고 진행 상황은 기존 큐 토스트가 그대로 보여준다 —
+   * 이 화면은 접수만 하고 기다리지 않는다.
+   *
+   * 하나가 실패해도 나머지는 계속 보낸다. 현장에서 열 건을 걸어 놓고 자리를 뜨는데,
+   * 중간에 멈춰 있으면 그 뒤가 통째로 안 돈다.
+   */
+  private async runAnalyze(): Promise<void> {
+    const stamps = this.sessions
+      .filter((s) => this.picked.has(s.stamp) && this.canAnalyze(s))
+      .map((s) => s.stamp);
+    if (stamps.length === 0 || this.analyzing) return;
+    this.analyzing = true;
+    this.syncAnalyzeBtn();
+    let ok = 0;
+    const failed: string[] = [];
+    for (const [i, stamp] of stamps.entries()) {
+      this.setStatus(t("verify_analyze_sending", { i: String(i + 1), n: String(stamps.length) }));
+      try {
+        await analyzeStoredCapture(this.apiBase, stamp);
+        ok += 1;
+        this.picked.delete(stamp);
+      } catch (err) {
+        failed.push(`${stamp}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+    this.analyzing = false;
+    this.setStatus(
+      t("verify_analyze_queued", { n: String(ok) }) +
+        (failed.length ? ` ${t("verify_analyze_skipped", { n: String(failed.length) })}` : ""),
+      failed.length > 0,
+    );
+    if (failed.length) console.warn("[verify] analyze failed", failed);
+    this.render();
   }
 
   /** 버린 촬영의 파일을 영구 삭제한다. 되돌릴 수 없으므로 개수를 박아 되묻는다. */
@@ -208,7 +257,10 @@ export class VerifyPage {
         deleted += result.deleted.length;
         failed += result.failed.length;
         // 파일이 사라졌으면 버림 표시도 같이 걷는다 — 안 걷으면 목록에 유령이 남는다.
-        await setStampDiscarded(this.apiBase, s.stamp, false).catch(() => undefined);
+        // 남은 파일이 있는데 걷으면 반쪽짜리 촬영이 살아있는 탭으로 되돌아온다.
+        if (result.failed.length === 0) {
+          await setStampDiscarded(this.apiBase, s.stamp, false).catch(() => undefined);
+        }
       }
       this.deleting = false;
       await this.reload();
@@ -244,6 +296,7 @@ export class VerifyPage {
     this.tabLiveBtn.classList.toggle("is-active", this.tab === "live");
     this.tabDiscardedBtn.classList.toggle("is-active", this.tab === "discarded");
     this.purgeBtn.hidden = this.tab !== "discarded" || this.sessions.length === 0;
+    this.syncAnalyzeBtn();
     this.emptyEl.textContent = this.tab === "discarded" ? t("verify_discarded_empty") : t("verify_empty");
     this.countEl.textContent = t("verify_count", { n: this.sessions.length });
     this.emptyEl.hidden = this.sessions.length > 0;
@@ -264,8 +317,37 @@ export class VerifyPage {
     this.renderDetail();
   }
 
+  /**
+   * Main 영상이 있어야 분석할 수 있다. CSV 는 없어도 된다 — 영상만으로도 분석은 돈다
+   * (압력 산출물만 빠진다). 버린 촬영은 대상이 아니다.
+   */
+  private canAnalyze(s: Session): boolean {
+    return this.tab === "live" && s.videos.some((v) => v.role === "main");
+  }
+
+  private syncAnalyzeBtn(): void {
+    const n = this.picked.size;
+    this.analyzeBtn.hidden = this.tab !== "live";
+    this.analyzeBtn.disabled = n === 0 || this.analyzing;
+    this.analyzeBtn.textContent = n === 0
+      ? t("verify_analyze_btn")
+      : t("verify_analyze_n", { n: String(n) });
+  }
+
   private sessionRow(s: Session): HTMLElement {
     const li = document.createElement("li");
+    li.className = "dv-row";
+    const pick = document.createElement("input");
+    pick.type = "checkbox";
+    pick.className = "dv-pick";
+    pick.checked = this.picked.has(s.stamp);
+    pick.disabled = !this.canAnalyze(s);
+    if (pick.disabled) pick.title = t("verify_analyze_no_video");
+    pick.addEventListener("change", () => {
+      if (pick.checked) this.picked.add(s.stamp);
+      else this.picked.delete(s.stamp);
+      this.syncAnalyzeBtn();
+    });
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "dv-item";
@@ -296,7 +378,7 @@ export class VerifyPage {
       this.selected = s.stamp;
       this.render();
     });
-    li.appendChild(btn);
+    li.append(pick, btn);
     return li;
   }
 

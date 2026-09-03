@@ -77,3 +77,32 @@ export async function uploadManualAnalysis(
   }
   return (await res.json()) as ManualAnalyzeJob;
 }
+
+/**
+ * 이미 서버에 있는 촬영을 분석한다 — 검증 화면의 "분석하기".
+ *
+ * `uploadManualAnalysis` 와 달리 파일을 올리지 않는다. 서버가 도장으로 디스크의
+ * CSV·Main 영상을 찾아 쓰므로 브라우저가 수백 MB 를 왕복시킬 이유가 없다.
+ * CSV 가 없는 촬영도 보낸다 — 영상만으로도 분석은 돈다(압력 산출물만 빠진다).
+ */
+export async function analyzeStoredCapture(
+  apiBaseUrl: string,
+  stamp: string,
+): Promise<ManualAnalyzeJob & { taskName: string; hasCsv: boolean }> {
+  const res = await apiFetch(joinApiUrl(apiBaseUrl, "/api/analyze/stored"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ stamp }),
+  });
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try {
+      const j = (await res.json()) as { error?: string };
+      if (j?.error) detail = j.error;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail);
+  }
+  return (await res.json()) as ManualAnalyzeJob & { taskName: string; hasCsv: boolean };
+}
