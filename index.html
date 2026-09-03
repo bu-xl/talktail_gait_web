@@ -164,27 +164,40 @@
       #rpDetail {
         display: flex; flex-direction: column; gap: 12px; min-height: 0;
       }
-      #rpDetail.hidden, #rpList.hidden, #rpEmpty.hidden, #rpLoading.hidden, #rpBack.hidden { display: none !important; }
-      #rpDetailActions {
-        display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0;
-      }
+      #rpDetail.hidden, #rpList.hidden, #rpEmpty.hidden, #rpLoading.hidden, #rpBack.hidden,
+      #rpDetailLoading.hidden { display: none !important; }
       #rpOpenReport {
-        margin-left: auto;
         background: #1f6f6a; color: #fff; border-color: #1f6f6a;
       }
       #rpOpenReport:hover { filter: brightness(1.06); }
       #rpLangHint { width: 100%; font-size: 12px; color: var(--muted); margin: 0 0 10px; }
 
       /*
-        상세는 스크롤 문서가 아니라 **화면 한 판**이다 — 5분할이 "완료된 분석"과 같은
-        크기로 보여야 한다. 스크롤 컨테이너 안에서는 높이가 정해지지 않아 패널이
-        min-height 로 쪼그라든다(그게 "축소돼 보인다"의 원인). 상세일 때만 이 열을
-        flex 로 바꿔 높이를 확정한다. 목록(#rpList)일 때는 그대로 스크롤한다.
+        상세는 스크롤 문서가 아니라 **화면 한 판**이다 — "완료된 분석"에서 우측 레일을
+        접었을 때와 같게 보여야 한다. 스크롤 컨테이너 안에서는 높이가 정해지지 않아
+        패널이 min-height 로 쪼그라든다(그게 "축소돼 보인다"의 원인).
+
+        그래서 상세일 때만: 툴바를 한 줄로 줄이고(경로·부제는 접는다), 스크롤 여백과
+        패널 테두리를 걷어내 남는 높이를 5분할이 전부 가져가게 한다. 목록일 때는
+        그대로 스크롤하는 카드 화면이다.
       */
-      .rp-scroll:has(> #rpDetail:not(.hidden)) {
-        display: flex; flex-direction: column; overflow: hidden;
+      #resultsPage:has(#rpDetail:not(.hidden)) .rp-toolbar {
+        align-items: center; padding: 6px 12px;
       }
-      .rp-scroll:has(> #rpDetail:not(.hidden)) > #rpDetail { flex: 1; min-height: 0; }
+      #resultsPage:has(#rpDetail:not(.hidden)) #rpCrumbs,
+      #resultsPage:has(#rpDetail:not(.hidden)) #rpSub { display: none; }
+      #resultsPage:has(#rpDetail:not(.hidden)) #rpTitle { font-size: 14px; font-weight: 600; }
+      #resultsPage:has(#rpDetail:not(.hidden)) .rp-scroll {
+        display: flex; flex-direction: column; overflow: hidden; padding: 0;
+      }
+      #resultsPage:has(#rpDetail:not(.hidden)) #rpDetail { flex: 1; min-height: 0; gap: 0; }
+      #resultsPage:has(#rpDetail:not(.hidden)) #rpReviewPanel {
+        border: 0; border-radius: 0; min-height: 0;
+      }
+      /* 상세 전용 버튼은 툴바에 산다 — 목록 화면에서는 감춘다. */
+      #rpReviewInfo, #rpOpenReport { display: none; }
+      #resultsPage:has(#rpDetail:not(.hidden)) #rpReviewInfo,
+      #resultsPage:has(#rpDetail:not(.hidden)) #rpOpenReport { display: inline-flex; }
 
       /* Session replay — same 5 panes as measure, inline in the detail body */
       #rpReviewPanel {
@@ -787,9 +800,8 @@
 
       /* —— 리포트 열람의 "정보" 버튼 + 반려견 정보 모달 —— */
       #rpReviewInfo.hidden { display: none !important; }
-      #rpReviewInfo {
-        background: transparent; color: #e8f4f2; border-color: rgba(232,244,242,.35);
-      }
+      /* 툴바(밝은 배경)에 산다 — 예전 어두운 패널 헤더용 색을 쓰면 글자가 안 보인다. */
+      #rpReviewInfo { background: transparent; }
       .rp-review-actions { display: flex; gap: 8px; flex-shrink: 0; }
 
       #dogInfoModal {
@@ -2315,6 +2327,8 @@
           <p id="rpSub" data-i18n="results_dates_hint">날짜를 선택하세요</p>
         </div>
         <div class="rp-toolbar-actions">
+          <button type="button" id="rpReviewInfo" data-i18n="btn_dog_info">ⓘ 정보</button>
+          <button type="button" id="rpOpenReport" data-i18n="report_open">리포트 보기</button>
           <button type="button" id="rpBack" class="hidden" data-i18n="btn_results_back">뒤로</button>
           <button type="button" id="rpRefresh" data-i18n="btn_results_refresh">새로고침</button>
         </div>
@@ -2324,10 +2338,6 @@
         <div id="rpEmpty" class="hidden" data-i18n="results_empty">저장된 분석 결과가 없습니다</div>
         <div id="rpList" class="rp-grid"></div>
         <div id="rpDetail" class="hidden">
-          <div id="rpDetailActions">
-            <button type="button" id="rpReviewInfo" data-i18n="btn_dog_info">ⓘ 정보</button>
-            <button type="button" id="rpOpenReport" data-i18n="report_open">리포트 보기</button>
-          </div>
           <div id="rpDetailLoading" class="hidden">…</div>
           <div id="rpReviewPanel">
             <div id="rpReviewStage">
