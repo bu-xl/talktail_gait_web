@@ -99,6 +99,7 @@ import { ReportsPage } from "../ui/reportsPage.js";
 import { UploadPage } from "../ui/uploadPage.js";
 import { FilesPage } from "../ui/filesPage.js";
 import { CsvPage } from "../ui/csvPage.js";
+import { MultiPage } from "../ui/multiPage.js";
 import { VerifyPage } from "../ui/verifyPage.js";
 import { StoragePage } from "../ui/storagePage.js";
 import { AccountsPage } from "../ui/accountsPage.js";
@@ -352,6 +353,7 @@ type AppModule =
   | "csv"
   | "verify"
   | "review"
+  | "multi"
   | "storage"
   | "mypage";
 
@@ -365,6 +367,7 @@ const APP_MODULES: readonly AppModule[] = [
   "csv",
   "verify",
   "review",
+  "multi",
   "storage",
   "mypage",
 ];
@@ -588,6 +591,9 @@ async function boot(): Promise<void> {
   const csvPageEl = $opt("csvPage");
   const csvPage = csvPageEl ? new CsvPage(csvPageEl) : null;
   csvPage?.setApiBase(apiBase);
+  const multiPageEl = $opt("multiPage");
+  const multiPage = multiPageEl ? new MultiPage(multiPageEl) : null;
+  multiPage?.setApiBase(apiBase);
   const verifyPageEl = $opt("verifyPage");
   const verifyPage = verifyPageEl ? new VerifyPage(verifyPageEl) : null;
   verifyPage?.setApiBase(apiBase);
@@ -1150,6 +1156,8 @@ async function boot(): Promise<void> {
       else filesPage?.hide();
       if (mod === "csv") csvPage?.show();
       else csvPage?.hide();
+      if (mod === "multi") multiPage?.show();
+      else multiPage?.hide();
       if (mod === "verify") verifyPage?.show();
       else verifyPage?.hide();
       if (mod === "storage") storagePage?.show();

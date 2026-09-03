@@ -89,6 +89,7 @@ export function getViewScope(): string | null {
 const SCOPED_PATHS = [
   "/results/",
   "/results/dates",
+  "/multi-analysis/",
   "/pressure/records",
   "/files",
   "/storage",

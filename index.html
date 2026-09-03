@@ -127,6 +127,7 @@
       body[data-module="verify"] #appBody,
       body[data-module="storage"] #appBody,
       body[data-module="accounts"] #appBody,
+      body[data-module="multi"] #appBody,
       body[data-module="mypage"] #appBody { display: none !important; }
 
       /* —— Report page —— */
@@ -692,6 +693,25 @@
         background: var(--bg); overflow: hidden;
       }
       body[data-module="csv"] #csvPage { display: flex; }
+      #multiPage {
+        flex: 1; min-height: 0; display: none; flex-direction: column;
+        background: var(--bg); overflow: hidden;
+      }
+      body[data-module="multi"] #multiPage { display: flex; }
+      #maDogList .fd-file, #maSessList .fd-file, #maJobList .fd-file {
+        padding: 10px 16px; background: var(--surface);
+        border: 1px solid var(--border); border-radius: 10px; margin-bottom: 6px;
+      }
+      #maDogList .fd-file { cursor: pointer; }
+      #maDogList .fd-file:hover { background: var(--surface-hover); }
+      /* 날짜 머리글 — 시각 줄들을 그날짜 밑에 묶는다. */
+      .ma-date {
+        list-style: none; margin: 14px 0 6px; font-size: 12px; font-weight: 700;
+        color: var(--muted); font-variant-numeric: tabular-nums;
+      }
+      .ma-state.is-pending { background: var(--primary-light); }
+      .ma-state.is-failed { color: var(--danger, #e5484d); }
+      #maPickDog { font-weight: 700; }
       /* 태스크 안이 아니라 평면 목록이라 왼쪽 들여쓰기를 걷어낸다. */
       #cdList .fd-file {
         padding: 10px 16px; background: var(--surface);
@@ -1717,6 +1737,7 @@
             <button type="button" data-module="verify" data-i18n="nav_verify">데이터 검증</button>
             <button type="button" data-module="results" data-i18n="nav_results">결과 보기</button>
             <button type="button" data-module="review" data-i18n="nav_completed">완료된 분석</button>
+            <button type="button" data-module="multi" data-i18n="nav_multi">다중 분석</button>
             <details class="ah-menu">
               <summary data-i18n-title="nav_more" title="더보기" aria-label="더보기">≡</summary>
               <div class="ah-menu-list">
@@ -2228,6 +2249,44 @@
       <div class="fd-scroll">
         <p id="cdEmpty" class="fd-empty" data-i18n="csv_empty">해당 기간의 CSV 가 없습니다.</p>
         <ul id="cdList" class="fd-list"></ul>
+      </div>
+    </section>
+
+    <section id="multiPage" hidden aria-label="Multi analysis">
+      <div class="rp-toolbar">
+        <div class="rp-toolbar-text">
+          <h1 id="maTitle" data-i18n="ma_title">다중 분석</h1>
+          <p id="maSub" data-i18n="ma_sub">한 마리를 여러 번 찍은 결과를 골라 종합 리포트를 만듭니다.</p>
+        </div>
+        <div class="fd-toolbar-extra">
+          <button type="button" id="maRefresh" data-i18n="btn_results_refresh">새로고침</button>
+        </div>
+      </div>
+      <div class="dv-tabs">
+        <button type="button" id="maTabNew" class="dv-tab is-active" data-i18n="ma_tab_new">새 분석</button>
+        <button type="button" id="maTabJobs" class="dv-tab" data-i18n="ma_tab_jobs">결과</button>
+      </div>
+      <p id="maStatus" class="fd-status"></p>
+
+      <div id="maNew" class="fd-scroll">
+        <div id="maDogWrap">
+          <p id="maDogEmpty" class="fd-empty" data-i18n="ma_dogs_empty">분석이 끝난 촬영이 아직 없습니다.</p>
+          <ul id="maDogList" class="fd-list"></ul>
+        </div>
+        <div id="maPick" hidden>
+          <div class="fd-actions">
+            <button type="button" id="maBack" data-i18n="ma_back_to_dogs">← 개 목록</button>
+            <span id="maPickDog"></span>
+            <span id="maSel" class="fd-sel"></span>
+            <button type="button" id="maRun" class="fd-zip" disabled data-i18n="ma_run">선택한 촬영 종합 분석</button>
+          </div>
+          <ul id="maSessList" class="fd-list"></ul>
+        </div>
+      </div>
+
+      <div id="maJobs" class="fd-scroll" hidden>
+        <p id="maJobEmpty" class="fd-empty" data-i18n="ma_jobs_empty">아직 다중 분석 결과가 없습니다.</p>
+        <ul id="maJobList" class="fd-list"></ul>
       </div>
     </section>
 
