@@ -537,6 +537,7 @@
       .mp-submit:hover { background: var(--primary-hover, #f2764d); border-color: var(--primary-hover, #f2764d); }
       .mp-submit:active { background: var(--primary-pressed); border-color: var(--primary-pressed); }
       .mp-submit:disabled { opacity: .4; cursor: not-allowed; }
+      a.mp-submit { display: inline-block; text-decoration: none; color: #fff; }
       .mp-msg { font-size: 12px; line-height: 1.5; color: var(--muted); }
       .mp-msg.ok { color: var(--success, #1a7f37); }
       .mp-msg.bad { color: var(--danger, #cf222e); }
@@ -2065,6 +2066,14 @@
               </select>
             </div>
             <p class="mp-note">선택은 이 브라우저에 저장되며 즉시 적용됩니다.</p>
+          </div>
+
+          <div class="mp-card">
+            <h3>사용 설명서</h3>
+            <p class="mp-note" style="margin-top:0">촬영·분석 전체 절차를 담은 PDF 설명서입니다.</p>
+            <div class="mp-actions">
+              <a id="myGuideLink" class="mp-submit" href="#" download="gait-guide.pdf">설명서 내려받기 (PDF)</a>
+            </div>
           </div>
 
           <div class="mp-card">

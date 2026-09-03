@@ -7,6 +7,7 @@
  */
 
 import { changePassword, type AuthUser } from "../api/authApi.js";
+import { joinApiUrl } from "../config/apiUrl.js";
 
 function fmtDate(v?: string | null): string {
   if (!v) return "—";
@@ -34,6 +35,10 @@ export function wireMyPage(apiBase: string, user: AuthUser): void {
   set("myStatus", user.isMaster ? "마스터" : (STATUS_LABEL[user.status] ?? user.status));
   set("myCreatedAt", fmtDate(user.createdAt));
   set("myLastLoginAt", fmtDate(user.lastLoginAt));
+
+  // 설명서 PDF — back 이 `back/docs/gait-guide.pdf` 를 그대로 내려준다.
+  const guide = root.querySelector<HTMLAnchorElement>("#myGuideLink");
+  if (guide) guide.href = joinApiUrl(apiBase, "/api/docs/gait-guide.pdf");
 
   const form = root.querySelector<HTMLFormElement>("#myPwForm");
   const msg = root.querySelector<HTMLElement>("#myPwMsg");
