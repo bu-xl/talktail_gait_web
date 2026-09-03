@@ -517,6 +517,12 @@ export const LOCALES = {
     ma_state_pending: "분석 중",
     ma_state_done: "완료",
     ma_state_failed: "실패",
+    ma_job_open: "보기",
+    ma_qr_open: "QR 로 다운받기",
+    ma_qr_back: "← 리포트 보기",
+    ma_qr_making: "다운로드 링크를 만드는 중…",
+    ma_qr_hint: "스마트폰 카메라로 찍으면 리포트를 내려받습니다. 링크는 {{min}}분간 유효합니다.",
+    ma_qr_failed: "링크 발급 실패",
 
     /* 완료된 분석 (열람 전용 화면) */
     nav_completed: "완료된 분석",
@@ -1052,6 +1058,12 @@ export const LOCALES = {
     ma_state_pending: "Analyzing",
     ma_state_done: "Done",
     ma_state_failed: "Failed",
+    ma_job_open: "Open",
+    ma_qr_open: "Download via QR",
+    ma_qr_back: "← Back to report",
+    ma_qr_making: "Creating download link…",
+    ma_qr_hint: "Scan with your phone camera to download the report. The link is valid for {{min}} minutes.",
+    ma_qr_failed: "Could not create link",
 
     /* Completed analyses (read-only screen) */
     nav_completed: "Completed",

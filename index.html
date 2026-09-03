@@ -485,6 +485,43 @@
       }
       #dvDelModal .dialog-foot button.danger:disabled { opacity: .5; cursor: not-allowed; }
 
+      /* 종합 리포트 보기 + QR 다운로드. 리포트는 크게, QR 은 폰이 물 만큼만. */
+      #maResultModal {
+        position: fixed; inset: 0; z-index: 1100; display: flex;
+        align-items: center; justify-content: center; padding: 24px;
+        background: rgba(15, 18, 24, 0.5);
+      }
+      #maResultModal[hidden] { display: none; }
+      #maResultModal .dialog {
+        display: flex; flex-direction: column;
+        width: min(900px, calc(100vw - 32px)); height: min(90vh, 1000px);
+        background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+        box-shadow: 0 16px 48px rgba(15, 18, 24, 0.2); overflow: hidden;
+      }
+      #maResultModal .dialog-head {
+        display: flex; align-items: center; gap: 10px;
+        padding: 12px 16px; border-bottom: 1px solid var(--divider);
+      }
+      #maResultTitle { margin: 0; font-size: 15px; font-weight: 700; flex: 1 1 auto; }
+      #maResultView { flex: 1 1 auto; min-height: 0; }
+      #maResultView[hidden] { display: none; }
+      #maResultFrame { display: block; width: 100%; height: 100%; border: 0; background: var(--bg); }
+      #maResultQr {
+        flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column;
+        align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center;
+      }
+      #maResultQr[hidden] { display: none; }
+      /* 흰 바탕은 장식이 아니다 — 어두운 테마에서 QR 대비가 무너지면 폰이 못 읽는다. */
+      #maQrBox {
+        width: min(280px, 60vh); aspect-ratio: 1; display: flex;
+        align-items: center; justify-content: center;
+        background: #fff; border-radius: 10px; padding: 8px;
+      }
+      #maQrBox:empty { display: none; }
+      #maQrBox svg { width: 100%; height: 100%; }
+      #maQrName { font-size: 14px; font-weight: 700; word-break: break-all; }
+      #maQrHint { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.5; }
+
       /* —— 파일 다운 (디스크 CSV · 원본 영상) —— */
       /* —— 계정 바 · 버전 —— */
       /* —— 하단 고정 푸터: 사업자 정보 | 약관 | 버전 —— */
@@ -2289,6 +2326,25 @@
         <ul id="maJobList" class="fd-list"></ul>
       </div>
     </section>
+
+    <div id="maResultModal" role="dialog" aria-modal="true" aria-labelledby="maResultTitle" hidden>
+      <div class="dialog">
+        <div class="dialog-head">
+          <h2 id="maResultTitle"></h2>
+          <button type="button" id="maResultBack" data-i18n="ma_qr_back" hidden>← 리포트 보기</button>
+          <button type="button" id="maResultQrBtn" data-i18n="ma_qr_open">QR 로 다운받기</button>
+          <button type="button" id="maResultClose" data-i18n="report_modal_close">닫기</button>
+        </div>
+        <div id="maResultView">
+          <iframe id="maResultFrame" title="Combined report"></iframe>
+        </div>
+        <div id="maResultQr" hidden>
+          <div id="maQrBox"></div>
+          <div id="maQrName"></div>
+          <p id="maQrHint"></p>
+        </div>
+      </div>
+    </div>
 
     <section id="reportPage" hidden aria-label="Reports">
       <div class="rp-toolbar">

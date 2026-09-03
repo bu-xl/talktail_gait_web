@@ -21,6 +21,7 @@ import {
   type MultiJob,
   type MultiSession,
 } from "../api/multiApi.js";
+import { MultiResultModal } from "./multiResultModal.js";
 
 /** 진행 중 항목이 있을 때 목록을 다시 받는 주기. */
 const POLL_MS = 4000;
@@ -62,6 +63,7 @@ export class MultiPage {
 
   private readonly jobListEl: HTMLElement;
   private readonly jobEmptyEl: HTMLElement;
+  private readonly resultModal: MultiResultModal;
 
   private apiBase = "";
   private tab: Tab = "new";
@@ -97,6 +99,10 @@ export class MultiPage {
     this.sessListEl = $("maSessList");
     this.jobListEl = $("maJobList");
     this.jobEmptyEl = $("maJobEmpty");
+    // 모달은 페이지 밖(body 직속)에 있다 — 목록의 overflow 안에 두면 잘린다.
+    this.resultModal = new MultiResultModal(
+      document.getElementById("maResultModal") as HTMLElement,
+    );
 
     this.refreshBtn.addEventListener("click", () => void this.reload());
     this.tabNewBtn.addEventListener("click", () => this.setTab("new"));
@@ -108,6 +114,7 @@ export class MultiPage {
 
   setApiBase(url: string): void {
     this.apiBase = url.replace(/\/$/, "");
+    this.resultModal.setApiBase(this.apiBase);
   }
 
   show(): void {
@@ -121,6 +128,8 @@ export class MultiPage {
   hide(): void {
     this.root.hidden = true;
     this.visible = false;
+    // 모달은 페이지 밖에 있어서 같이 숨지 않는다 — 화면을 옮겼는데 리포트만 떠 있게 된다.
+    this.resultModal.close();
     this.syncPolling();
   }
 
@@ -368,13 +377,12 @@ export class MultiPage {
 
       const href = multiPdfUrl(this.apiBase, job);
       if (href) {
-        const link = document.createElement("a");
-        link.className = "fd-icon-btn";
-        link.textContent = "PDF";
-        link.href = href;
-        link.target = "_blank";
-        link.rel = "noopener";
-        li.append(link);
+        const open = document.createElement("button");
+        open.type = "button";
+        open.className = "fd-icon-btn";
+        open.textContent = t("ma_job_open");
+        open.addEventListener("click", () => this.resultModal.open(job, href));
+        li.append(open);
       }
       this.jobListEl.appendChild(li);
     }

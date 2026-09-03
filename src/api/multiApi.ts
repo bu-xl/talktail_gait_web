@@ -88,3 +88,28 @@ export async function requestMultiAnalysis(
 export function multiPdfUrl(apiBase: string, job: MultiJob): string | null {
   return job.pdfUrl ? joinApiUrl(apiBase, job.pdfUrl) : null;
 }
+
+export type MultiShareLink = {
+  /** 폰이 그대로 여는 절대 주소. back 이 요청 Host 로 만든다. */
+  url: string;
+  filename: string;
+  expiresAt: string;
+  ttlSec: number;
+};
+
+/**
+ * 로그인 없이 열리는 짧은 다운로드 링크를 받는다. QR 로 찍을 대상이다.
+ *
+ * 기존 `pdfUrl` 을 QR 로 만들면 안 된다 — 폰에는 세션 쿠키가 없어 401 만 본다.
+ */
+export async function createMultiShareLink(
+  apiBase: string,
+  jobId: number,
+): Promise<MultiShareLink> {
+  const res = await apiFetch(joinApiUrl(apiBase, `/api/multi-analysis/jobs/${jobId}/share`), {
+    method: "POST",
+  });
+  const body = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(body?.error || `HTTP ${res.status}`);
+  return body as MultiShareLink;
+}
