@@ -6,6 +6,8 @@
  * 고정 카드다 — 지금 분석 중인 것, 대기열에 선 것들, 각각의 예상 완료 시각을
  * 보여 주고, 남은 시간은 expectedEndAt(서버 시각) − 현재 서버 시각으로 매 초
  * 로컬에서 다시 계산한다(서버는 상태가 바뀔 때만 쏜다). 큐가 비면 카드는 사라진다.
+ * 대기열이 길어져 오른쪽 UI를 가리지 않도록 접기/펼치기(로컬 기억)와 본문
+ * 최대 높이 스크롤을 제공한다.
  */
 
 import { t } from "../i18n/index.js";
@@ -103,11 +105,15 @@ export function showToast(opts: {
 
 // ---- 분석 대기열 고정 카드 -------------------------------------------------
 
+const QUEUE_COLLAPSE_KEY = "gait.queueToast.collapsed";
+
 let queueCard: HTMLElement | null = null;
 let queueTimer: number | null = null;
 let lastSnapshot: QueueSnapshot | null = null;
 /** 서버 시각 → 로컬 시각 보정값(로컬 now − serverNow). */
 let serverOffsetMs = 0;
+/** 접힌 상태 — 대기열이 길어져도 오른쪽 UI를 가리지 않도록. */
+let queueCollapsed = localStorage.getItem(QUEUE_COLLAPSE_KEY) === "1";
 
 function clearQueueTimer(): void {
   if (queueTimer != null) {
@@ -121,6 +127,12 @@ function removeQueueCard(): void {
   queueCard?.remove();
   queueCard = null;
   lastSnapshot = null;
+}
+
+function setQueueCollapsed(collapsed: boolean): void {
+  queueCollapsed = collapsed;
+  localStorage.setItem(QUEUE_COLLAPSE_KEY, collapsed ? "1" : "0");
+  renderQueueCard();
 }
 
 function serverNowMs(): number {
@@ -148,13 +160,10 @@ function renderQueueCard(): void {
   if (!queueCard || !lastSnapshot) return;
   const snap = lastSnapshot;
   const now = serverNowMs();
+  const total = snap.queuedCount + (snap.running ? 1 : 0);
+  const toggleLabel = t(queueCollapsed ? "toast_queue_expand" : "toast_queue_collapse");
 
   const rows: string[] = [];
-  rows.push(
-    `<div class="tq-head"><span class="tq-title">${t("toast_queue_title")}</span>` +
-      `<span class="tq-count">${snap.queuedCount + (snap.running ? 1 : 0)}</span></div>`,
-  );
-
   if (snap.running) {
     const remain = fmtRemain(snap.running.expectedEndAt - now);
     rows.push(
@@ -177,7 +186,16 @@ function renderQueueCard(): void {
     );
   }
 
-  queueCard.innerHTML = rows.join("");
+  queueCard.classList.toggle("is-collapsed", queueCollapsed);
+  queueCard.innerHTML =
+    `<div class="tq-head">` +
+    `<span class="tq-title">${t("toast_queue_title")}</span>` +
+    `<span class="tq-count">${total}</span>` +
+    `<button type="button" class="tq-toggle" aria-expanded="${String(!queueCollapsed)}" ` +
+    `aria-label="${escapeHtml(toggleLabel)}" title="${escapeHtml(toggleLabel)}">` +
+    `${queueCollapsed ? "▸" : "▾"}</button>` +
+    `</div>` +
+    `<div class="tq-body">${rows.join("")}</div>`;
 }
 
 function escapeHtml(s: string): string {
@@ -204,6 +222,19 @@ export function updateQueueToast(snap: QueueSnapshot): void {
     queueCard.className = "toast toast-queue";
     // 대기열 카드는 항상 스택 맨 위(고정), 이벤트 토스트는 그 아래로 쌓인다.
     stack.prepend(queueCard);
+    // innerHTML 로 매 초 다시 그리므로 토글은 카드에 위임한다.
+    queueCard.addEventListener("click", (ev) => {
+      const target = ev.target as HTMLElement | null;
+      if (!target) return;
+      if (target.closest(".tq-toggle")) {
+        setQueueCollapsed(!queueCollapsed);
+        return;
+      }
+      // 접힌 상태에서는 헤더 클릭으로도 펼친다.
+      if (queueCollapsed && target.closest(".tq-head")) {
+        setQueueCollapsed(false);
+      }
+    });
   }
   renderQueueCard();
   if (queueTimer == null) {

@@ -1389,16 +1389,30 @@
       #toastStack .toast-bad  { border-left: 3px solid #cf222e; }
       #toastStack .toast-info { border-left: 3px solid var(--primary); }
 
-      /* 분석 대기열 카드 */
-      #toastStack .toast-queue { border-left: 3px solid var(--primary); }
+      /* 분석 대기열 카드 — 길어지면 접을 수 있고, 펼쳐도 높이 제한 */
+      #toastStack .toast-queue { border-left: 3px solid var(--primary); padding-bottom: 8px; }
+      #toastStack .toast-queue.is-collapsed { padding-bottom: 10px; cursor: pointer; }
       #toastStack .tq-head {
-        display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;
+        display: flex; align-items: center; gap: 8px; margin-bottom: 0;
       }
-      #toastStack .tq-title { font-weight: 700; font-size: 13px; }
+      #toastStack .toast-queue:not(.is-collapsed) .tq-head { margin-bottom: 6px; }
+      #toastStack .tq-title { font-weight: 700; font-size: 13px; flex: 1; min-width: 0; }
       #toastStack .tq-count {
         min-width: 20px; text-align: center; border-radius: 999px; padding: 1px 7px;
         background: var(--primary); color: #fff; font-size: 11px; font-weight: 700;
+        flex-shrink: 0;
       }
+      #toastStack .tq-toggle {
+        flex-shrink: 0; width: 24px; height: 24px; padding: 0; margin: 0;
+        border: 1px solid var(--border); border-radius: 6px;
+        background: var(--surface); color: var(--muted);
+        font-size: 12px; line-height: 1; cursor: pointer;
+      }
+      #toastStack .tq-toggle:hover { border-color: var(--primary); color: var(--fg); }
+      #toastStack .tq-body {
+        max-height: min(36vh, 240px); overflow-y: auto; overscroll-behavior: contain;
+      }
+      #toastStack .toast-queue.is-collapsed .tq-body { display: none; }
       #toastStack .tq-row {
         display: grid; grid-template-columns: 16px 1fr; column-gap: 8px;
         padding: 5px 0; border-top: 1px solid var(--divider);
