@@ -114,6 +114,8 @@ let lastSnapshot: QueueSnapshot | null = null;
 let serverOffsetMs = 0;
 /** 접힌 상태 — 대기열이 길어져도 오른쪽 UI를 가리지 않도록. */
 let queueCollapsed = localStorage.getItem(QUEUE_COLLAPSE_KEY) === "1";
+/** 닫기(×)로 치운 대기열의 jobId 조합. 같은 대기열인 동안은 다시 띄우지 않는다. */
+let dismissedKey: string | null = null;
 
 function clearQueueTimer(): void {
   if (queueTimer != null) {
@@ -162,6 +164,7 @@ function renderQueueCard(): void {
   const now = serverNowMs();
   const total = snap.queuedCount + (snap.running ? 1 : 0);
   const toggleLabel = t(queueCollapsed ? "toast_queue_expand" : "toast_queue_collapse");
+  const closeLabel = t("toast_queue_close");
 
   const rows: string[] = [];
   if (snap.running) {
@@ -194,6 +197,8 @@ function renderQueueCard(): void {
     `<button type="button" class="tq-toggle" aria-expanded="${String(!queueCollapsed)}" ` +
     `aria-label="${escapeHtml(toggleLabel)}" title="${escapeHtml(toggleLabel)}">` +
     `${queueCollapsed ? "▸" : "▾"}</button>` +
+    `<button type="button" class="tq-close" ` +
+    `aria-label="${escapeHtml(closeLabel)}" title="${escapeHtml(closeLabel)}">×</button>` +
     `</div>` +
     `<div class="tq-body">${rows.join("")}</div>`;
 }
@@ -206,15 +211,23 @@ function escapeHtml(s: string): string {
     .replaceAll('"', "&quot;");
 }
 
+function queueKey(snap: QueueSnapshot): string {
+  return [snap.running?.jobId ?? "", ...snap.queued.map((q) => q.jobId)].join("|");
+}
+
 /**
  * `analysis_queue` 스냅샷 반영. 큐가 완전히 비면 카드를 제거한다.
  */
 export function updateQueueToast(snap: QueueSnapshot): void {
   serverOffsetMs = Date.now() - snap.serverNow;
   if (!snap.running && snap.queued.length === 0) {
+    dismissedKey = null;
     removeQueueCard();
     return;
   }
+  // 닫아 둔 대기열 그대로면 다시 띄우지 않는다. 새 작업이 들어오면 다시 뜬다.
+  if (dismissedKey === queueKey(snap)) return;
+  dismissedKey = null;
   lastSnapshot = snap;
   if (!queueCard) {
     const stack = ensureStack();
@@ -226,6 +239,11 @@ export function updateQueueToast(snap: QueueSnapshot): void {
     queueCard.addEventListener("click", (ev) => {
       const target = ev.target as HTMLElement | null;
       if (!target) return;
+      if (target.closest(".tq-close")) {
+        if (lastSnapshot) dismissedKey = queueKey(lastSnapshot);
+        removeQueueCard();
+        return;
+      }
       if (target.closest(".tq-toggle")) {
         setQueueCollapsed(!queueCollapsed);
         return;
