@@ -205,7 +205,7 @@ async function send(payload: Payload): Promise<void> {
   } catch {
     showAlert("서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.");
   } finally {
-    submitBtn.disabled = false;
+    syncSubmitGate();
   }
 }
 
@@ -213,15 +213,25 @@ async function send(payload: Payload): Promise<void> {
 
 const AGREE_IDS = ["rAgreePrivacy", "rAgreeEmail", "rAgreeVideo"];
 
+/**
+ * 동의 전에는 신청 버튼을 잠근다. 셋 다 필수라 눌러 봐야 거절될 뿐이고,
+ * 잠긴 이유는 버튼 아래에 적어 둔다 — 이유 없이 잠긴 버튼은 고장으로 읽힌다.
+ */
+function syncSubmitGate(): void {
+  const ready = AGREE_IDS.every(checked);
+  $<HTMLInputElement>("rAgreeAll").checked = ready;
+  submitBtn.disabled = !ready;
+  $("rSubmitNote").hidden = ready;
+}
+
 $("rAgreeAll").addEventListener("change", (ev) => {
   const on = (ev.target as HTMLInputElement).checked;
   for (const id of AGREE_IDS) $<HTMLInputElement>(id).checked = on;
+  syncSubmitGate();
 });
-for (const id of AGREE_IDS) {
-  $(id).addEventListener("change", () => {
-    $<HTMLInputElement>("rAgreeAll").checked = AGREE_IDS.every(checked);
-  });
-}
+for (const id of AGREE_IDS) $(id).addEventListener("change", syncSubmitGate);
+// 새로고침해도 브라우저가 체크를 복원할 수 있다 — 화면 상태와 버튼을 맞춰 둔다.
+syncSubmitGate();
 
 // ── 제출 ──────────────────────────────────────────────────────────────────
 
@@ -244,7 +254,7 @@ form.addEventListener("submit", (ev) => {
       confirmModal.classList.add("open");
     })
     .finally(() => {
-      submitBtn.disabled = false;
+      syncSubmitGate();
     });
 });
 

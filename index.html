@@ -1083,6 +1083,46 @@
       .mc-fold:hover { border-color: var(--border-strong); color: var(--fg); }
       .mc-card.is-collapsed > *:not(.mc-head) { display: none; }
 
+      /* 예약 → 측정 확인 모달. 카드를 누르면 곧바로 상태가 바뀌므로 한 번 묻는다. */
+      #reserveConfirmModal {
+        display: none; position: fixed; inset: 0; z-index: 1100;
+        align-items: center; justify-content: center; background: rgba(15, 18, 24, 0.45);
+      }
+      #reserveConfirmModal.open { display: flex; }
+      .rcm-shell {
+        width: min(420px, calc(100vw - 32px)); background: var(--surface);
+        border: 1px solid var(--border); border-radius: 14px; overflow: hidden;
+      }
+      .rcm-head { padding: 16px 18px 12px; border-bottom: 1px solid var(--divider); }
+      .rcm-head h2 { margin: 0; font-size: 15px; font-weight: 700; }
+      .rcm-body { padding: 16px 18px; }
+      .rcm-name { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+      .rcm-meta { margin-top: 6px; font-size: 13px; color: var(--fg); }
+      .rcm-email { margin-top: 10px; font-size: 13px; color: var(--muted); word-break: break-all; }
+      .rcm-reason {
+        margin-top: 10px; padding: 10px 12px; border-radius: 9px;
+        background: var(--bg); font-size: 13px; line-height: 1.5; color: var(--fg);
+        max-height: 120px; overflow: auto;
+      }
+      /* 다른 자리에서 이미 부른 사람이면 반드시 보여야 한다 — 막지는 않는다. */
+      .rcm-warn {
+        margin-top: 12px; padding: 9px 12px; border-radius: 9px;
+        background: var(--primary-light); border: 1px solid var(--primary);
+        color: var(--primary-pressed); font-size: 12.5px; font-weight: 600;
+      }
+      .rcm-warn[hidden] { display: none; }
+      .rcm-foot {
+        display: flex; justify-content: flex-end; gap: 8px;
+        padding: 12px 18px 16px; border-top: 1px solid var(--divider);
+      }
+      .rcm-foot button { min-width: 88px; min-height: 40px; border-radius: 9px; }
+      .rcm-foot button.primary {
+        background: var(--primary); border-color: var(--primary); color: #fff;
+      }
+      .rcm-foot button.primary:hover {
+        background: var(--primary-hover); border-color: var(--primary-hover);
+      }
+
       /* —— 예약 현황 —— */
       .mc-reserve { flex-shrink: 0; }
       .mc-reserve .mc-head { flex-wrap: wrap; }
@@ -1110,17 +1150,24 @@
       /* 측정중은 다른 자리에서 이미 부른 사람이라는 표시다 — 누르는 것 자체는 막지 않는다. */
       .rv-row.is-measuring { border-color: var(--primary); background: var(--primary-light); }
       .rv-row.is-hold { opacity: .62; }
+      /* 한 줄이다. 현장에서 먼저 읽히는 순서대로 크기를 준다 — 이름 → 시간 → 나머지.
+         부수 정보는 남는 폭만 쓰고 넘치면 자른다(전체는 확인 모달에서 본다). */
       .rv-pick {
-        flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;
-        align-items: flex-start; text-align: left; padding: 2px 0;
+        flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 10px;
+        text-align: left; padding: 2px 0;
         background: none; border: none; color: inherit; cursor: pointer;
       }
-      .rv-head { display: flex; align-items: baseline; gap: 8px; max-width: 100%; }
-      .rv-time { font-size: 11px; color: var(--muted); font-feature-settings: 'tnum' 1; }
-      .rv-name { font-size: 14px; font-weight: 700; }
-      .rv-meta { font-size: 12px; color: var(--fg); }
-      .rv-sub {
-        font-size: 11px; color: var(--muted); max-width: 100%;
+      .rv-name {
+        flex: none; max-width: 8em; font-size: 17px; font-weight: 700;
+        letter-spacing: -0.02em;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .rv-time {
+        flex: none; font-size: 14px; font-weight: 700; color: var(--brand-text);
+        font-feature-settings: 'tnum' 1;
+      }
+      .rv-meta {
+        flex: 1; min-width: 0; font-size: 12px; color: var(--muted);
         overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       }
       .rv-side { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
@@ -2723,6 +2770,26 @@
         </div>
         <div id="rpReportFoot">
           <button type="button" id="rpReportDownload" data-i18n="report_download">PDF 다운로드</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 예약 → 측정 확인 -->
+    <div id="reserveConfirmModal" role="dialog" aria-modal="true" aria-labelledby="rcmTitle">
+      <div class="rcm-shell">
+        <div class="rcm-head">
+          <h2 id="rcmTitle">이 예약 내용으로 측정하시겠습니까?</h2>
+        </div>
+        <div class="rcm-body">
+          <div class="rcm-name" id="rcmName"></div>
+          <div class="rcm-meta" id="rcmMeta"></div>
+          <div class="rcm-email" id="rcmEmail"></div>
+          <div class="rcm-reason" id="rcmReason" hidden></div>
+          <p class="rcm-warn" id="rcmWarn" hidden></p>
+        </div>
+        <div class="rcm-foot">
+          <button type="button" id="rcmCancel">취소</button>
+          <button type="button" id="rcmGo" class="primary">측정</button>
         </div>
       </div>
     </div>

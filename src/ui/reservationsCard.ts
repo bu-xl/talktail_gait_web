@@ -10,6 +10,12 @@
  * 이미 "측정중" 인 예약도 다른 계정이 누를 수 있다. 현장 두세 곳이 같은 목록을
  * 보는데 잠가 두면 꼬였을 때 풀 방법이 없다. 대신 누가 잡았는지 배지로 보여 준다.
  *
+ * ## 카드 한 줄에 이름·시간만 크게
+ *
+ * 현장에서 먼저 읽는 것은 "누구를 부르는가"(이름)와 "언제 왔는가"(시간)다. 몸무게·
+ * 견종·나이는 그 다음이라 작게 두고, 이메일·신청 사유는 줄을 더 쓰지 않고 확인
+ * 모달로 넘겼다. 목록이 세 줄씩 쓰면 한 화면에 몇 명 안 들어온다.
+ *
  * ## 자동 갱신하지 않는다
  *
  * 다른 자리의 변경은 새로고침을 눌러야 보인다. 폴링을 넣으면 현장 한 곳당 초당
@@ -68,6 +74,9 @@ export class ReservationsCard {
   private readonly emptyEl: HTMLElement;
   private readonly dateEl: HTMLSelectElement;
   private readonly filtersEl: HTMLElement;
+  private readonly modal: HTMLElement;
+  /** 확인 모달이 물어보고 있는 예약. 취소하면 아무 일도 없었던 것이 된다. */
+  private asking: Reservation | null = null;
 
   constructor(private readonly opts: ReservationsCardOptions) {
     this.root = document.getElementById("reserveCard") as HTMLElement;
@@ -75,6 +84,7 @@ export class ReservationsCard {
     this.emptyEl = document.getElementById("rvEmpty") as HTMLElement;
     this.dateEl = document.getElementById("rvDate") as HTMLSelectElement;
     this.filtersEl = document.getElementById("rvFilters") as HTMLElement;
+    this.modal = document.getElementById("reserveConfirmModal") as HTMLElement;
     this.bind();
   }
 
@@ -137,6 +147,18 @@ export class ReservationsCard {
       this.setCollapsed(!this.root.classList.contains("is-collapsed"));
     });
     document.getElementById("rvRefresh")?.addEventListener("click", () => void this.refresh());
+    document.getElementById("rcmCancel")?.addEventListener("click", () => this.closeModal());
+    document.getElementById("rcmGo")?.addEventListener("click", () => {
+      const row = this.asking;
+      this.closeModal();
+      if (row) void this.pick(row);
+    });
+    this.modal.addEventListener("click", (ev) => {
+      if (ev.target === this.modal) this.closeModal();
+    });
+    window.addEventListener("keydown", (ev) => {
+      if (ev.key === "Escape" && this.modal.classList.contains("open")) this.closeModal();
+    });
     this.dateEl.addEventListener("change", () => {
       this.date = this.dateEl.value;
       void this.refresh();
@@ -161,7 +183,55 @@ export class ReservationsCard {
   // ── 동작 ──────────────────────────────────────────────────────────────
 
   /**
-   * 카드를 누르면 입력란을 채우고 **측정중으로 잡는다.** 잠금이 아니라 표시라,
+   * 카드를 누르면 곧바로 채우지 않고 한 번 묻는다. 누르는 순간 상태가 `측정중` 으로
+   * 바뀌고 입력란이 덮이는데, 목록을 훑다가 잘못 누르는 일이 현장에서 자주 생긴다.
+   */
+  private ask(row: Reservation): void {
+    this.asking = row;
+    const set = (id: string, text: string): void => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = text;
+    };
+    set("rcmName", row.dogName);
+    set(
+      "rcmMeta",
+      [
+        `${row.dogWeightKg}kg`,
+        row.dogBreed,
+        ageLabel(row.dogBirthMonth),
+        sexLabel(row.dogSex, row.dogNeutered),
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    );
+    set("rcmEmail", row.ownerEmail);
+
+    const reason = document.getElementById("rcmReason");
+    if (reason) {
+      reason.textContent = row.reason || "";
+      reason.hidden = !row.reason;
+    }
+    // 다른 자리가 이미 부른 사람일 수 있다. 막지는 않되 모르고 지나치게 두지 않는다.
+    const warn = document.getElementById("rcmWarn");
+    if (warn) {
+      const taken = Boolean(row.status === "measuring" && row.claimedBy);
+      warn.textContent = taken ? `${row.claimedBy} 계정이 이미 측정중으로 표시했습니다.` : "";
+      warn.hidden = !taken;
+    }
+
+    this.modal.classList.add("open");
+    document.body.classList.add("modal-open");
+    (document.getElementById("rcmGo") as HTMLButtonElement | null)?.focus();
+  }
+
+  private closeModal(): void {
+    this.modal.classList.remove("open");
+    document.body.classList.remove("modal-open");
+    this.asking = null;
+  }
+
+  /**
+   * 확인을 받은 뒤 입력란을 채우고 **측정중으로 잡는다.** 잠금이 아니라 표시라,
    * 서버가 실패해도 입력란은 이미 채워졌으므로 측정은 그대로 진행할 수 있다.
    */
   private async pick(row: Reservation): Promise<void> {
@@ -244,40 +314,36 @@ export class ReservationsCard {
     const pick = document.createElement("button");
     pick.type = "button";
     pick.className = "rv-pick";
-    pick.addEventListener("click", () => void this.pick(row));
+    pick.addEventListener("click", () => this.ask(row));
 
-    const head = document.createElement("span");
-    head.className = "rv-head";
+    // 이름이 가장 크다 — 현장에서 부르는 것이 이름이다.
+    const name = document.createElement("span");
+    name.className = "rv-name";
+    name.textContent = row.dogName;
+
     const time = document.createElement("span");
     time.className = "rv-time";
     time.textContent = new Date(row.createdAt).toLocaleTimeString("ko-KR", {
       hour: "2-digit",
       minute: "2-digit",
     });
-    const name = document.createElement("span");
-    name.className = "rv-name";
-    name.textContent = row.dogName;
-    head.append(time, name);
 
+    // 같은 이름이 여럿일 수 있으므로 몸무게까지 붙인다. 넘치면 잘리고, 전체는 모달에서 본다.
     const meta = document.createElement("span");
     meta.className = "rv-meta";
-    // 같은 이름이 여럿일 수 있으므로 몸무게까지 보여 줘야 고를 수 있다.
     meta.textContent = [
       `${row.dogWeightKg}kg`,
       row.dogBreed,
       ageLabel(row.dogBirthMonth),
       sexLabel(row.dogSex, row.dogNeutered),
+      row.ownerEmail,
     ]
       .filter(Boolean)
       .join(" · ");
+    // 잘린 뒷부분과 신청 사유는 마우스를 올리면 보인다.
+    pick.title = [meta.textContent, row.reason].filter(Boolean).join(" / ");
 
-    // 이메일과 신청 사유는 측정에 쓰이지 않지만, 현장에서 사람을 확인하는 근거다.
-    const sub = document.createElement("span");
-    sub.className = "rv-sub";
-    sub.textContent = [row.ownerEmail, row.reason].filter(Boolean).join(" — ");
-    sub.title = sub.textContent;
-
-    pick.append(head, meta, sub);
+    pick.append(name, time, meta);
 
     const side = document.createElement("div");
     side.className = "rv-side";

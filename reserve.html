@@ -113,7 +113,12 @@
       }
       button.primary:hover:not(:disabled) { background: var(--primary-hover); }
       button.primary:active:not(:disabled) { background: var(--primary-pressed); }
-      button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+      button.primary:disabled { opacity: 0.45; cursor: not-allowed; }
+      /* 버튼이 왜 잠겨 있는지 바로 아래에 적는다 — 잠긴 이유가 없으면 고장으로 읽힌다. */
+      .submit-note {
+        margin: 8px 0 0; text-align: center; font-size: 12.5px; color: var(--muted);
+      }
+      .submit-note[hidden] { display: none; }
 
       /* 오류는 그 입력 옆에 붙는다. 버튼 아래 한 줄로는 어디가 문제인지 안 보인다. */
       .ferr { display: none; font-size: 12.5px; color: var(--danger); margin-top: 6px; font-weight: 600; }
@@ -142,11 +147,19 @@
       }
       .modal-actions { display: flex; gap: 8px; margin-top: 20px; }
       .modal-actions button {
-        flex: 1; padding: 12px 8px; font: 600 15px var(--font-ui);
-        border-radius: 10px; cursor: pointer; border: 1px solid var(--border-strong);
-        background: var(--surface); color: var(--fg);
+        flex: 1; width: auto; margin: 0; padding: 13px 8px;
+        font: 600 15px var(--font-ui); border-radius: 10px; cursor: pointer;
+        border: 1px solid var(--border-strong); background: var(--surface); color: var(--fg);
       }
-      .modal-actions button.primary { margin: 0; border: none; }
+      .modal-actions button:hover { border-color: var(--fg); }
+      /* ★ `.modal-actions button` 이 `button.primary` 와 특이도가 같고 뒤에 있어서
+         배경·글자색을 덮는다. 여기서 다시 칠하지 않으면 흰 버튼이 된다. */
+      .modal-actions button.primary {
+        flex: 1.3; border: 1px solid var(--primary);
+        background: var(--primary); color: #fff;
+      }
+      .modal-actions button.primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+      .modal-actions button.primary:active { background: var(--primary-pressed); border-color: var(--primary-pressed); }
       /* 서버·네트워크 실패용. 필드에 붙일 수 없는 오류만 여기로 온다. */
       #alertModal {
         position: fixed; inset: 0; z-index: 21; display: none;
@@ -290,7 +303,8 @@
           </p>
         </div>
 
-        <button type="submit" class="primary" id="rSubmit">신청하기</button>
+        <button type="submit" class="primary" id="rSubmit" disabled>신청하기</button>
+        <p class="submit-note" id="rSubmitNote">동의 항목에 모두 동의해야 신청할 수 있습니다.</p>
       </form>
 
       <div id="done">
@@ -304,11 +318,11 @@
 
     <div id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
       <div class="modal-card">
-        <h3 id="confirmTitle">이 주소로 리포트를 보내 드립니다</h3>
+        <h3 id="confirmTitle">이 주소로 분석 리포트를 보내드립니다.</h3>
         <strong class="modal-email" id="confirmEmail"></strong>
         <p>주소가 틀리면 리포트를 받아보실 수 없습니다. 한 글자씩 확인해 주세요.</p>
         <div class="modal-actions">
-          <button type="button" id="confirmBack">주소 수정</button>
+          <button type="button" id="confirmBack">다시 입력</button>
           <button type="button" class="primary" id="confirmGo">신청하기</button>
         </div>
       </div>
