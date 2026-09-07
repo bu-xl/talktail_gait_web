@@ -9,6 +9,12 @@
  *
  * 코드를 지우지 않고 끄는 쪽이 기본이다 — 지우면 이미 그 코드로 들어온 예약의
  * 유입 경로만 남고 코드 자체는 사라진다.
+ *
+ * ## 저장하지 않은 편집을 조용히 버리지 않는다
+ *
+ * 이 화면은 입력이 곧 저장이 아니다. 그래서 코드를 쳐 놓고 `새로고침` 을 누르거나
+ * 다른 화면으로 가면 서버 값으로 덮여 방금 친 것이 사라진다 — 실제로 그렇게 잃었다.
+ * `dirty` 를 들고 있다가 되돌릴 수 없는 동작 앞에서 반드시 묻는다.
  */
 
 import {
@@ -19,14 +25,41 @@ import {
 import { showToast } from "./toast.js";
 
 /** 서버와 같은 규칙. 여기서 막는 것은 편의고, 정본은 서버다. */
-const CODE_RE = /^[A-Z0-9]{4,32}$/;
+const CODE_RE = /^[A-Z0-9]{1,32}$/;
 
 export class ReservationCodesPage {
   private apiBase = "";
   private rows: ReservationCode[] = [];
   private loading = false;
+  /** 저장하지 않은 편집이 있는가. 새로고침·화면 이탈·탭 닫기를 막는 근거다. */
+  private dirty = false;
 
-  constructor(private readonly root: HTMLElement) {}
+  constructor(private readonly root: HTMLElement) {
+    // 브라우저 새로고침·탭 닫기까지 덮는다. 화면 안의 버튼만 막으면 F5 로 잃는다.
+    window.addEventListener("beforeunload", (ev) => {
+      if (!this.root.hidden && this.dirty) ev.preventDefault();
+    });
+  }
+
+  /** 편집이 생겼다고 표시하고 저장 버튼을 눈에 띄게 바꾼다. */
+  private markDirty(): void {
+    if (this.dirty) return;
+    this.dirty = true;
+    this.paintDirty();
+  }
+
+  private paintDirty(): void {
+    const save = this.root.querySelector<HTMLButtonElement>(".rc-save");
+    if (save) save.textContent = this.dirty ? "저장 안 됨 — 저장" : "저장";
+    const warn = this.root.querySelector<HTMLElement>(".rc-dirty");
+    if (warn) warn.hidden = !this.dirty;
+  }
+
+  /** 되돌릴 수 없는 동작 앞에서 한 번 묻는다. */
+  private confirmDiscard(): boolean {
+    if (!this.dirty) return true;
+    return window.confirm("저장하지 않은 코드가 있습니다. 버리고 진행할까요?");
+  }
 
   setApiBase(apiBase: string): void {
     this.apiBase = apiBase;
@@ -38,6 +71,14 @@ export class ReservationCodesPage {
   }
 
   hide(): void {
+    // 화면을 떠나면 편집은 사라진다. 떠나기 전에 묻는다 — 못 막으면 저장해 준다.
+    if (this.dirty && !this.root.hidden) {
+      if (window.confirm("저장하지 않은 코드가 있습니다. 저장할까요?")) {
+        void this.save();
+      } else {
+        this.dirty = false;
+      }
+    }
     this.root.hidden = true;
   }
 
@@ -47,6 +88,7 @@ export class ReservationCodesPage {
     this.render("불러오는 중…");
     try {
       this.rows = await listReservationCodes(this.apiBase);
+      this.dirty = false;
       this.render(null);
     } catch (err) {
       this.rows = [];
@@ -62,14 +104,21 @@ export class ReservationCodesPage {
         showToast({
           kind: "bad",
           title: "코드 형식이 올바르지 않습니다",
-          message: "영문 대문자와 숫자 4~32자로 입력하세요.",
+          message: "영문·숫자로 1~32자까지. 숫자만 써도 됩니다.",
         });
         return;
       }
     }
     try {
       this.rows = await saveReservationCodes(this.apiBase, this.rows);
-      showToast({ kind: "ok", title: "코드를 저장했습니다" });
+      this.dirty = false;
+      showToast({
+        kind: "ok",
+        title: "코드를 저장했습니다",
+        message: this.rows.length
+          ? this.rows.map((r) => r.code).join(", ")
+          : "코드가 없으므로 신청 폼은 닫힙니다.",
+      });
       this.render(null);
     } catch (err) {
       showToast({
@@ -108,20 +157,27 @@ export class ReservationCodesPage {
     add.textContent = "＋ 코드 추가";
     add.addEventListener("click", () => {
       this.rows = [...this.rows, { code: "", label: null, active: true }];
+      this.markDirty();
       this.render(null);
+      // 방금 만든 줄로 커서를 옮긴다 — 어디에 쳐야 하는지 찾게 두지 않는다.
+      const inputs = this.root.querySelectorAll<HTMLInputElement>(".rc-code");
+      inputs[inputs.length - 1]?.focus();
     });
 
     const save = document.createElement("button");
     save.type = "button";
-    save.className = "primary";
-    save.textContent = "저장";
+    save.className = "primary rc-save";
+    save.textContent = this.dirty ? "저장 안 됨 — 저장" : "저장";
     save.addEventListener("click", () => void this.save());
 
     const refresh = document.createElement("button");
     refresh.type = "button";
     refresh.textContent = "새로고침";
     refresh.disabled = this.loading;
-    refresh.addEventListener("click", () => void this.reload());
+    // 서버 값으로 덮는 동작이다 — 편집 중이면 반드시 묻는다.
+    refresh.addEventListener("click", () => {
+      if (this.confirmDiscard()) void this.reload();
+    });
 
     actions.append(add, refresh, save);
     head.append(text, actions);
@@ -139,6 +195,12 @@ export class ReservationCodesPage {
       scroll.append(p);
       return scroll;
     }
+
+    const warn = document.createElement("p");
+    warn.className = "rc-dirty";
+    warn.textContent = "저장하지 않은 변경이 있습니다. 오른쪽 위 저장을 눌러야 반영됩니다.";
+    warn.hidden = !this.dirty;
+    scroll.append(warn);
 
     const link = document.createElement("p");
     link.className = "rc-link";
@@ -187,6 +249,7 @@ export class ReservationCodesPage {
     code.addEventListener("input", () => {
       code.value = code.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
       row.code = code.value;
+      this.markDirty();
     });
     codeTd.append(code);
     tr.append(codeTd);
@@ -200,6 +263,7 @@ export class ReservationCodesPage {
     label.placeholder = "예: A존 / 부산 행사";
     label.addEventListener("input", () => {
       row.label = label.value.trim() || null;
+      this.markDirty();
     });
     labelTd.append(label);
     tr.append(labelTd);
@@ -213,6 +277,7 @@ export class ReservationCodesPage {
       row.active = !row.active;
       toggle.className = row.active ? "acc-tester is-on" : "acc-tester";
       toggle.textContent = row.active ? "사용" : "중지";
+      this.markDirty();
     });
     activeTd.append(toggle);
     tr.append(activeTd);
@@ -229,6 +294,7 @@ export class ReservationCodesPage {
         return;
       }
       this.rows = this.rows.filter((_, i) => i !== index);
+      this.markDirty();
       this.render(null);
     });
     actions.append(del);

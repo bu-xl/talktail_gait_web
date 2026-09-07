@@ -702,6 +702,18 @@
         margin: 0 0 14px; font-size: 12px; color: var(--muted);
         word-break: break-all; user-select: all;
       }
+      /* 이 화면은 입력이 곧 저장이 아니다 — 저장 전에 떠나면 잃는다는 것을 보이게 둔다. */
+      .rc-dirty {
+        margin: 0 0 12px; padding: 9px 12px; border-radius: 9px;
+        background: var(--primary-light); border: 1px solid var(--primary);
+        color: var(--primary-pressed); font-size: 13px; font-weight: 600;
+      }
+      #resCodesPage .rp-toolbar-actions .rc-save {
+        background: var(--primary); border-color: var(--primary); color: #fff;
+      }
+      #resCodesPage .rp-toolbar-actions .rc-save:hover {
+        background: var(--primary-hover); border-color: var(--primary-hover);
+      }
       .rc-input {
         width: 100%; min-width: 120px; padding: 7px 10px; font: inherit; font-size: 13px;
         color: var(--fg); background: var(--surface);
