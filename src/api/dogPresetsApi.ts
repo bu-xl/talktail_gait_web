@@ -7,6 +7,10 @@ export interface DogPreset {
   weightKg: number;
   heightCm: number | null;
   breed: string | null;
+  /** `YYYY-MM`. 나이는 화면에서 계산한다 — 저장하면 1년 뒤 틀린 값이 된다. */
+  birthMonth: string | null;
+  sex: "male" | "female" | null;
+  neutered: boolean | null;
 }
 
 export type DogPresetDraft = Omit<DogPreset, "id">;

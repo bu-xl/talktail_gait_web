@@ -113,7 +113,18 @@ export default defineConfig({
   root: ".",
   // Relative for Electron file:// ; set VITE_BASE for reverse-proxy path prefix (H100).
   base: process.env.VITE_BASE || "./",
-  build: { outDir: "dist", target: "es2022" },
+  build: {
+    outDir: "dist",
+    target: "es2022",
+    rollupOptions: {
+      // 현장 QR 용 신청 폼은 **별도 엔트리**다. 앱 본체에 라우터가 없어서이기도 하고,
+      // 로그인·촬영·소켓이 딸려오면 폰에서 첫 화면이 늦어서이기도 하다.
+      input: {
+        main: path.resolve(__dirname, "index.html"),
+        reserve: path.resolve(__dirname, "reserve.html"),
+      },
+    },
+  },
   server: {
     port: 5173,
     host: "0.0.0.0",

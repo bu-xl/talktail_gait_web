@@ -127,6 +127,7 @@
       body[data-module="verify"] #appBody,
       body[data-module="storage"] #appBody,
       body[data-module="accounts"] #appBody,
+      body[data-module="rescodes"] #appBody,
       body[data-module="multi"] #appBody,
       body[data-module="mypage"] #appBody { display: none !important; }
 
@@ -676,6 +677,38 @@
       .acc-actions button.danger { color: var(--danger); border-color: #F0BFC3; }
       .acc-actions button.danger:hover { background: #FBE9EA; border-color: var(--danger); }
       .acc-empty { padding: 40px 16px; text-align: center; color: var(--muted); font-size: 13px; }
+      /* 켜짐/꺼짐 토글 — 계정의 예약 열람 권한과 코드 사용 여부가 같은 모양을 쓴다. */
+      .acc-tester {
+        padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700;
+        background: var(--surface); border: 1px solid var(--border-strong);
+        color: var(--muted); cursor: pointer;
+      }
+      .acc-tester.is-on {
+        background: var(--primary-light); border-color: var(--primary); color: var(--primary-pressed);
+      }
+      .acc-tester:disabled { cursor: default; opacity: .7; }
+
+      /* —— 예약 코드 (마스터) —— */
+      #resCodesPage {
+        flex: 1; min-height: 0; display: none; flex-direction: column;
+        background: var(--bg); overflow: hidden;
+      }
+      body[data-module="rescodes"] #resCodesPage { display: flex; }
+      #resCodesPage .rp-toolbar-text h1 {
+        margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em;
+      }
+      #resCodesPage .rp-toolbar-text p { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+      .rc-link {
+        margin: 0 0 14px; font-size: 12px; color: var(--muted);
+        word-break: break-all; user-select: all;
+      }
+      .rc-input {
+        width: 100%; min-width: 120px; padding: 7px 10px; font: inherit; font-size: 13px;
+        color: var(--fg); background: var(--surface);
+        border: 1px solid var(--border-strong); border-radius: 8px;
+      }
+      .rc-code { font-weight: 700; letter-spacing: .06em; }
+      .rc-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
 
       /* —— Server storage page —— */
       #storagePage {
@@ -973,7 +1006,8 @@
 
       /* 반려견 — 가로 4칸 */
       .mc-dog { flex-shrink: 0; }
-      .mc-dog .dog-info .field-col input { min-height: 42px; font-size: 15px; }
+      .mc-dog .dog-info .field-col input,
+      .mc-dog .dog-info .field-col select { min-height: 42px; font-size: 15px; }
       body[data-module="measure"] .mc-dog .dog-info {
         display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px;
       }
@@ -1024,6 +1058,68 @@
       }
       .dp-del:hover { color: var(--danger); }
 
+      /* 접기 — 빠른 입력과 예약 현황이 같은 동작을 쓴다. 접으면 머리만 남는다.
+         현장에서 이 둘이 다 펼쳐져 있으면 시작 버튼이 화면 밖으로 밀린다. */
+      .mc-fold {
+        margin-left: 8px; min-width: 34px; min-height: 34px; padding: 0;
+        background: none; border: 1px solid var(--border); border-radius: 8px;
+        color: var(--muted); font-size: 13px; line-height: 1; cursor: pointer;
+      }
+      .mc-fold:hover { border-color: var(--border-strong); color: var(--fg); }
+      .mc-card.is-collapsed > *:not(.mc-head) { display: none; }
+
+      /* —— 예약 현황 —— */
+      .mc-reserve { flex-shrink: 0; }
+      .mc-reserve .mc-head { flex-wrap: wrap; }
+      .rv-date {
+        margin-left: auto; min-height: 34px; padding: 0 28px 0 10px; font-size: 13px;
+      }
+      .mc-reserve .mc-head #rvRefresh { min-height: 34px; padding: 0 12px; font-size: 13px; }
+      .rv-filters { display: flex; gap: 6px; margin-bottom: 10px; }
+      .rv-filters button {
+        padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 600;
+        background: var(--surface); border: 1px solid var(--border); color: var(--muted);
+        cursor: pointer;
+      }
+      .rv-filters button:hover { border-color: var(--border-strong); color: var(--fg); }
+      .rv-filters button.active {
+        background: var(--primary-light); border-color: var(--primary); color: var(--primary-pressed);
+      }
+      /* 목록은 길어질 수 있다 — 카드 안에서만 스크롤시켜 시작 버튼을 밀어내지 않는다. */
+      .rv-list { display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow: auto; }
+      .rv-row {
+        display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+        border: 1px solid var(--border); border-radius: 10px; background: var(--surface);
+      }
+      .rv-row:hover { border-color: var(--border-strong); background: var(--surface-hover); }
+      /* 측정중은 다른 자리에서 이미 부른 사람이라는 표시다 — 누르는 것 자체는 막지 않는다. */
+      .rv-row.is-measuring { border-color: var(--primary); background: var(--primary-light); }
+      .rv-row.is-hold { opacity: .62; }
+      .rv-pick {
+        flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;
+        align-items: flex-start; text-align: left; padding: 2px 0;
+        background: none; border: none; color: inherit; cursor: pointer;
+      }
+      .rv-head { display: flex; align-items: baseline; gap: 8px; max-width: 100%; }
+      .rv-time { font-size: 11px; color: var(--muted); font-feature-settings: 'tnum' 1; }
+      .rv-name { font-size: 14px; font-weight: 700; }
+      .rv-meta { font-size: 12px; color: var(--fg); }
+      .rv-sub {
+        font-size: 11px; color: var(--muted); max-width: 100%;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .rv-side { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+      .rv-claim {
+        padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 700;
+        background: var(--surface); border: 1px solid var(--primary); color: var(--primary-pressed);
+      }
+      .rv-status { min-height: 32px; padding: 0 26px 0 8px; font-size: 12px; }
+      .rv-del {
+        padding: 4px 7px; line-height: 1; background: none; border: none;
+        color: var(--muted); font-size: 12px; cursor: pointer;
+      }
+      .rv-del:hover { color: var(--danger); }
+
       /* 빠른 입력 등록 모달 */
       #dogPresetModal {
         display: none; position: fixed; inset: 0; z-index: 1100;
@@ -1041,7 +1137,7 @@
       .dpm-body { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 16px 18px; }
       .dpm-body .field-col { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
       .dpm-body label { font-size: 12px; color: var(--muted); }
-      .dpm-body input {
+      .dpm-body input, .dpm-body select {
         width: 100%; min-height: 40px; background: var(--bg); color: var(--fg);
         border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
         font: inherit; font-feature-settings: 'tnum' 1;
@@ -1791,6 +1887,7 @@
           <nav class="ah-nav" aria-label="Modules">
             <!-- 마스터 전용. body[data-role] 로 갈린다 — URL 을 알아도 서버가 막는다. -->
             <button type="button" class="master-only" data-module="accounts">계정 관리</button>
+            <button type="button" class="master-only" data-module="rescodes">예약 코드</button>
             <button type="button" class="capture-only active" data-module="measure" aria-current="page" data-i18n="nav_measure">측정</button>
             <button type="button" data-module="verify" data-i18n="nav_verify">데이터 검증</button>
             <button type="button" data-module="results" data-i18n="nav_results">결과 보기</button>
@@ -1973,9 +2070,27 @@
             <div class="section" id="dogPresetTitle" data-i18n="qi_title">빠른 입력</div>
             <span class="dp-hint" id="dogPresetHint" data-i18n="qi_hint">등록해 둔 반려견을 누르면 아래 입력란이 채워집니다.</span>
             <button type="button" id="btnDogPresetAdd" class="primary" data-i18n="qi_register">＋ 빠른 입력 등록</button>
+            <button type="button" id="qiFold" class="mc-fold" aria-expanded="true" title="접기/펴기">▾</button>
           </div>
           <p class="dp-empty" id="dogPresetEmpty" hidden></p>
           <div class="dp-list" id="dogPresetList"></div>
+        </section>
+
+        <!--
+          예약 현황 — 현장 QR 로 들어온 신청자를 눌러 아래 입력란을 채운다.
+          테스터·마스터 계정에만 보인다(hidden 은 main.ts 가 걷는다). 서버도 403 을 준다.
+        -->
+        <section class="mc-card mc-reserve" id="reserveCard" hidden>
+          <div class="mc-head">
+            <div class="section">예약 현황 보기</div>
+            <span class="dp-hint">신청자를 누르면 아래 입력란이 채워지고 측정중으로 표시됩니다.</span>
+            <select id="rvDate" class="rv-date" aria-label="예약 날짜"></select>
+            <button type="button" id="rvRefresh">새로고침</button>
+            <button type="button" id="rvFold" class="mc-fold" aria-expanded="true" title="접기/펴기">▾</button>
+          </div>
+          <div class="rv-filters" id="rvFilters"></div>
+          <p class="dp-empty" id="rvEmpty" hidden></p>
+          <div class="rv-list" id="rvList"></div>
         </section>
 
         <!-- 반려견 — 가로 4칸. 이름·몸무게는 파일명에 들어가는 필수값이다. -->
@@ -1997,6 +2112,27 @@
             <div class="field-col">
               <label for="dogBreed" data-i18n="dog_breed">견종</label>
               <input id="dogBreed" type="text" placeholder="예: 진돗개" autocomplete="off" />
+            </div>
+            <!-- 나이가 아니라 생년월이다 — 나이를 저장하면 1년 뒤 그 기록은 틀린 값이 된다. -->
+            <div class="field-col">
+              <label for="dogBirthMonth" data-i18n="dog_birth_month">생년월</label>
+              <input id="dogBirthMonth" type="month" />
+            </div>
+            <div class="field-col">
+              <label for="dogSex" data-i18n="dog_sex">성별</label>
+              <select id="dogSex">
+                <option value="" data-i18n="dog_unset">미입력</option>
+                <option value="male" data-i18n="dog_male">수컷</option>
+                <option value="female" data-i18n="dog_female">암컷</option>
+              </select>
+            </div>
+            <div class="field-col">
+              <label for="dogNeutered" data-i18n="dog_neutered">중성화</label>
+              <select id="dogNeutered">
+                <option value="" data-i18n="dog_unset">미입력</option>
+                <option value="1" data-i18n="dog_neutered_yes">했음</option>
+                <option value="0" data-i18n="dog_neutered_no">안 했음</option>
+              </select>
             </div>
           </div>
         </section>
@@ -2209,6 +2345,9 @@
     </section>
 
     <section id="accountsPage" hidden aria-label="Accounts"></section>
+
+    <!-- 예약 코드 (마스터). 계정 관리와 같은 껍데기를 쓴다. -->
+    <section id="resCodesPage" hidden aria-label="Reservation codes"></section>
 
     <section id="storagePage" hidden aria-label="Server storage">
       <div class="rp-toolbar">
@@ -2596,6 +2735,26 @@
           <div class="field-col">
             <label for="dpBreed" data-i18n="dog_breed">견종</label>
             <input id="dpBreed" type="text" autocomplete="off" required />
+          </div>
+          <div class="field-col">
+            <label for="dpBirthMonth" data-i18n="dog_birth_month">생년월</label>
+            <input id="dpBirthMonth" type="month" />
+          </div>
+          <div class="field-col">
+            <label for="dpSex" data-i18n="dog_sex">성별</label>
+            <select id="dpSex">
+              <option value="" data-i18n="dog_unset">미입력</option>
+              <option value="male" data-i18n="dog_male">수컷</option>
+              <option value="female" data-i18n="dog_female">암컷</option>
+            </select>
+          </div>
+          <div class="field-col">
+            <label for="dpNeutered" data-i18n="dog_neutered">중성화</label>
+            <select id="dpNeutered">
+              <option value="" data-i18n="dog_unset">미입력</option>
+              <option value="1" data-i18n="dog_neutered_yes">했음</option>
+              <option value="0" data-i18n="dog_neutered_no">안 했음</option>
+            </select>
           </div>
         </div>
         <p class="dpm-error" id="dogPresetError"></p>

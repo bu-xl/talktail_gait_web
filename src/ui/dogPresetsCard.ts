@@ -15,7 +15,10 @@ import {
   listDogPresets,
   type DogPreset,
 } from "../api/dogPresetsApi.js";
+import { ageLabel, sexLabel } from "../api/reservationsApi.js";
 import { t } from "../i18n/index.js";
+
+const COLLAPSE_KEY = "gait.quickCollapsed";
 
 export interface DogPresetsCardOptions {
   /** 카드를 눌렀을 때 — 측정 화면의 반려견 입력란을 채운다. */
@@ -74,7 +77,34 @@ export class DogPresetsCard {
     this.render();
   }
 
+  /** 접기 — 예약 현황과 같은 동작. 둘 다 펼쳐져 있으면 시작 버튼이 화면 밖으로 밀린다. */
+  private setCollapsed(collapsed: boolean): void {
+    const card = document.querySelector(".mc-quick");
+    card?.classList.toggle("is-collapsed", collapsed);
+    const toggle = document.getElementById("qiFold");
+    if (toggle) {
+      toggle.textContent = collapsed ? "▸" : "▾";
+      toggle.setAttribute("aria-expanded", String(!collapsed));
+    }
+    try {
+      localStorage.setItem(COLLAPSE_KEY, collapsed ? "1" : "0");
+    } catch {
+      /* 저장이 막힌 환경 — 이번 세션에서만 유지된다 */
+    }
+  }
+
   private bind(): void {
+    let collapsed = false;
+    try {
+      collapsed = localStorage.getItem(COLLAPSE_KEY) === "1";
+    } catch {
+      /* 읽기가 막힌 환경 — 펼친 상태로 시작한다 */
+    }
+    this.setCollapsed(collapsed);
+    document.getElementById("qiFold")?.addEventListener("click", () => {
+      const card = document.querySelector(".mc-quick");
+      this.setCollapsed(!card?.classList.contains("is-collapsed"));
+    });
     document
       .getElementById("btnDogPresetAdd")
       ?.addEventListener("click", () => this.openModal());
@@ -116,9 +146,12 @@ export class DogPresetsCard {
       return Number.isFinite(n) && n > 0 ? n : null;
     };
 
+    const select = (id: string): string =>
+      (document.getElementById(id) as HTMLSelectElement | null)?.value ?? "";
     const name = value("dpName");
     const weightKg = num("dpWeight");
     const breed = value("dpBreed");
+    const neutered = select("dpNeutered");
     // 시작 게이트와 같은 규칙 — 이 셋이 없으면 카드로 채워도 시작이 막힌다.
     if (!name || weightKg == null || !breed) {
       this.errorEl.textContent = t("qi_need_name_weight");
@@ -133,6 +166,10 @@ export class DogPresetsCard {
         weightKg,
         heightCm: num("dpHeight"),
         breed,
+        birthMonth: value("dpBirthMonth") || null,
+        // 미입력과 "안 했음" 은 다르다 — 빈 값은 null 로 남긴다.
+        sex: (select("dpSex") || null) as "male" | "female" | null,
+        neutered: neutered === "" ? null : neutered === "1",
       });
       this.closeModal();
       await this.refresh();
@@ -178,6 +215,8 @@ export class DogPresetsCard {
         `${preset.weightKg}kg`,
         preset.heightCm != null ? `${preset.heightCm}cm` : null,
         preset.breed,
+        ageLabel(preset.birthMonth),
+        sexLabel(preset.sex, preset.neutered),
       ]
         .filter(Boolean)
         .join(" · ");

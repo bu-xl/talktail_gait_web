@@ -25,6 +25,7 @@ import {
   listUsers,
   setUserStatus,
   resetUserPassword,
+  setUserTester,
   type AccountStatus,
   type AuthUser,
 } from "../api/authApi.js";
@@ -106,6 +107,19 @@ export class AccountsPage {
     }
     showToast({ kind: "ok", title: `${id} → ${STATUS_LABEL[next]}` });
     await this.reload();
+  }
+
+  private async toggleTester(row: Row): Promise<void> {
+    const next = !row.isTester;
+    const res = await setUserTester(this.apiBase, row.id, next);
+    if (!res.ok) {
+      showToast({ kind: "bad", title: "변경 실패", message: res.error.message });
+      return;
+    }
+    showToast({ kind: "ok", title: `${row.id} 예약 열람 ${next ? "켜짐" : "꺼짐"}` });
+    // 목록만 다시 그린다 — 용량까지 다시 재면 계정 수만큼 요청이 또 나간다.
+    row.isTester = next;
+    this.render(null);
   }
 
   private async resetPw(id: string): Promise<void> {
@@ -215,7 +229,16 @@ export class AccountsPage {
 
     const thead = document.createElement("thead");
     const headRow = document.createElement("tr");
-    for (const label of ["아이디", "기관명", "전화번호", "상태", "용량", "마지막 로그인", ""]) {
+    for (const label of [
+      "아이디",
+      "기관명",
+      "전화번호",
+      "상태",
+      "예약 열람",
+      "용량",
+      "마지막 로그인",
+      "",
+    ]) {
       const th = document.createElement("th");
       th.textContent = label;
       headRow.append(th);
@@ -266,6 +289,18 @@ export class AccountsPage {
     pill.textContent = STATUS_LABEL[row.status];
     statusTd.append(pill);
     tr.append(statusTd);
+
+    // 예약 열람 — 현장 두세 곳이 각자 계정으로 로그인하므로 그 계정만 켠다.
+    const testerTd = document.createElement("td");
+    const testerBtn = document.createElement("button");
+    testerBtn.type = "button";
+    testerBtn.className = row.isMaster || row.isTester ? "acc-tester is-on" : "acc-tester";
+    testerBtn.textContent = row.isMaster ? "항상" : row.isTester ? "켜짐" : "꺼짐";
+    // 마스터는 플래그와 무관하게 늘 보므로 끌 수 있는 것처럼 보이면 안 된다.
+    testerBtn.disabled = row.isMaster;
+    testerBtn.addEventListener("click", () => void this.toggleTester(row));
+    testerTd.append(testerBtn);
+    tr.append(testerTd);
 
     tr.append(
       text(row.bytes == null ? null : formatSize(row.bytes), "acc-num"),

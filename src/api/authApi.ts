@@ -16,6 +16,8 @@ export type AuthUser = {
   phone: string | null;
   status: AccountStatus;
   isMaster: boolean;
+  /** 체험 예약 현황을 볼 수 있는 계정. 마스터는 이 값과 무관하게 항상 본다. */
+  isTester: boolean;
   createdAt?: string;
   lastLoginAt?: string | null;
 };
@@ -151,6 +153,27 @@ export async function setUserStatus(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
+    },
+  );
+  if (!res.ok) return { ok: false, error: await readError(res) };
+  return { ok: true };
+}
+
+/**
+ * 예약 현황 열람 권한. 예약은 계정 격리가 없는 전역 큐라, 켜 준 계정에만 보인다 —
+ * 안 그러면 남의 기관 보호자 이메일이 그대로 노출된다.
+ */
+export async function setUserTester(
+  apiBase: string,
+  id: string,
+  isTester: boolean,
+): Promise<{ ok: true } | { ok: false; error: LoginFailure }> {
+  const res = await apiFetch(
+    joinApiUrl(apiBase, `/api/admin/users/${encodeURIComponent(id)}/tester`),
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isTester }),
     },
   );
   if (!res.ok) return { ok: false, error: await readError(res) };

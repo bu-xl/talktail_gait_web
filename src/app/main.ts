@@ -90,6 +90,8 @@ import {
 } from "../ui/toast.js";
 import { CompletedPage } from "../ui/completedPage.js";
 import { DogPresetsCard } from "../ui/dogPresetsCard.js";
+import { ReservationsCard } from "../ui/reservationsCard.js";
+import { ReservationCodesPage } from "../ui/reservationCodesPage.js";
 import type { CompletedSessionRef } from "../ui/completedPage.js";
 import { getResultDetail, listResultDates, listResultSessions } from "../api/resultsApi.js";
 import { getSessionNotes, saveSessionNotes } from "../api/sessionNotesApi.js";
@@ -355,6 +357,7 @@ type AppModule =
   | "review"
   | "multi"
   | "storage"
+  | "rescodes"
   | "mypage";
 
 const APP_MODULES: readonly AppModule[] = [
@@ -369,6 +372,7 @@ const APP_MODULES: readonly AppModule[] = [
   "review",
   "multi",
   "storage",
+  "rescodes",
   "mypage",
 ];
 
@@ -601,22 +605,59 @@ async function boot(): Promise<void> {
    * 빠른 입력 — 등록해 둔 반려견을 눌러 아래 입력란을 채운다.
    * 채운 뒤 게이트를 다시 평가해야 시작 버튼이 그 자리에서 풀린다.
    */
-  const dogPresets = new DogPresetsCard({
-    onPick: (preset) => {
-      const set = (id: string, value: string): void => {
-        const el = $opt(id) as HTMLInputElement | null;
-        if (el) el.value = value;
-      };
-      set("dogName", preset.name);
-      set("dogWeightInfo", String(preset.weightKg));
-      set("dogHeight", preset.heightCm == null ? "" : String(preset.heightCm));
-      set("dogBreed", preset.breed ?? "");
-      applyDogIdentityGate();
-    },
-  });
+  /** 카드 하나가 반려견 입력란 한 벌을 채운다. 빠른 입력과 예약 현황이 공유한다. */
+  const fillDogInputs = (dog: {
+    name: string;
+    weightKg: number;
+    heightCm?: number | null;
+    breed?: string | null;
+    birthMonth?: string | null;
+    sex?: "male" | "female" | null;
+    neutered?: boolean | null;
+  }): void => {
+    const set = (id: string, value: string): void => {
+      const el = $opt(id) as HTMLInputElement | HTMLSelectElement | null;
+      if (el) el.value = value;
+    };
+    set("dogName", dog.name);
+    set("dogWeightInfo", String(dog.weightKg));
+    set("dogHeight", dog.heightCm == null ? "" : String(dog.heightCm));
+    set("dogBreed", dog.breed ?? "");
+    set("dogBirthMonth", dog.birthMonth ?? "");
+    set("dogSex", dog.sex ?? "");
+    // 미입력과 "안 했음" 은 다르다 — 빈 문자열이 미입력이다.
+    set("dogNeutered", dog.neutered == null ? "" : dog.neutered ? "1" : "0");
+    applyDogIdentityGate();
+  };
+
+  const dogPresets = new DogPresetsCard({ onPick: (preset) => fillDogInputs(preset) });
   dogPresets.setApiBase(apiBase);
   void dogPresets.refresh();
   onLangChange(() => dogPresets.renderLabels());
+
+  /**
+   * 예약 현황 — 현장 QR 로 들어온 신청자를 눌러 같은 입력란을 채운다.
+   * 테스터·마스터가 아니면 섹션 자체를 켜지 않는다. 서버도 403 을 준다.
+   */
+  const reservations = new ReservationsCard({
+    onPick: (row) =>
+      fillDogInputs({
+        name: row.dogName,
+        weightKg: row.dogWeightKg,
+        // 신장은 신청 폼에서 받지 않는다 — 현장에서 재서 입력한다.
+        heightCm: null,
+        breed: row.dogBreed,
+        birthMonth: row.dogBirthMonth,
+        sex: row.dogSex,
+        neutered: row.dogNeutered,
+      }),
+  });
+  reservations.setApiBase(apiBase);
+  if (currentUser.isMaster || currentUser.isTester) reservations.enable();
+
+  const resCodesEl = $opt("resCodesPage");
+  const resCodesPage = resCodesEl ? new ReservationCodesPage(resCodesEl) : null;
+  resCodesPage?.setApiBase(apiBase);
 
   const storagePageEl = $opt("storagePage");
   const storagePage = storagePageEl ? new StoragePage(storagePageEl) : null;
@@ -1164,6 +1205,8 @@ async function boot(): Promise<void> {
       else storagePage?.hide();
       if (mod === "accounts") accountsPage?.show();
       else accountsPage?.hide();
+      if (mod === "rescodes") resCodesPage?.show();
+      else resCodesPage?.hide();
       if (mod === "review") enterViewerMode();
       else leaveViewerMode();
       // 측정 화면의 1·압력패드는 라이브 히트맵이다 — 열람이 덮어 둔 결과 미디어를 걷어낸다.
