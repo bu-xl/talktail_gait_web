@@ -115,11 +115,12 @@
       button.primary:active:not(:disabled) { background: var(--primary-pressed); }
       button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
-      .error {
-        margin: 12px 0 0; padding: 11px 12px; border-radius: 9px;
-        background: #fdf0f0; color: var(--danger); font-size: 14px;
-      }
-      .error:empty { display: none; }
+      /* 오류는 그 입력 옆에 붙는다. 버튼 아래 한 줄로는 어디가 문제인지 안 보인다. */
+      .ferr { display: none; font-size: 12.5px; color: var(--danger); margin-top: 6px; font-weight: 600; }
+      .ferr.on { display: block; }
+      .is-error input, .is-error select, .is-error textarea { border-color: var(--danger); }
+      .is-error .choice label { border-color: var(--danger); }
+      .is-error .hint { display: none; }
 
       /* 이메일 확인 — 인증을 안 하기로 했으므로 여기가 마지막 방어선이다. */
       #confirmModal {
@@ -132,20 +133,28 @@
         width: 100%; max-width: 380px; background: var(--surface);
         border-radius: 16px; padding: 22px 20px;
       }
-      .modal-card h3 { margin: 0 0 8px; font-size: 18px; }
-      .modal-card p { margin: 0 0 6px; font-size: 14px; color: var(--muted); line-height: 1.55; }
+      .modal-card h3 { margin: 0 0 16px; font-size: 17px; line-height: 1.45; }
+      .modal-card p { margin: 12px 0 0; font-size: 13px; color: var(--muted); line-height: 1.55; }
       .modal-email {
-        display: block; margin: 14px 0; padding: 13px 12px; border-radius: 10px;
+        display: block; padding: 15px 12px; border-radius: 10px;
         background: var(--primary-light); color: var(--brand-text);
-        font-size: 16px; font-weight: 700; word-break: break-all; text-align: center;
+        font-size: 17px; font-weight: 700; word-break: break-all; text-align: center;
       }
-      .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+      .modal-actions { display: flex; gap: 8px; margin-top: 20px; }
       .modal-actions button {
-        flex: 1; padding: 12px; font: 600 15px var(--font-ui);
+        flex: 1; padding: 12px 8px; font: 600 15px var(--font-ui);
         border-radius: 10px; cursor: pointer; border: 1px solid var(--border-strong);
         background: var(--surface); color: var(--fg);
       }
       .modal-actions button.primary { margin: 0; border: none; }
+      /* 서버·네트워크 실패용. 필드에 붙일 수 없는 오류만 여기로 온다. */
+      #alertModal {
+        position: fixed; inset: 0; z-index: 21; display: none;
+        align-items: center; justify-content: center; padding: 20px;
+        background: rgba(31, 35, 41, 0.45);
+      }
+      #alertModal.open { display: flex; }
+      #alertModal .modal-actions button { flex: none; width: 100%; }
 
       /* 제출 후 화면 — 폼을 통째로 갈아 끼운다. 두 번 내는 것을 막는다. */
       #done { display: none; text-align: center; padding: 40px 12px; }
@@ -188,6 +197,7 @@
               placeholder="예: GAIT01"
             />
             <span class="hint">코드를 모르시면 현장 진행요원에게 문의해 주세요.</span>
+            <span class="ferr" data-for="rCode"></span>
           </div>
         </div>
 
@@ -196,35 +206,41 @@
           <div class="field">
             <label for="rDogName">이름<span class="req">*</span></label>
             <input id="rDogName" type="text" autocomplete="off" maxlength="120" placeholder="예: 바둑이" />
+            <span class="ferr" data-for="rDogName"></span>
           </div>
           <div class="row">
             <div class="field">
               <label for="rWeight">몸무게(kg)<span class="req">*</span></label>
               <input id="rWeight" type="number" inputmode="decimal" min="0" step="0.1" placeholder="예: 5.2" />
+              <span class="ferr" data-for="rWeight"></span>
             </div>
             <div class="field">
-              <label for="rBreed">견종</label>
+              <label for="rBreed">견종<span class="req">*</span></label>
               <input id="rBreed" type="text" autocomplete="off" maxlength="120" placeholder="예: 푸들" />
+              <span class="ferr" data-for="rBreed"></span>
             </div>
           </div>
           <div class="field">
-            <label for="rBirth">생년월</label>
+            <label for="rBirth">생년월<span class="req">*</span></label>
             <input id="rBirth" type="month" />
-            <span class="hint">나이 대신 태어난 해와 달을 받습니다. 모르시면 비워 두세요.</span>
+            <span class="hint">나이 대신 태어난 해와 달을 받습니다. 정확하지 않으면 대략이라도 골라 주세요.</span>
+            <span class="ferr" data-for="rBirth"></span>
           </div>
           <div class="field">
-            <label>성별</label>
+            <label>성별<span class="req">*</span></label>
             <div class="choice">
               <label><input type="radio" name="dogSex" value="male" /><span>수컷</span></label>
               <label><input type="radio" name="dogSex" value="female" /><span>암컷</span></label>
             </div>
+            <span class="ferr" data-for="dogSex"></span>
           </div>
           <div class="field">
-            <label>중성화 여부</label>
+            <label>중성화 여부<span class="req">*</span></label>
             <div class="choice">
               <label><input type="radio" name="dogNeutered" value="1" /><span>했음</span></label>
               <label><input type="radio" name="dogNeutered" value="0" /><span>안 했음</span></label>
             </div>
+            <span class="ferr" data-for="dogNeutered"></span>
           </div>
         </div>
 
@@ -234,6 +250,7 @@
             <label for="rEmail">이메일<span class="req">*</span></label>
             <input id="rEmail" type="email" inputmode="email" autocomplete="email" maxlength="190" placeholder="예: guardian@example.com" />
             <span class="hint">측정이 끝나면 이 주소로 분석 리포트를 보내 드립니다.</span>
+            <span class="ferr" data-for="rEmail"></span>
           </div>
           <div class="field">
             <label for="rReason">체험하게 된 이유</label>
@@ -265,6 +282,7 @@
               >[필수] 측정 영상 촬영 및 이용 — 촬영 범위에 보호자가 함께 담길 수 있습니다</label
             >
           </div>
+          <span class="ferr" data-for="rAgreeAll"></span>
           <p class="hint" style="margin-top: 12px">
             자세한 수집 항목·보유 기간은
             <a href="./legal/experiment-consent.html" target="_blank" rel="noopener">체험 참여 동의 안내</a>에서
@@ -273,7 +291,6 @@
         </div>
 
         <button type="submit" class="primary" id="rSubmit">신청하기</button>
-        <p class="error" id="rError"></p>
       </form>
 
       <div id="done">
@@ -287,16 +304,21 @@
 
     <div id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
       <div class="modal-card">
-        <h3 id="confirmTitle">이메일 주소가 맞습니까?</h3>
-        <p>분석 리포트는 이 주소로만 발송됩니다.</p>
+        <h3 id="confirmTitle">이 주소로 리포트를 보내 드립니다</h3>
         <strong class="modal-email" id="confirmEmail"></strong>
-        <p>
-          주소가 정확하지 않으면 <strong>리포트를 받아보실 수 없습니다.</strong>
-          한 글자씩 다시 확인해 주세요.
-        </p>
+        <p>주소가 틀리면 리포트를 받아보실 수 없습니다. 한 글자씩 확인해 주세요.</p>
         <div class="modal-actions">
-          <button type="button" id="confirmBack">수정할게요</button>
-          <button type="button" class="primary" id="confirmGo">맞습니다, 신청</button>
+          <button type="button" id="confirmBack">주소 수정</button>
+          <button type="button" class="primary" id="confirmGo">신청하기</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="alertModal" role="alertdialog" aria-modal="true" aria-labelledby="alertText">
+      <div class="modal-card">
+        <h3 id="alertText"></h3>
+        <div class="modal-actions">
+          <button type="button" class="primary" id="alertClose">확인</button>
         </div>
       </div>
     </div>

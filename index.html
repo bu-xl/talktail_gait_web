@@ -980,6 +980,9 @@
         background: var(--panel); border: 1px solid var(--border);
         border-radius: 10px; padding: 12px 14px;
       }
+      /* .mc-card 가 display:flex 라 브라우저 기본 [hidden]{display:none} 을 덮는다.
+         hidden 을 건 카드가 그대로 보이므로 여기서 다시 눌러 준다. */
+      .mc-card[hidden] { display: none !important; }
       .mc-card > .section { margin-top: 0; }
       .mc-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
       .mc-head .section { margin: 0; }
@@ -1887,7 +1890,6 @@
           <nav class="ah-nav" aria-label="Modules">
             <!-- 마스터 전용. body[data-role] 로 갈린다 — URL 을 알아도 서버가 막는다. -->
             <button type="button" class="master-only" data-module="accounts">계정 관리</button>
-            <button type="button" class="master-only" data-module="rescodes">예약 코드</button>
             <button type="button" class="capture-only active" data-module="measure" aria-current="page" data-i18n="nav_measure">측정</button>
             <button type="button" data-module="verify" data-i18n="nav_verify">데이터 검증</button>
             <button type="button" data-module="results" data-i18n="nav_results">결과 보기</button>
@@ -1901,6 +1903,7 @@
                 <button type="button" data-module="upload" data-i18n="nav_upload">직접 분석</button>
                 <button type="button" data-module="report" data-i18n="nav_report">리포트</button>
                 <button type="button" data-module="storage" data-i18n="nav_storage">서버 조회</button>
+                <button type="button" class="master-only" data-module="rescodes">예약 코드</button>
                 <button type="button" data-module="mypage">마이페이지</button>
               </div>
             </details>
