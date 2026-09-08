@@ -82,7 +82,6 @@ export class VerifyPage {
 
   private readonly tabLiveBtn: HTMLButtonElement;
   private readonly tabDiscardedBtn: HTMLButtonElement;
-  private readonly purgeBtn: HTMLButtonElement;
   private readonly dayEl: HTMLInputElement;
   private readonly selectAllBtn: HTMLButtonElement;
   private readonly bulkDiscardBtn: HTMLButtonElement;
@@ -125,10 +124,8 @@ export class VerifyPage {
 
     this.tabLiveBtn = root.querySelector("#dvTabLive") as HTMLButtonElement;
     this.tabDiscardedBtn = root.querySelector("#dvTabDiscarded") as HTMLButtonElement;
-    this.purgeBtn = root.querySelector("#dvPurge") as HTMLButtonElement;
     this.tabLiveBtn.addEventListener("click", () => this.setTab("live"));
     this.tabDiscardedBtn.addEventListener("click", () => this.setTab("discarded"));
-    this.purgeBtn.addEventListener("click", () => void this.purgeDiscarded());
 
     this.dayEl = root.querySelector("#dvDay") as HTMLInputElement;
     this.selectAllBtn = root.querySelector("#dvSelectAll") as HTMLButtonElement;
@@ -274,50 +271,9 @@ export class VerifyPage {
     this.render();
   }
 
-  /** 버린 촬영의 파일을 영구 삭제한다. 되돌릴 수 없으므로 개수를 박아 되묻는다. */
-  private async purgeDiscarded(): Promise<void> {
-    const targets = this.allSessions.filter((s) => this.discarded.has(s.stamp));
-    if (targets.length === 0 || this.deleting) return;
-    if (!window.confirm(t("verify_purge_ask", { n: String(targets.length) }))) return;
-    this.deleting = true;
-    this.purgeBtn.disabled = true;
-    try {
-      let deleted = 0;
-      let failed = 0;
-      // 서버는 한 번에 32개까지 받는다 — 촬영 단위로 끊어 보낸다.
-      for (const s of targets) {
-        const result = await deleteStoredFiles(this.apiBase, {
-          csv: s.csv ? [s.csv.name] : [],
-          videos: s.videos.map((v) => `${"role" in v ? v.role : "main"}/${v.name}`),
-        });
-        deleted += result.deleted.length;
-        failed += result.failed.length;
-        // 파일이 사라졌으면 버림 표시도 같이 걷는다 — 안 걷으면 목록에 유령이 남는다.
-        // 남은 파일이 있는데 걷으면 반쪽짜리 촬영이 살아있는 탭으로 되돌아온다.
-        if (result.failed.length === 0) {
-          await setStampDiscarded(this.apiBase, s.stamp, false).catch(() => undefined);
-        }
-      }
-      this.deleting = false;
-      await this.reload();
-      this.setStatus(
-        t("verify_purge_done", { n: String(deleted) }) +
-          (failed ? ` ${t("verify_del_failed_n", { n: String(failed) })}` : ""),
-        failed > 0,
-      );
-    } catch (err) {
-      const detail = err instanceof Error ? err.message : String(err);
-      this.setStatus(`${t("verify_del_failed")}: ${detail}`, true);
-    } finally {
-      this.deleting = false;
-      this.purgeBtn.disabled = false;
-    }
-  }
-
   private render(): void {
     this.tabLiveBtn.classList.toggle("is-active", this.tab === "live");
     this.tabDiscardedBtn.classList.toggle("is-active", this.tab === "discarded");
-    this.purgeBtn.hidden = this.tab !== "discarded" || this.sessions.length === 0;
     this.syncAnalyzeBtn();
     this.emptyEl.textContent = this.tab === "discarded" ? t("verify_discarded_empty") : t("verify_empty");
     this.countEl.textContent = t("verify_count", { n: this.sessions.length });
