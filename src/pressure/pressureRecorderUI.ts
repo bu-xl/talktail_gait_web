@@ -2,9 +2,10 @@
  * 압력판 CSV 저장/열람 컨트롤러.
  *
  * 기존 세션 흐름(시작 버튼 → 영상 + 압력판 동시 녹화)을 그대로 두고, 세션이 종료될 때
- * 캡처된 압력 프레임을 canine_gait 호환 CSV 로 만들어 백엔드(`back/pressure_data`)에
- * 업로드한다. 강아지 이름/견종/몸무게는 "반려견" 입력란(#dogName/#dogBreed/#dogWeightInfo)
- * 에서 읽는다. 저장된 CSV 는 "저장된 CSV" 목록에서 열람/다운로드할 수 있다.
+ * 캡처된 압력 프레임을 canine_gait 호환 CSV 로 만들어 백엔드의 **촬영 폴더**
+ * (`uploads/<userId>/<dogId>/<도장>/`)로 업로드한다 — 영상과 같은 자리다.
+ * 개 정보는 보내지 않는다: 촬영 세션이 이미 개체를 알고 있고, 세션이 없을 때만 `dogId` 를
+ * 실어 보낸다. 저장된 CSV 는 "저장된 CSV" 목록에서 열람/다운로드할 수 있다.
  *
  * 별도의 압력판 전용 녹화 UI 는 없다 — 업로드는 세션 종료 훅에서만 일어난다.
  */
@@ -30,6 +31,8 @@ export interface PressureCsvDeps {
   buildCsv: () => string;
   /** 동기 촬영 세션 id (영상과 CSV 를 back 에서 한 세션으로 묶기 위함). */
   sessionId?: () => string | null;
+  /** 세션이 없을 때 쓸 개체 id. 세션이 있으면 서버가 세션의 값을 우선한다. */
+  dogId?: () => number | null;
   /** 녹화 시작 시각 — CSV 파일명의 도장. 업로드 시각이 아니다. */
   startedAt?: () => Date | string | null;
   /**
@@ -41,26 +44,30 @@ export interface PressureCsvDeps {
   clockRttP50Ns?: () => bigint | null;
 }
 
+/**
+ * 업로드 상태 — 확인 모달이 영상과 같은 수준으로 보여 준다(§3-10).
+ *
+ * **퍼센트는 없다.** 진행률을 그리려면 XHR 로 바꿔야 하는데, 현장에서 필요한 답은
+ * "올라갔나 / 아직인가" 둘뿐이다.
+ */
+export type PressureUploadState = "idle" | "uploading" | "done" | "failed";
+
 export interface PressureCsvController {
   /** 세션 종료 시 호출 — 프레임이 있으면 CSV 를 만들어 업로드하고 목록을 갱신한다. */
   uploadRecorded: () => Promise<void>;
   /** 저장된 CSV 목록 새로고침. */
   refresh: () => Promise<void>;
+  /** 지금 업로드 상태. */
+  state: () => PressureUploadState;
+  /** 상태가 바뀔 때마다 부른다 — 확인 모달이 표시를 갱신한다. */
+  onStateChange: (cb: (state: PressureUploadState) => void) => void;
+  /** 실패한 CSV 다시 올리기(§3-13). 자동 재시도는 하지 않는다. */
+  retry: () => Promise<void>;
+  /** 다시 올릴 CSV 를 들고 있나. 모달의 [다시 올리기] 버튼 표시 조건. */
+  canRetry: () => boolean;
 }
 
 const $ = (id: string): HTMLElement | null => document.getElementById(id);
-
-function readDogInfo(): { name?: string; breed?: string; weightKg?: number | null } {
-  const name = ($("dogName") as HTMLInputElement | null)?.value?.trim() || undefined;
-  const breed = ($("dogBreed") as HTMLInputElement | null)?.value?.trim() || undefined;
-  const weightRaw = ($("dogWeightInfo") as HTMLInputElement | null)?.value?.trim();
-  let weightKg: number | null = null;
-  if (weightRaw) {
-    const n = Number(weightRaw);
-    weightKg = Number.isFinite(n) && n > 0 ? n : null;
-  }
-  return { name, breed, weightKg };
-}
 
 export function createPressureCsvController(deps: PressureCsvDeps): PressureCsvController {
   const statusEl = $("pressureRecStatus");
@@ -156,6 +163,12 @@ export function createPressureCsvController(deps: PressureCsvDeps): PressureCsvC
    * recorder 를 초기화하면 그 회차의 압력 데이터는 복구할 방법이 없다.
    */
   let pendingUpload: Parameters<typeof uploadPressureCsv>[1] | null = null;
+  let uploadState: PressureUploadState = "idle";
+  const stateListeners: ((s: PressureUploadState) => void)[] = [];
+  const setUploadState = (next: PressureUploadState): void => {
+    uploadState = next;
+    for (const cb of stateListeners) cb(next);
+  };
 
   /** 실패한 CSV 를 다시 올리는 버튼 — 실패했을 때만 나타난다. */
   const retryBtn = document.createElement("button");
@@ -173,15 +186,20 @@ export function createPressureCsvController(deps: PressureCsvDeps): PressureCsvC
 
   const send = async (payload: Parameters<typeof uploadPressureCsv>[1]): Promise<void> => {
     busy = true;
+    setUploadState("uploading");
     setStatus(t("csv_uploading", { n: payload.recording?.frames ?? 0 }), "warn");
     try {
       const record = await uploadPressureCsv(deps.apiBase, payload);
       pendingUpload = null;
+      setUploadState("done");
       setStatus(t("csv_upload_done", { name: record.csv.filename }), "ok");
       await refresh();
     } catch (err) {
       // 실패한 CSV 는 들고 있는다 — 사람이 [다시 올리기] 로 되살릴 수 있다.
+      // **자동 재시도는 넣지 않는다**(§3-13): 회선이 죽은 상태에서 반복 시도는 실패를
+      // 되풀이하며 원인을 가린다. 사람이 문제를 인지한 자리에서 조치하게 한다.
       pendingUpload = payload;
+      setUploadState("failed");
       const msg = err instanceof Error ? err.message : String(err);
       setStatus(t("csv_retry_pending"), "bad");
       showToast({ kind: "bad", title: t("csv_upload_failed_title"), message: msg });
@@ -191,10 +209,12 @@ export function createPressureCsvController(deps: PressureCsvDeps): PressureCsvC
     }
   };
 
-  retryBtn.addEventListener("click", () => {
+  const retry = async (): Promise<void> => {
     if (busy || !pendingUpload) return;
-    void send(pendingUpload);
-  });
+    await send(pendingUpload);
+  };
+
+  retryBtn.addEventListener("click", () => void retry());
 
   const uploadRecorded = async (): Promise<void> => {
     if (busy) return;
@@ -216,9 +236,9 @@ export function createPressureCsvController(deps: PressureCsvDeps): PressureCsvC
       showToast({ kind: "bad", title: t("csv_no_frames_title"), message: t("csv_no_frames_msg") });
       return;
     }
-    const dog = readDogInfo();
     // sessionId 는 record_stop 에서 null 로 지워지기 전에 지금 즉시 확보한다.
     const sessionId = deps.sessionId?.() ?? null;
+    const dogId = deps.dogId?.() ?? null;
     const startedRaw = deps.startedAt?.() ?? null;
     const startedAtDate =
       startedRaw instanceof Date
@@ -248,11 +268,20 @@ export function createPressureCsvController(deps: PressureCsvDeps): PressureCsvC
       );
     }
 
-    await send({ csv, dog, recording, sessionId, timebase });
+    await send({ csv, dogId, recording, sessionId, timebase });
   };
 
   refreshBtn?.addEventListener("click", () => void refresh());
   void refresh();
 
-  return { uploadRecorded, refresh };
+  return {
+    uploadRecorded,
+    refresh,
+    state: () => uploadState,
+    onStateChange: (cb) => {
+      stateListeners.push(cb);
+    },
+    retry,
+    canRetry: () => pendingUpload !== null,
+  };
 }

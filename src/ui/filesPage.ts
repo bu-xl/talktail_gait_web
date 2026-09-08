@@ -4,7 +4,7 @@
  *
  * 파일을 CSV 열·영상 열로 늘어놓으면 sub 카메라 수가 촬영마다 달라서 어떤 파일이
  * 어느 촬영의 것인지 사람이 맞춰야 한다. 그래서 파일명 도장으로 되묶어
- * (`sessionNaming.groupSessions` — "데이터 검증" 화면과 같은 규칙) 태스크 한 줄로 보여주고,
+ * (서버가 폴더로 묶어 준다 — `/api/files` 의 `tasks`) 태스크 한 줄로 보여주고,
  * ZIP 도 태스크 폴더 안에 그 촬영의 CSV + 영상이 함께 들어가게 받는다.
  *
  * 체크박스는 태스크에만 있다. "여러 개 골라 묶기"는 체크박스, "이거 하나만"은 ⬇ 로
@@ -27,14 +27,8 @@ import {
   type StoredCsvFile,
   type StoredVideoFile,
 } from "../api/storedFilesApi.js";
-import {
-  groupSessions,
-  parseCaptureName,
-  sessionKey,
-  taskName,
-  ungroupedFiles,
-  type CaptureSession,
-} from "../core/sessionNaming.js";
+import type { StoredTask } from "../api/storedFilesApi.js";
+import { parseStamp, roleOrder } from "../core/sessionNaming.js";
 
 /** 받는 화면이냐 지우는 화면이냐. 목록은 같고 행의 동작만 갈린다. */
 export type FilesMode = "download" | "delete";
@@ -44,27 +38,47 @@ const ALL_ACCOUNTS = "*";
 
 type StoredFile = StoredCsvFile | StoredVideoFile;
 
+/**
+ * 화면이 다루는 태스크 한 건 — **서버가 묶어 준 폴더**에 그 안의 파일을 붙인 것.
+ *
+ * 예전에는 화면이 파일명을 파싱해 도장으로 되묶었다(`groupSessions`). 이름이 규칙에서
+ * 벗어난 파일은 조용히 빠졌고, 같은 초에 찍은 남의 파일이 한 줄로 합쳐지기도 했다.
+ * 폴더가 곧 촬영이 되면서 그 파싱이 통째로 사라졌다.
+ */
+type TaskView = StoredTask & {
+  csv: StoredCsvFile | null;
+  videos: StoredVideoFile[];
+  when: Date | null;
+};
+
 /** 태스크 한 건의 파일들. 목록·용량 계산이 전부 이걸 쓴다. */
-function taskFiles(task: CaptureSession): StoredFile[] {
+function taskFiles(task: TaskView): StoredFile[] {
   return task.csv ? [task.csv, ...task.videos] : [...task.videos];
 }
 
-function taskSize(task: CaptureSession): number {
+function taskSize(task: TaskView): number {
   return taskFiles(task).reduce((sum, row) => sum + (Number(row.size) || 0), 0);
 }
 
 /** 이 촬영에 빠진 게 있으면 사유. 없으면 null. */
-function taskWarning(task: CaptureSession): string | null {
+function taskWarning(task: TaskView): string | null {
   if (!task.csv) return t("files_tag_no_csv");
   if (task.videos.length === 0) return t("files_tag_no_video");
   return null;
 }
 
+/** 표시용 개 이름. 파일명이 아니라 **`dogs` 조인**에서 온다(§3-9). */
+function taskDogLabel(task: TaskView): string {
+  const name = task.dog?.name;
+  if (!name) return `#${task.dogId}`;
+  const weight = task.dog?.weightKg;
+  return weight != null ? `${name} · ${weight}kg` : name;
+}
+
 function roleLabel(name: string): string {
-  const parsed = parseCaptureName(name);
-  if (!parsed) return "";
-  if (parsed.role === "main") return t("files_role_main");
-  return `${t("files_role_sub")}${parsed.subIndex ?? 1}`;
+  const order = roleOrder(name);
+  if (order === 999) return "";
+  return order === 0 ? t("files_role_main") : `${t("files_role_sub")}${order}`;
 }
 
 const VIDEO_EXT_RE = /\.(mp4|mov|m4v|avi|webm)$/i;
@@ -101,8 +115,13 @@ export class FilesPage {
   /** 지금 보고 있는 계정. `"*"` 는 전 계정, `""` 는 내 계정(헤더 스코프를 따름). */
   private acct = "";
   private acctLoaded = false;
-  private tasks: CaptureSession[] = [];
-  /** 도장이 없어 묶이지 않은 파일 — 개별 다운로드만 된다. */
+  private tasks: TaskView[] = [];
+  /**
+   * 폴더 밖에 남은 파일 — **구조적으로 생길 수 없다.**
+   *
+   * 예전에는 도장을 못 읽어 안 묶인 파일이 있었고, 안 보여 주면 없는 파일이 되어 버렸다.
+   * 지금은 모든 파일이 회차 폴더 안에 있다. 화면은 남겨 두되 항상 비어 있다.
+   */
   private loose: StoredFile[] = [];
   private query = "";
   /** `<input type="date">` 값(`YYYY-MM-DD`), 비어 있으면 그 방향 제한 없음. */
@@ -238,10 +257,30 @@ export class FilesPage {
     this.setStatus(t("files_loading"));
     try {
       const list = await listStoredFiles(this.apiBase, this.acct || undefined);
-      this.tasks = groupSessions(list.csv, list.videos);
-      this.loose = ungroupedFiles(list.csv, list.videos);
+      // 폴더 키로 파일을 태스크에 꽂는다. 묶는 규칙은 서버에 있고 여기는 배치만 한다.
+      const byKey = new Map<string, TaskView>();
+      for (const task of list.tasks) {
+        byKey.set(task.key, {
+          ...task,
+          csv: null,
+          videos: [],
+          when: parseStamp(task.stamp),
+        });
+      }
+      for (const row of list.csv) {
+        const task = byKey.get(`${row.dogId}/${row.stamp}`);
+        if (task && !task.csv) task.csv = row;
+      }
+      for (const row of list.videos) {
+        byKey.get(`${row.dogId}/${row.stamp}`)?.videos.push(row);
+      }
+      for (const task of byKey.values()) {
+        task.videos.sort((a, b) => roleOrder(a.name) - roleOrder(b.name));
+      }
+      this.tasks = [...byKey.values()];
+      this.loose = [];
       // 목록에서 사라진 촬영은 선택도 풀어야 ZIP·삭제 요청에 유령 이름이 남지 않는다.
-      const alive = new Set(this.tasks.map(sessionKey));
+      const alive = new Set(this.tasks.map((task) => task.key));
       for (const key of [...this.selected]) {
         if (!alive.has(key)) this.selected.delete(key);
       }
@@ -257,9 +296,9 @@ export class FilesPage {
   }
 
   /** 검색은 태스크 이름과 그 안의 파일명 모두에 걸린다. */
-  private matches(task: CaptureSession): boolean {
+  private matches(task: TaskView): boolean {
     if (this.query) {
-      const hay = [task.userId, taskName(task), ...taskFiles(task).map((row) => row.name)]
+      const hay = [task.userId ?? "", task.taskName, taskDogLabel(task), ...taskFiles(task).map((row) => row.name)]
         .join("\n")
         .toLowerCase();
       if (!hay.includes(this.query)) return false;
@@ -277,7 +316,7 @@ export class FilesPage {
    * 촬영 날짜(`YYYY-MM-DD`). 도장은 촬영 시각이라 업로드가 끝난 mtime 보다 정확하다.
    * 도장을 못 읽으면 파일 저장 시각으로 물러선다.
    */
-  private taskDay(task: CaptureSession): string {
+  private taskDay(task: TaskView): string {
     if (task.when) {
       const p = (n: number): string => String(n).padStart(2, "0");
       return `${task.when.getFullYear()}-${p(task.when.getMonth() + 1)}-${p(task.when.getDate())}`;
@@ -287,12 +326,12 @@ export class FilesPage {
   }
 
   /** 검색어·날짜에 걸린, 지금 화면에 보이는 촬영들. */
-  private visibleTasks(): CaptureSession[] {
+  private visibleTasks(): TaskView[] {
     return this.tasks.filter((task) => this.matches(task));
   }
 
-  private selectedTasks(): CaptureSession[] {
-    return this.tasks.filter((task) => this.selected.has(sessionKey(task)));
+  private selectedTasks(): TaskView[] {
+    return this.tasks.filter((task) => this.selected.has(task.key));
   }
 
   private render(): void {
@@ -313,8 +352,8 @@ export class FilesPage {
     this.syncSelectionUi();
   }
 
-  private taskRow(task: CaptureSession): HTMLElement {
-    const key = sessionKey(task);
+  private taskRow(task: TaskView): HTMLElement {
+    const key = task.key;
     const li = document.createElement("li");
     li.className = "fd-task";
     const open = this.expanded.has(key);
@@ -327,7 +366,7 @@ export class FilesPage {
     check.className = "fd-check";
     check.checked = this.selected.has(key);
     check.disabled = this.busy;
-    check.setAttribute("aria-label", taskName(task));
+    check.setAttribute("aria-label", task.taskName);
     check.addEventListener("change", () => {
       if (check.checked) this.selected.add(key);
       else this.selected.delete(key);
@@ -351,8 +390,8 @@ export class FilesPage {
 
     const name = document.createElement("div");
     name.className = "fd-task-name";
-    name.textContent = task.dog || t("files_unnamed");
-    name.title = taskName(task);
+    name.textContent = taskDogLabel(task);
+    name.title = task.taskName;
 
     const sub = document.createElement("div");
     sub.className = "fd-task-sub";
@@ -387,7 +426,7 @@ export class FilesPage {
     zip.className = del ? "fd-icon-btn is-danger" : "fd-icon-btn";
     zip.textContent = del ? "🗑" : "⬇";
     zip.title = t(del ? "purge_task" : "files_task_zip");
-    zip.setAttribute("aria-label", `${zip.title} ${taskName(task)}`);
+    zip.setAttribute("aria-label", `${zip.title} ${task.taskName}`);
     zip.disabled = this.busy;
     zip.addEventListener("click", () => {
       if (del) void this.deleteTasks([task]);
@@ -488,8 +527,8 @@ export class FilesPage {
   /** "모두 선택" — 지금 검색 결과로 보이는 촬영만 대상으로 한다. */
   private toggleAll(checked: boolean): void {
     for (const task of this.visibleTasks()) {
-      if (checked) this.selected.add(sessionKey(task));
-      else this.selected.delete(sessionKey(task));
+      if (checked) this.selected.add(task.key);
+      else this.selected.delete(task.key);
     }
     // 다시 그리지 않고 체크 상태만 맞춘다(펼침·스크롤 유지).
     this.listEl.querySelectorAll<HTMLInputElement>("input.fd-check").forEach((el) => {
@@ -501,7 +540,7 @@ export class FilesPage {
   /** 선택 개수·용량 표시와 버튼/전체선택 체크박스 상태를 현재 선택에 맞춘다. */
   private syncSelectionUi(): void {
     const visible = this.visibleTasks();
-    const visibleSelected = visible.filter((task) => this.selected.has(sessionKey(task))).length;
+    const visibleSelected = visible.filter((task) => this.selected.has(task.key)).length;
     this.allEl.disabled = visible.length === 0 || this.busy;
     this.allEl.checked = visible.length > 0 && visibleSelected === visible.length;
     this.allEl.indeterminate = visibleSelected > 0 && visibleSelected < visible.length;
@@ -541,7 +580,7 @@ export class FilesPage {
    * (`targetAccount`). 같은 도장을 가진 남의 파일이 딸려가는 사고를 그 구조가 막는다.
    * 분석 산출물과 DB 행은 남는다. 여기서 지우는 것은 back 디스크의 원본뿐이다.
    */
-  private async deleteTasks(tasks: CaptureSession[]): Promise<void> {
+  private async deleteTasks(tasks: TaskView[]): Promise<void> {
     if (this.busy) return;
     if (tasks.length === 0) {
       this.setStatus(t("purge_empty"), true);
@@ -581,16 +620,10 @@ export class FilesPage {
       let deleted = 0;
       let failed = 0;
       for (const [userId, group] of byAccount) {
-        const csv = group.filter((row) => !isVideoRow(row)).map((row) => row.name);
-        const videos = group
-          .filter(isVideoRow)
-          .map((row) => `${row.role === "sub" ? "sub" : "main"}/${row.name}`);
-        if (csv.length === 0 && videos.length === 0) continue;
-        const result = await deleteStoredFiles(
-          this.apiBase,
-          { csv, videos },
-          userId || undefined,
-        );
+        // 키가 곧 서버의 폴더 경로다 — 화면이 경로를 조립하지 않는다.
+        const keys = group.map((row) => row.key);
+        if (keys.length === 0) continue;
+        const result = await deleteStoredFiles(this.apiBase, keys, userId || undefined);
         deleted += result.deleted.length;
         failed += result.failed.length;
       }
@@ -608,7 +641,7 @@ export class FilesPage {
   }
 
   /** 태스크 이름만 보낸다 — 어느 파일이 그 촬영의 것인지는 서버가 도장으로 찾는다. */
-  private async downloadZip(tasks: CaptureSession[]): Promise<void> {
+  private async downloadZip(tasks: TaskView[]): Promise<void> {
     if (this.busy) return;
     if (tasks.length === 0) {
       this.setStatus(t("files_zip_empty"), true);
@@ -619,7 +652,7 @@ export class FilesPage {
     this.allEl.disabled = true;
     this.setStatus(t("files_zip_preparing"));
     try {
-      const ticket = await createZipTicket(this.apiBase, "task", tasks.map(taskName));
+      const ticket = await createZipTicket(this.apiBase, "task", tasks.map((task) => task.key));
       this.startDownload(zipDownloadUrl(this.apiBase, ticket.url));
       let msg = t("files_zip_started", {
         name: ticket.filename,

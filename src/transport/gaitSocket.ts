@@ -9,6 +9,14 @@ import { clockSync } from "./clockSync.js";
 export type SyncPeers = {
   web: boolean;
   mobile: boolean;
+  /**
+   * 이 계정이 지금 측정 중인가 (§3-11).
+   *
+   * 한 기관 = 한 계정이고 방도 계정당 하나다. 다른 브라우저가 같은 계정으로 들어오면
+   * 이 값으로 시작 버튼을 잠근다 — 브라우저끼리는 서로의 존재를 모르므로 서버가 판정한다.
+   */
+  measuring?: boolean;
+  activeSessionId?: string | null;
   /** 연결된 카메라 폰 수 (Main + Sub). 구버전 서버는 없음. */
   mobileCount?: number;
   /** Main 카메라 접속 여부 (분석 대상). */
@@ -42,6 +50,8 @@ export type SyncMessage =
    */
   | { type: "auth_required"; message?: string }
   | { type: "peer_update"; userId: string; peers: SyncPeers }
+  /** 측정 시작/종료 시 방 전체에 나간다 — 다른 브라우저의 시작 버튼을 잠그고 푼다. */
+  | { type: "measure_state"; measuring: boolean; sessionId: string | null; serverNow: number }
   | {
       type: "sync_start";
       /** @deprecated 서버가 토큰에서 정한다. 자리만 남겨 뒀다. */
@@ -273,16 +283,22 @@ export class GaitSyncSocket {
    * backend uses it to name the file.
    */
   /** viewer 에서 호출되면 조용히 무시한다. 서버도 거부하지만 두 번 막는다. */
-  requestRecord(dog?: {
-    name?: string | null;
-    weightKg?: number | null;
-  } | null, captureSettings?: CaptureSettingsPayload | null, maxDurationMs?: number | null): void {
+  /**
+   * 촬영 시작 요청.
+   *
+   * 나르는 개 정보는 **`dogId` 하나**다. 예전에는 이름·몸무게를 실어 보내 서버가 파일명에
+   * 박았고, 그래서 오타가 그대로 파일명이 되고 이름이 같은 다른 개가 구분되지 않았다.
+   * 개체가 없으면 서버가 시작을 거절한다(§3-3).
+   */
+  requestRecord(
+    dogId?: number | null,
+    captureSettings?: CaptureSettingsPayload | null,
+    maxDurationMs?: number | null,
+  ): void {
     if (this.isViewer) return;
     this.send({
       type: "record_request",
-      dog: dog && (dog.name || dog.weightKg != null)
-        ? { dogName: dog.name ?? null, dogWeightKg: dog.weightKg ?? null }
-        : null,
+      dogId: dogId ?? null,
       ...(captureSettings ? { captureSettings } : {}),
       // 촬영 하드 상한. 서버가 10~180초로 clamp 한 뒤 sync_start 로 폰에 내려보낸다.
       ...(maxDurationMs != null ? { maxDurationMs } : {}),
@@ -336,6 +352,10 @@ export class GaitSyncSocket {
         const msg = JSON.parse(String(ev.data)) as SyncMessage;
         if (msg.type === "joined" || msg.type === "peer_update") {
           this.peers = msg.peers;
+        }
+        // 잠금 상태만 따로 오는 메시지 — peers 를 통째로 다시 그리지 않는다.
+        if (msg.type === "measure_state") {
+          this.peers = { ...this.peers, measuring: msg.measuring, activeSessionId: msg.sessionId };
         }
         // 서버가 쿠키에서 확정한 방(=계정). 클라가 정하지 않는다.
         if (msg.type === "joined") this.userId = msg.userId;

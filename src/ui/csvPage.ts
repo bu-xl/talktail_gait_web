@@ -16,13 +16,17 @@ import {
   zipDownloadUrl,
   type StoredCsvFile,
 } from "../api/storedFilesApi.js";
-import { csvDog, csvStamp, parseStamp } from "../core/sessionNaming.js";
+import { parseStamp } from "../core/sessionNaming.js";
 import { formatSize, formatWhen, localDay } from "./filesPage.js";
 
-/** 파일명 도장의 촬영일(`YYYY-MM-DD`). 도장이 없으면 저장 시각으로 물러선다. */
+/**
+ * 촬영일(`YYYY-MM-DD`). 도장은 **서버가 준다** — 파일명을 되읽지 않는다.
+ *
+ * 예전에는 `csvStamp(row.name)` 로 파일명에서 뽑았고, 이름이 규칙에서 벗어나면 그 파일이
+ * 날짜 필터에서 조용히 빠졌다. 지금은 폴더가 곧 회차라 서버가 도장을 알고 있다.
+ */
 export function fileDay(row: StoredCsvFile): string {
-  const stamp = csvStamp(row.name);
-  const when = stamp ? parseStamp(stamp) : null;
+  const when = row.stamp ? parseStamp(row.stamp) : null;
   if (!when) return localDay(row.mtime);
   const p = (n: number): string => String(n).padStart(2, "0");
   return `${when.getFullYear()}-${p(when.getMonth() + 1)}-${p(when.getDate())}`;
@@ -30,9 +34,9 @@ export function fileDay(row: StoredCsvFile): string {
 
 /** 목록에 보여줄 한 줄 요약 — 촬영 시각 · 반려견 · 용량. */
 function fileSub(row: StoredCsvFile): string {
-  const stamp = csvStamp(row.name);
-  const when = stamp ? parseStamp(stamp) : null;
-  const dog = stamp ? csvDog(row.name, stamp) : "";
+  const when = row.stamp ? parseStamp(row.stamp) : null;
+  // 개 이름은 서버가 `dogs` 를 조회해 만든 다운로드 이름에서 온다(§3-9).
+  const dog = row.downloadName.replace(/^\d{6}-\d{6}-?/, "").replace(/\.[^.]+$/, "");
   return [when ? formatWhen(when.toISOString()) : formatWhen(row.mtime), dog, formatSize(row.size)]
     .filter(Boolean)
     .join(" · ");
@@ -138,7 +142,7 @@ export class CsvPage {
       // 최신 촬영이 위로. 도장이 없는 파일은 저장 시각으로 줄을 선다.
       this.files = [...list.csv].sort((a, b) => fileTime(b) - fileTime(a));
       // 사라진 파일은 선택도 푼다 — ZIP 요청에 유령 이름이 남지 않게.
-      const alive = new Set(this.files.map((row) => row.name));
+      const alive = new Set(this.files.map((row) => row.key));
       for (const name of [...this.selected]) {
         if (!alive.has(name)) this.selected.delete(name);
       }
@@ -159,7 +163,7 @@ export class CsvPage {
   }
 
   private selectedFiles(): StoredCsvFile[] {
-    return this.files.filter((row) => this.selected.has(row.name));
+    return this.files.filter((row) => this.selected.has(row.key));
   }
 
   private render(): void {
@@ -178,12 +182,12 @@ export class CsvPage {
     const check = document.createElement("input");
     check.type = "checkbox";
     check.className = "fd-check";
-    check.checked = this.selected.has(row.name);
+    check.checked = this.selected.has(row.key);
     check.disabled = this.busy;
-    check.setAttribute("aria-label", row.name);
+    check.setAttribute("aria-label", row.downloadName);
     check.addEventListener("change", () => {
-      if (check.checked) this.selected.add(row.name);
-      else this.selected.delete(row.name);
+      if (check.checked) this.selected.add(row.key);
+      else this.selected.delete(row.key);
       this.syncSelectionUi();
     });
 
@@ -195,7 +199,8 @@ export class CsvPage {
     meta.className = "fd-row-meta";
     const name = document.createElement("div");
     name.className = "fd-row-name";
-    name.textContent = row.name;
+    // 보여 주는 것은 **받을 때 붙는 이름**이다. 디스크 이름은 title 로 남긴다.
+    name.textContent = row.downloadName;
     name.title = row.name;
     const sub = document.createElement("div");
     sub.className = "fd-row-sub";
@@ -206,9 +211,9 @@ export class CsvPage {
     link.className = "fd-icon-btn";
     link.textContent = "⬇";
     link.title = t("files_download");
-    link.setAttribute("aria-label", `${t("files_download")} ${row.name}`);
+    link.setAttribute("aria-label", `${t("files_download")} ${row.downloadName}`);
     link.href = storedFileUrl(this.apiBase, row.url, true);
-    link.setAttribute("download", row.name);
+    link.setAttribute("download", row.downloadName);
     link.rel = "noopener";
 
     li.append(check, tag, meta, link);
@@ -218,8 +223,8 @@ export class CsvPage {
   /** "모두 선택" — 지금 기간·검색에 걸려 보이는 파일만 대상으로 한다. */
   private toggleAll(checked: boolean): void {
     for (const row of this.visibleFiles()) {
-      if (checked) this.selected.add(row.name);
-      else this.selected.delete(row.name);
+      if (checked) this.selected.add(row.key);
+      else this.selected.delete(row.key);
     }
     this.listEl.querySelectorAll<HTMLInputElement>("input.fd-check").forEach((el) => {
       el.checked = checked;
@@ -229,7 +234,7 @@ export class CsvPage {
 
   private syncSelectionUi(): void {
     const visible = this.visibleFiles();
-    const visibleSelected = visible.filter((row) => this.selected.has(row.name)).length;
+    const visibleSelected = visible.filter((row) => this.selected.has(row.key)).length;
     this.allEl.disabled = visible.length === 0 || this.busy;
     this.allEl.checked = visible.length > 0 && visibleSelected === visible.length;
     this.allEl.indeterminate = visibleSelected > 0 && visibleSelected < visible.length;
@@ -266,7 +271,7 @@ export class CsvPage {
     this.allEl.disabled = true;
     this.setStatus(t("files_zip_preparing"));
     try {
-      const ticket = await createZipTicket(this.apiBase, "csv", picked.map((row) => row.name));
+      const ticket = await createZipTicket(this.apiBase, "csv", picked.map((row) => row.key));
       this.startDownload(zipDownloadUrl(this.apiBase, ticket.url));
       let msg = t("files_zip_started", {
         name: ticket.filename,
@@ -290,7 +295,7 @@ export function matchesCsv(
   row: StoredCsvFile,
   filter: { query: string; from: string; to: string },
 ): boolean {
-  if (filter.query && !row.name.toLowerCase().includes(filter.query)) return false;
+  if (filter.query && !row.downloadName.toLowerCase().includes(filter.query)) return false;
   if (filter.from || filter.to) {
     const day = fileDay(row);
     if (!day) return false;
@@ -302,8 +307,7 @@ export function matchesCsv(
 
 /** 정렬 키(ms) — 도장이 있으면 촬영 시각, 없으면 저장 시각. 둘 다 못 읽으면 맨 뒤. */
 export function fileTime(row: StoredCsvFile): number {
-  const stamp = csvStamp(row.name);
-  const when = stamp ? parseStamp(stamp) : null;
+  const when = row.stamp ? parseStamp(row.stamp) : null;
   if (when) return when.getTime();
   const mtime = new Date(row.mtime).getTime();
   return Number.isNaN(mtime) ? 0 : mtime;

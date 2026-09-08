@@ -36,12 +36,16 @@ export type PressureRecord = {
 
 export type UploadPressureInput = {
   csv: string;
-  dog: {
-    name?: string;
-    breed?: string;
-    weightKg?: number | null;
-    heightCm?: number | null;
-  };
+  /**
+   * 촬영 대상 개체(`dogs.id`).
+   *
+   * 예전에는 이름·몸무게를 함께 올려 파일명에 박았다. 지금은 저장 경로가
+   * `uploads/<userId>/<dogId>/<도장>/` 이라 **id 하나면 된다** — 서버가 세션에서 나머지를
+   * 안다. `sessionId` 가 있으면 서버가 그쪽을 우선하므로 이 값은 세션 없는 경로용이다.
+   */
+  dogId?: number | null;
+  /** 촬영 도장. 세션이 있으면 서버가 세션의 도장을 쓴다. */
+  stamp?: string | null;
   recording?: Partial<PressureRecording>;
   /** 동기 촬영 세션 id — back 에서 영상과 CSV 를 한 세션으로 묶는다. */
   sessionId?: string | null;
@@ -67,27 +71,26 @@ export async function uploadPressureCsv(
 ): Promise<PressureRecord> {
   const form = new FormData();
   const blob = new Blob([input.csv], { type: "text/csv;charset=utf-8" });
-  const { name, breed, weightKg, heightCm } = input.dog;
-  // The stored CSV carries the dog, so a file pulled off disk later still says
-  // whose walk it is. Falls back to the legacy name when the dog is unknown.
   const rec = input.recording || {};
+  // 파일명은 서버가 다시 정한다(`<도장>-<dogId>.csv`). 여기 이름은 멀티파트 파트 이름일
+  // 뿐이라 개 정보를 담지 않는다 — 담으면 두 곳이 규칙을 알게 되고 언젠가 갈린다.
   form.append(
     "csv",
     blob,
-    pressureCsvName({
-      dog: { name, weightKg },
-      when: rec.startedAt ? new Date(rec.startedAt) : undefined,
-    }),
+    input.dogId != null
+      ? pressureCsvName({
+          dogId: input.dogId,
+          stamp: input.stamp ?? undefined,
+          when: rec.startedAt ? new Date(rec.startedAt) : undefined,
+        })
+      : "pressure.csv",
   );
-  if (name) form.append("dogName", name);
-  if (breed) form.append("dogBreed", breed);
-  if (weightKg != null && Number.isFinite(weightKg)) form.append("dogWeightKg", String(weightKg));
-  if (heightCm != null && Number.isFinite(heightCm)) form.append("dogHeightCm", String(heightCm));
+  if (input.dogId != null) form.append("dogId", String(input.dogId));
+  if (input.stamp) form.append("stamp", input.stamp);
   for (const key of ["frames", "durationSec", "fps"] as const) {
     const v = rec[key];
     if (v != null && Number.isFinite(v)) form.append(key, String(v));
   }
-  if (rec.startedAt) form.append("startedAt", rec.startedAt);
   if (input.sessionId) form.append("sessionId", input.sessionId);
 
   // 백엔드는 snake_case 를 받는다(pressureStore.js). 값이 없으면 아예 보내지 않는다 —

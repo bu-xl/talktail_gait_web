@@ -2,166 +2,65 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
-  dogPrefix,
+  checkDogNameForFilename,
+  downloadName,
   formatWeightTag,
-  groupSessions,
-  parseCaptureName,
+  parseStamp,
   pressureCsvName,
+  roleOrder,
   sanitizeDogName,
-  sessionKey,
   stampFrom,
+  taskName,
   videoBaseName,
 } from "../src/core/sessionNaming.js";
 
-const DOG = { name: "대박이", weightKg: 5.2 };
 const STAMP = "260819-144204";
 
-test("the documented example round-trips exactly", () => {
+test("저장 이름에는 개 이름·몸무게가 들어가지 않는다", () => {
+  assert.equal(taskName({ dogId: 37, stamp: STAMP }), "260819-144204-37");
+  assert.equal(videoBaseName({ dogId: 37, role: "main", stamp: STAMP }), "260819-144204-37-main");
   assert.equal(
-    videoBaseName({ dog: DOG, role: "main", stamp: STAMP }),
-    "260819-144204-main-대박이-5.2kg",
+    videoBaseName({ dogId: 37, role: "sub", subIndex: 2, stamp: STAMP }),
+    "260819-144204-37-sub2",
   );
-  assert.equal(
-    videoBaseName({ dog: DOG, role: "sub", subIndex: 1, stamp: STAMP }),
-    "260819-144204-sub1-대박이-5.2kg",
-  );
-  assert.equal(
-    videoBaseName({ dog: DOG, role: "sub", subIndex: 2, stamp: STAMP }),
-    "260819-144204-sub2-대박이-5.2kg",
-  );
-  assert.equal(pressureCsvName({ dog: DOG, stamp: STAMP }), "260819-144204-대박이-5.2kg.csv");
+  // CSV 는 역할 꼬리가 없다 — 확장자가 이미 종류를 말한다.
+  assert.equal(pressureCsvName({ dogId: 37, stamp: STAMP }), "260819-144204-37.csv");
 });
 
-test("weight drops trailing zeros but keeps real decimals", () => {
-  assert.equal(formatWeightTag(5.2), "5.2kg");
-  assert.equal(formatWeightTag(5), "5kg");
+test("back 의 naming.js 와 같은 도장을 만든다", () => {
+  const when = new Date(2026, 7, 19, 14, 42, 4);
+  assert.equal(stampFrom(when), STAMP);
+  const back = parseStamp(STAMP);
+  assert.ok(back);
+  assert.equal(back?.getTime(), when.getTime());
+});
+
+test("역할 순서 — main 이 sub 보다 앞", () => {
+  assert.equal(roleOrder("260819-144204-37-main.mp4"), 0);
+  assert.equal(roleOrder("260819-144204-37-sub2.mp4"), 2);
+  // CSV 처럼 역할이 없는 이름은 뒤로 민다.
+  assert.equal(roleOrder("260819-144204-37.csv"), 999);
+});
+
+test("다운로드 이름 재조립 — 서버가 만드는 값과 같아야 한다", () => {
+  const dog = { name: "대박이", weightKg: 5.2 };
+  assert.equal(
+    downloadName("260819-144204-37-main.mp4", dog),
+    "260819-144204-대박이-5.2kg-main.mp4",
+  );
+  assert.equal(downloadName("260819-144204-37.csv", dog), "260819-144204-대박이-5.2kg.csv");
+  // 1kg 미만도 표현된다 — 몸무게가 개체 식별의 일부라 반올림이 정본이다(§3-2-A).
+  assert.equal(formatWeightTag(0.66), "0.66kg");
   assert.equal(formatWeightTag(5.0), "5kg");
-  assert.equal(formatWeightTag(12.75), "12.75kg");
-  assert.equal(formatWeightTag(5.239), "5.24kg", "rounds to 2 decimals");
+  // 규칙 밖의 이름은 **그대로 돌려준다** — 내보내기가 실패하는 것보다 낫다.
+  assert.equal(downloadName("weird.mp4", dog), "weird.mp4");
 });
 
-test("an unusable weight is left out instead of printing zero", () => {
-  assert.equal(formatWeightTag(0), "");
-  assert.equal(formatWeightTag(-3), "");
-  assert.equal(formatWeightTag(null), "");
-  assert.equal(formatWeightTag(undefined), "");
-  assert.equal(formatWeightTag(Number.NaN), "");
-  assert.equal(dogPrefix({ name: "대박이", weightKg: null }), "대박이");
-});
-
-test("names that would break a filesystem are cleaned, not rejected", () => {
-  assert.equal(sanitizeDogName("a/b"), "ab");
-  assert.equal(sanitizeDogName("a\\b:c*d?e\"f<g>h|i"), "abcdefghi");
-  assert.equal(sanitizeDogName("  뭉치  "), "뭉치");
-  assert.equal(sanitizeDogName("초코 라떼"), "초코_라떼", "spaces become underscores");
-  assert.equal(sanitizeDogName("..hidden"), "hidden", "a leading dot would hide the file");
-  assert.equal(sanitizeDogName("trailing."), "trailing", "a trailing dot breaks on Windows");
-});
-
-test("hyphens are stripped from names so the separator stays unambiguous", () => {
-  assert.equal(sanitizeDogName("대-박-이"), "대박이");
-  const base = videoBaseName({ dog: { name: "대-박-이", weightKg: 5.2 }, role: "main", stamp: STAMP });
-  assert.equal(base, "260819-144204-main-대박이-5.2kg");
-  assert.deepEqual(parseCaptureName(`${base}.mp4`), {
-    role: "main",
-    subIndex: null,
-    stamp: STAMP,
-    dog: "대박이-5.2kg",
-  });
-});
-
-test("an unnamed dog is simply left out of the name", () => {
-  assert.equal(sanitizeDogName(""), "");
-  assert.equal(sanitizeDogName(null), "");
+test("파일명에 못 쓰는 이름은 다운로드 직전에 걸러 낸다 (입력은 막지 않는다)", () => {
+  assert.equal(checkDogNameForFilename("대박이").ok, true);
+  assert.equal(checkDogNameForFilename("대/박이").reason, "forbidden");
+  assert.equal(checkDogNameForFilename("   ").reason, "empty");
+  assert.equal(checkDogNameForFilename("가".repeat(41)).reason, "too_long");
+  // 정리 결과가 비면 접두어 없이 도장만 남는다.
   assert.equal(sanitizeDogName("///"), "");
-  assert.equal(dogPrefix({ name: null, weightKg: 5.2 }), "");
-  assert.equal(
-    videoBaseName({ dog: { name: null, weightKg: 5.2 }, role: "main", stamp: STAMP }),
-    "260819-144204-main",
-  );
-  assert.equal(
-    pressureCsvName({ dog: { name: "", weightKg: null }, stamp: STAMP }),
-    "260819-144204.csv",
-  );
-});
-
-test("a very long name is truncated so the path stays usable", () => {
-  const long = "가".repeat(120);
-  assert.equal(sanitizeDogName(long).length, 40);
-});
-
-test("the stamp matches the backend's YYMMDD-HHMMSS", () => {
-  assert.equal(stampFrom(new Date(2026, 7, 19, 14, 42, 4)), "260819-144204");
-  assert.equal(stampFrom(new Date(2026, 0, 2, 3, 4, 5)), "260102-030405", "pads every field");
-  assert.match(stampFrom(), /^\d{6}-\d{6}$/);
-});
-
-test("parseCaptureName reads a capture with no dog on it", () => {
-  assert.deepEqual(parseCaptureName("260812-143022-main.mp4"), {
-    role: "main",
-    subIndex: null,
-    stamp: "260812-143022",
-    dog: "",
-  });
-  assert.deepEqual(parseCaptureName("260812-143022-sub2.mp4"), {
-    role: "sub",
-    subIndex: 2,
-    stamp: "260812-143022",
-    dog: "",
-  });
-});
-
-test("parseCaptureName handles the collision suffix the backend appends", () => {
-  assert.deepEqual(parseCaptureName("260819-144204-main-대박이-5.2kg-2.mp4"), {
-    role: "main",
-    subIndex: null,
-    stamp: "260819-144204",
-    dog: "대박이-5.2kg",
-  });
-  assert.deepEqual(parseCaptureName("260812-143022-main-3.mp4"), {
-    role: "main",
-    subIndex: null,
-    stamp: "260812-143022",
-    dog: "",
-  });
-});
-
-test("parseCaptureName rejects names that are not capture files", () => {
-  assert.equal(parseCaptureName("notes.txt"), null);
-  assert.equal(parseCaptureName("main.mp4"), null, "no stamp");
-  assert.equal(parseCaptureName("2608-1430-main.mp4"), null, "malformed stamp");
-  assert.equal(parseCaptureName(""), null);
-});
-
-test("a dog literally named main or sub does not confuse the parser", () => {
-  const base = videoBaseName({ dog: { name: "main", weightKg: 4 }, role: "sub", subIndex: 1, stamp: STAMP });
-  assert.equal(base, "260819-144204-sub1-main-4kg");
-  const parsed = parseCaptureName(`${base}.mp4`);
-  assert.ok(parsed);
-  assert.equal(parsed.role, "sub", "the role right after the stamp wins, not the name");
-  assert.equal(parsed.subIndex, 1);
-  assert.equal(parsed.dog, "main-4kg");
-});
-
-test("전 계정 목록에서 같은 도장은 계정별로 갈린다", () => {
-  const csv = [
-    { name: `${STAMP}-대박이-5.2kg.csv`, size: 1, mtime: "", url: "", userId: "clinicA" },
-    { name: `${STAMP}-제니-9.8kg.csv`, size: 1, mtime: "", url: "", userId: "clinicB" },
-  ];
-  const videos = [
-    { name: `${STAMP}-main-대박이-5.2kg.mp4`, size: 1, mtime: "", url: "", role: "main", userId: "clinicA" },
-  ];
-  const tasks = groupSessions(csv, videos);
-  assert.equal(tasks.length, 2, "같은 초에 찍혔어도 계정이 다르면 다른 촬영이다");
-  const a = tasks.find((s) => s.userId === "clinicA");
-  const b = tasks.find((s) => s.userId === "clinicB");
-  assert.equal(a?.videos.length, 1, "영상은 주인 쪽에만 붙는다");
-  assert.equal(b?.videos.length, 0);
-  assert.notEqual(sessionKey(a!), sessionKey(b!));
-});
-
-test("한 계정만 볼 때 키는 도장 그대로다", () => {
-  const [task] = groupSessions([{ name: `${STAMP}-제니-9.8kg.csv`, size: 1, mtime: "", url: "" }], []);
-  assert.equal(task.userId, "");
-  assert.equal(sessionKey(task), STAMP);
 });

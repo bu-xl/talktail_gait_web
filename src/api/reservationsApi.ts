@@ -1,4 +1,5 @@
 import { apiFetch } from "./http.js";
+import type { Dog } from "./dogsApi.js";
 /**
  * 체험 예약 현황 — back `/api/reservations`.
  *
@@ -11,6 +12,13 @@ export type ReservationStatus = "waiting" | "measuring" | "hold";
 export interface Reservation {
   id: string;
   code: string | null;
+  /**
+   * 접수 확정 시 발급된 개체(`dogs.id`). **접수만으로는 null 이다**(§3-3-A).
+   *
+   * 예약은 방문하지 않을 수 있어 자동으로 만들지 않는다. 카드의 [측정 시작] 이
+   * `POST /api/reservations/:id/dog` 를 불러 그때 발급한다.
+   */
+  dogId: number | null;
   dogName: string;
   dogWeightKg: number;
   dogBreed: string | null;
@@ -25,6 +33,18 @@ export interface Reservation {
   claimedBy: string | null;
   claimedAt: string | null;
   createdAt: string;
+}
+
+/** 같은 개체 후보 — [측정 시작] 전에 "기존 개체로 측정" 을 제안한다(§3-3-A). */
+export interface DogCandidate {
+  id: number;
+  name: string;
+  weightKg: number | null;
+  breed: string | null;
+  birthMonth: string | null;
+  createdAt: string;
+  /** 예약서의 몸무게와 같은가. 다르면 §3-2-A 대로 **새 개체**가 맞다. */
+  sameWeight: boolean;
 }
 
 export interface ReservationDate {
@@ -127,4 +147,42 @@ export function sexLabel(
   if (sex) parts.push(sex === "male" ? "수컷" : "암컷");
   if (neutered != null) parts.push(neutered ? "중성화 O" : "중성화 X");
   return parts.length ? parts.join(" · ") : null;
+}
+
+/**
+ * 이름·견종·생년월이 같은 기존 개체 후보.
+ *
+ * 몸무게는 **일부러 빼고** 찾는다 — 몸무게가 다르면 다른 개체지만, 사람에게는
+ * "같은 개가 살이 쪘다" 로 보여야 판단할 수 있다.
+ */
+export async function listDogCandidates(
+  apiBase: string,
+  reservationId: string,
+): Promise<DogCandidate[]> {
+  const res = await apiFetch(
+    `${apiBase}/api/reservations/${encodeURIComponent(reservationId)}/dog-candidates`,
+  );
+  return (await json<{ candidates: DogCandidate[] }>(res)).candidates;
+}
+
+/**
+ * **[추가]** — 이 예약을 개체 등록부에 올린다(§3-3-A).
+ *
+ * `dogId` 를 주면 기존 개체에 연결하고, 안 주면 예약서 정보로 새로 만든다.
+ * 사람이 이 버튼을 누른 순간이 곧 "실제로 왔다" 는 신호다.
+ */
+export async function linkReservationDog(
+  apiBase: string,
+  reservationId: string,
+  dogId?: number | null,
+): Promise<{ reservation: Reservation; dog: Dog }> {
+  const res = await apiFetch(
+    `${apiBase}/api/reservations/${encodeURIComponent(reservationId)}/dog`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(dogId != null ? { dogId } : {}),
+    },
+  );
+  return json<{ reservation: Reservation; dog: Dog }>(res);
 }

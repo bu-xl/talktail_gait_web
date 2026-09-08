@@ -522,7 +522,10 @@ export const LOCALES = {
     rs_estimated: "{{n}}개 패널은 추정 정렬",
 
     /* 측정 시작 전 필수 입력 */
-    session_need_dog: "강아지 이름·몸무게·견종을 모두 입력해야 측정을 시작할 수 있습니다.",
+    session_need_dog: "측정할 반려견을 먼저 선택하세요 (빠른 입력 등록 또는 예약).",
+    session_measuring_elsewhere: "이 계정은 다른 화면에서 측정 중입니다.",
+    nav_tasks: "태스크 목록",
+    nav_doginfo: "정보 변경",
 
     nav_storage: "서버 조회",
     storage_page_title: "서버 조회",
@@ -1105,7 +1108,10 @@ export const LOCALES = {
     rs_estimated: "{{n}} pane(s) aligned by estimate",
 
     /* Required before a measurement can start */
-    session_need_dog: "Enter the dog's name, weight and breed before starting a measurement.",
+    session_need_dog: "Pick a dog first (quick register or a reservation).",
+    session_measuring_elsewhere: "This account is already measuring in another window.",
+    nav_tasks: "Tasks",
+    nav_doginfo: "Dog info",
 
     nav_storage: "Server",
     storage_page_title: "Server storage",

@@ -1,29 +1,57 @@
 /**
- * 서버 디스크의 원본 CSV·영상 목록. DB 가 아니라 back 폴더를 읽는다.
+ * 서버 디스크의 원본(영상 + 압력 CSV) 목록. DB 가 아니라 back 폴더를 읽는다.
+ *
+ * ## 폴더가 곧 촬영이다 (2026-09 재설계)
+ *
+ * 예전에는 CSV 와 영상이 다른 폴더에 흩어져 있어 화면이 파일명을 파싱해 도장으로 되묶었다
+ * (`sessionNaming.groupSessions`). 지금은 `uploads/<userId>/<dogId>/<도장>/` 폴더 하나가
+ * 촬영 하나라, 서버가 `tasks[]` 로 묶어서 준다 — 화면은 묶을 일이 없다.
+ *
+ * 키는 전부 **`<dogId>/<도장>[/<파일명>]`** 형태다. 이 문자열이 곧 서버의 폴더 경로라
+ * 화면이 경로를 조립하지 않는다.
  */
 
 import { joinApiUrl } from "../config/apiUrl.js";
 import { apiFetch } from "./http.js";
 
-export type StoredCsvFile = {
+export type StoredFile = {
+  /** 디스크 파일명 — `260819-144204-37-main.mp4`. 개 이름은 들어 있지 않다. */
   name: string;
+  /** `<dogId>/<도장>/<파일명>`. 삭제·zip 요청이 그대로 보내는 값. */
+  key: string;
   size: number;
   mtime: string;
   url: string;
   /** 이 파일이 있는 계정 폴더. 전 계정 목록(`userId="*"`)에서 주인을 가른다. */
   userId?: string;
+  dogId: number;
+  stamp: string;
+  /** 받을 때 붙는 이름 — 서버가 `dogs` 를 조회해 재조립한 값(§3-9). */
+  downloadName: string;
 };
 
-export type StoredVideoFile = StoredCsvFile & {
-  role: "main" | "sub" | string;
+export type StoredCsvFile = StoredFile;
+export type StoredVideoFile = StoredFile & { role: "main" | "sub" | string };
+
+/** 촬영 한 건 = 폴더 하나. 서버가 묶어서 준다. */
+export type StoredTask = {
+  /** `<dogId>/<도장>`. zip·삭제가 이 값을 그대로 보낸다. */
+  key: string;
+  dogId: number;
+  stamp: string;
+  dog: { name: string | null; weightKg: number | null };
+  /** `260819-144204-37`. */
+  taskName: string;
+  files: number;
+  bytes: number;
+  userId?: string;
 };
 
 export type StoredFilesList = {
   source: string;
   csv: StoredCsvFile[];
   videos: StoredVideoFile[];
-  /** 버려진 촬영의 도장 목록 — 검증 화면이 "살아있는 것 / 버려진 것" 을 이걸로 가른다. */
-  discarded: string[];
+  tasks: StoredTask[];
 };
 
 /**
@@ -42,34 +70,36 @@ export async function listStoredFiles(
     source: json.source || "fs",
     csv: Array.isArray(json.csv) ? json.csv : [],
     videos: Array.isArray(json.videos) ? json.videos : [],
-    discarded: Array.isArray(json.discarded) ? json.discarded : [],
+    tasks: Array.isArray(json.tasks) ? json.tasks : [],
   };
 }
 
 /**
- * 이번 촬영을 버린다(소프트 삭제) — 파일은 남고 표시만 붙는다.
- * 도장에 표시하므로 **버린 뒤 늦게 도착한 업로드도** 같은 취급을 받는다.
+ * 이번 촬영을 버린다(소프트 삭제) — 파일은 남고 회차 행에 표시만 붙는다.
+ *
+ * 예전에는 도장 문자열 목록(`discarded-stamps.json`)에 적었다. 계정 구분이 없어 같은 초에
+ * 찍은 남의 회차가 같이 표시됐고 DB 백업에도 안 들어갔다. 지금은
+ * `gait_sessions.discarded_at` 컬럼이고, 회차를 통삭제하면 표시도 함께 사라진다(§3-17-1).
  */
-export async function discardSession(apiBaseUrl: string, sessionId: string): Promise<{ stamp: string }> {
-  const res = await apiFetch(joinApiUrl(apiBaseUrl, `/api/sessions/${encodeURIComponent(sessionId)}/discard`), {
-    method: "POST",
-  });
+export async function discardSession(
+  apiBaseUrl: string,
+  sessionId: string,
+): Promise<{ stamp: string }> {
+  const res = await apiFetch(
+    joinApiUrl(apiBaseUrl, `/api/sessions/${encodeURIComponent(sessionId)}/discard`),
+    { method: "POST" },
+  );
   if (!res.ok) throw new Error(`discard HTTP ${res.status}`);
   return (await res.json()) as { stamp: string };
 }
 
-/** 도장 단위 버림 표시/해제 — 검증 화면의 되살리기에 쓴다. */
-export async function setStampDiscarded(
-  apiBaseUrl: string,
-  stamp: string,
-  discarded: boolean,
-): Promise<void> {
-  const res = await apiFetch(joinApiUrl(apiBaseUrl, "/api/files/discarded"), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ stamp, discarded }),
-  });
-  if (!res.ok) throw new Error(`discard flag HTTP ${res.status}`);
+/** 버림 표시 해제 — 검증 화면의 되살리기. */
+export async function restoreSession(apiBaseUrl: string, sessionId: string): Promise<void> {
+  const res = await apiFetch(
+    joinApiUrl(apiBaseUrl, `/api/sessions/${encodeURIComponent(sessionId)}/restore`),
+    { method: "POST" },
+  );
+  if (!res.ok) throw new Error(`restore HTTP ${res.status}`);
 }
 
 /** 목록의 상대 경로를 절대 URL 로. `download=1` 이면 첨부 저장. */
@@ -80,12 +110,19 @@ export function storedFileUrl(apiBaseUrl: string, rel: string, download = true):
 }
 
 /**
- * `task` 는 촬영 한 건을 통째로 묶는다 — zip 안이 태스크 폴더로 갈리고 그 안에
- * CSV 와 영상이 함께 들어간다. `csv`/`video` 는 파일 단위 묶음(다른 화면이 쓴다).
+ * `task` 는 촬영 한 건을 통째로 묶는다 — zip 안이 **dogId 폴더**로 갈리고 그 안에
+ * CSV 와 영상이 사람이 읽는 이름으로 들어간다. `csv`/`video` 는 파일 단위 묶음이다.
  */
 export type ZipKind = "csv" | "video" | "task";
 
 const ZIP_KINDS: readonly ZipKind[] = ["csv", "video", "task"];
+
+/** 이름에 파일명으로 못 쓰는 문자가 있는 개체 — 화면이 모달로 알린다(§3-9-A). */
+export type ZipNameWarning = {
+  dogId: number;
+  name: string;
+  reason: "forbidden" | "too_long" | "empty" | string;
+};
 
 export type ZipTicket = {
   token: string;
@@ -98,6 +135,7 @@ export type ZipTicket = {
   url: string;
   /** 서버에서 찾지 못한 항목 수. */
   missingCount: number;
+  nameWarnings: ZipNameWarning[];
 };
 
 /**
@@ -106,8 +144,8 @@ export type ZipTicket = {
  * 파일명을 URL 에 싣지 않으려고 POST 로 목록을 보내고, 실제 내려받기는
  * `zipDownloadUrl()` 을 브라우저에 맡긴다 — 수 GB 를 Blob 으로 들고 있지 않기 위해서다.
  *
- * @param files csv 는 파일명(`a.csv`), 영상은 `role/파일명`(`main/x.mp4`),
- *              task 는 태스크명(`대박이-5.2kg-260819-144204`) — 파일 찾기는 서버가 한다.
+ * @param files 파일은 `<dogId>/<도장>/<파일명>`, 태스크는 `<dogId>/<도장>`.
+ *              어떤 파일이 그 촬영의 것인지는 서버가 폴더를 읽어 정한다.
  */
 export async function createZipTicket(
   apiBaseUrl: string,
@@ -119,7 +157,9 @@ export async function createZipTicket(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ kind, files }),
   });
-  const json = (await res.json().catch(() => null)) as (Partial<ZipTicket> & { error?: string }) | null;
+  const json = (await res.json().catch(() => null)) as
+    | (Partial<ZipTicket> & { error?: string })
+    | null;
   if (!res.ok || !json || typeof json.url !== "string") {
     const detail = json && typeof json.error === "string" ? json.error : `HTTP ${res.status}`;
     throw new Error(detail);
@@ -132,6 +172,7 @@ export async function createZipTicket(
     filename: String(json.filename || "files.zip"),
     url: json.url,
     missingCount: Number(json.missingCount) || 0,
+    nameWarnings: Array.isArray(json.nameWarnings) ? json.nameWarnings : [],
   };
 }
 
@@ -224,36 +265,38 @@ function pickRow(
 
 /** `POST /api/files/delete` 의 결과. */
 export type DeleteResult = {
-  /** 실제로 지운 항목(csv 는 파일명, 영상은 `role/파일명`). */
+  /** 실제로 지운 항목의 키. */
   deleted: string[];
   /** 요청했지만 이미 없던 항목 — 오류가 아니다. */
   missing: string[];
   failed: { name: string; error: string }[];
-  /** 함께 지운 압력 기록(records.json) 행 수. */
-  forgottenRecords: number;
 };
 
 /**
- * 촬영 한 건의 원본 파일을 서버에서 지운다. **되돌릴 수 없다.**
+ * 원본 파일(또는 촬영 폴더)을 서버에서 지운다. **되돌릴 수 없다.**
  *
- * 지우는 것은 back 디스크의 원본(CSV·영상)뿐이다. ai-server 의 분석 산출물과
- * MySQL 행은 그대로 남는다 — 리포트는 그쪽을 보므로 이미 나온 분석은 살아 있다.
+ * 지우는 것은 back 디스크의 원본뿐이다. ai-server 의 분석 산출물과 MySQL 행은 그대로 남는다
+ * — 셋을 한꺼번에 지우는 것은 태스크 목록의 **회차 통삭제**(`deleteTasks`)다.
  *
- * @param files csv 는 파일명(`a.csv`), 영상은 `role/파일명`(`main/x.mp4`).
+ * @param files `<dogId>/<도장>/<파일명>`(파일 하나) 또는 `<dogId>/<도장>`(폴더 통째로).
  */
 export async function deleteStoredFiles(
   apiBaseUrl: string,
-  files: { csv: string[]; videos: string[] },
+  files: string[],
   userId?: string,
 ): Promise<DeleteResult> {
   // 쓰기 요청에는 조회 스코프가 붙지 않는다(`http.ts`). 남의 계정을 지우려면 여기서 명시한다.
-  const path = userId ? `/api/files/delete?userId=${encodeURIComponent(userId)}` : "/api/files/delete";
+  const path = userId
+    ? `/api/files/delete?userId=${encodeURIComponent(userId)}`
+    : "/api/files/delete";
   const res = await apiFetch(joinApiUrl(apiBaseUrl, path), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(files),
+    body: JSON.stringify({ files }),
   });
-  const json = (await res.json().catch(() => null)) as (Partial<DeleteResult> & { error?: string }) | null;
+  const json = (await res.json().catch(() => null)) as
+    | (Partial<DeleteResult> & { error?: string })
+    | null;
   if (!res.ok || !json) {
     const detail = json && typeof json.error === "string" ? json.error : `HTTP ${res.status}`;
     throw new Error(detail);
@@ -262,6 +305,5 @@ export async function deleteStoredFiles(
     deleted: Array.isArray(json.deleted) ? json.deleted : [],
     missing: Array.isArray(json.missing) ? json.missing : [],
     failed: Array.isArray(json.failed) ? json.failed : [],
-    forgottenRecords: Number(json.forgottenRecords) || 0,
   };
 }

@@ -1,9 +1,17 @@
 /**
- * 예약 현황 — 측정 화면에서 체험 신청자를 눌러 반려견 입력란을 채운다.
+ * 예약 현황 — 측정 화면에서 체험 신청자를 눌러 **그 개체로 측정을 시작한다**.
  *
- * 빠른 입력(`dogPresetsCard`)과 하는 일이 같고 출처만 다르다. 그쪽은 기관이 직접
- * 등록해 둔 단골이고, 이쪽은 현장 QR 로 방금 들어온 신청자다. 그래서 카드를
- * 누르면 입력란이 채워지는 동작은 같게 두고, 여기에만 **상태**가 붙는다.
+ * 빠른 입력(`dogsCard`)과 하는 일이 같고 출처만 다르다. 그쪽은 기관이 직접 등록해 둔
+ * 단골이고, 이쪽은 현장 QR 로 방금 들어온 신청자다. 여기에만 **상태**가 붙는다.
+ *
+ * ## 예약은 아직 개체가 아니다 (§3-3-A)
+ *
+ * 접수만으로 `dogs` 행을 만들지 않는다 — 방문하지 않을 수 있고, 자동 생성하면 등록부에
+ * 유령 개체가 쌓인다(삭제도 참조 무결성에 걸려 번거롭다). 카드를 눌러 확인한 그 순간이
+ * "실제로 왔다" 는 신호이고, 그때 개체를 발급한다.
+ *
+ * 재방문이면 이름·견종·생년월이 같은 **기존 개체 후보**를 먼저 보여 준다. 그러지 않으면
+ * 같은 개의 촬영이 두 개체로 갈린다. 다만 몸무게가 다르면 §3-2-A 대로 새 개체가 맞다.
  *
  * ## 잠그지 않는다
  *
@@ -25,6 +33,8 @@
 import {
   ageLabel,
   deleteReservation,
+  linkReservationDog,
+  listDogCandidates,
   listReservationDates,
   listReservations,
   sexLabel,
@@ -32,11 +42,12 @@ import {
   type Reservation,
   type ReservationStatus,
 } from "../api/reservationsApi.js";
+import type { Dog } from "../api/dogsApi.js";
 import { showToast } from "./toast.js";
 
 export interface ReservationsCardOptions {
-  /** 카드를 눌렀을 때 — 측정 화면의 반려견 입력란을 채운다. */
-  onPick(reservation: Reservation): void;
+  /** 개체가 확정됐을 때 — 이 개체로 측정한다. */
+  onPick(dog: Dog): void;
 }
 
 type Filter = ReservationStatus | "all";
@@ -231,11 +242,27 @@ export class ReservationsCard {
   }
 
   /**
-   * 확인을 받은 뒤 입력란을 채우고 **측정중으로 잡는다.** 잠금이 아니라 표시라,
-   * 서버가 실패해도 입력란은 이미 채워졌으므로 측정은 그대로 진행할 수 있다.
+   * 확인을 받은 뒤 **개체를 확정하고** 측정중으로 잡는다.
+   *
+   * 이미 연결된 예약이면 그 개체를 그대로 쓴다. 아니면 기존 개체 후보를 먼저 물어보고,
+   * 사람이 고른 결과로 `dogs` 행을 발급하거나 연결한다(§3-3-A).
+   *
+   * 상태 갱신(측정중)은 잠금이 아니라 표시라, 실패해도 개체는 이미 확정됐으므로 측정은
+   * 그대로 진행할 수 있다.
    */
   private async pick(row: Reservation): Promise<void> {
-    this.opts.onPick(row);
+    let dog: Dog;
+    try {
+      dog = await this.resolveDog(row);
+    } catch (err) {
+      showToast({
+        kind: "bad",
+        title: "반려견을 등록하지 못했습니다",
+        message: err instanceof Error ? err.message : String(err),
+      });
+      return;
+    }
+    this.opts.onPick(dog);
     try {
       const updated = await setReservationStatus(this.apiBase, row.id, "measuring");
       Object.assign(row, updated);
@@ -247,6 +274,43 @@ export class ReservationsCard {
         message: err instanceof Error ? err.message : String(err),
       });
     }
+  }
+
+  /** 이 예약이 가리킬 개체를 정한다 — 기존 것을 쓰거나 새로 발급한다. */
+  private async resolveDog(row: Reservation): Promise<Dog> {
+    if (row.dogId != null) {
+      const linked = await linkReservationDog(this.apiBase, row.id);
+      Object.assign(row, linked.reservation);
+      return linked.dog;
+    }
+
+    const candidates = await listDogCandidates(this.apiBase, row.id).catch(() => []);
+    // 몸무게까지 같은 후보만 "같은 개" 로 제안한다. 다르면 §3-2-A 대로 새 개체가 맞다 —
+    // 그래도 목록에는 보여 준다(사람이 "살이 쪘구나" 를 알아야 판단할 수 있다).
+    let wanted: number | null = null;
+    if (candidates.length) {
+      const lines = candidates
+        .map((c) => `#${c.id} ${c.name} · ${c.weightKg ?? "?"}kg${c.sameWeight ? " (몸무게 같음)" : " (몸무게 다름 → 새 개체 권장)"}`)
+        .join("\n");
+      const same = candidates.find((c) => c.sameWeight);
+      if (same) {
+        wanted = window.confirm(
+          `이름·견종이 같은 반려견이 이미 있습니다.\n\n${lines}\n\n` +
+            `[확인] 기존 개체(#${same.id})로 측정  ·  [취소] 새 개체로 등록`,
+        )
+          ? same.id
+          : null;
+      } else {
+        window.alert(
+          `이름·견종이 같은 반려견이 있지만 몸무게가 다릅니다.\n\n${lines}\n\n` +
+            "몸무게가 다르면 다른 개체입니다 — 새로 등록합니다.",
+        );
+      }
+    }
+
+    const created = await linkReservationDog(this.apiBase, row.id, wanted);
+    Object.assign(row, created.reservation);
+    return created.dog;
   }
 
   private async changeStatus(row: Reservation, status: ReservationStatus): Promise<void> {

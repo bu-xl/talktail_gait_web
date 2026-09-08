@@ -23,10 +23,9 @@ import { configureSync, isSyncEnabled, resolveApiBase, resolveRoomId, resolveWsU
 import { clockSync } from "../transport/clockSync.js";
 import { loadConfig } from "../core/config.js";
 import { GRID_COLS, GRID_ROWS, aspectHeight } from "../core/constants.js";
-import { checkDogIdentity } from "../core/dogIdentity.js";
 import { camKey, countCamsInState } from "../core/camState.js";
 import { framesToCanineGaitCsv } from "../core/csvExport.js";
-import { dogPrefix, pressureCsvName, stampFrom } from "../core/sessionNaming.js";
+import { dogPrefix, displayCsvName, stampFrom } from "../core/sessionNaming.js";
 import {
   analyzeRecordedSession,
   GaitAnalysisError,
@@ -89,7 +88,10 @@ import {
   updateQueueToast,
 } from "../ui/toast.js";
 import { CompletedPage } from "../ui/completedPage.js";
-import { DogPresetsCard } from "../ui/dogPresetsCard.js";
+import { DogPresetsCard } from "../ui/dogsCard.js";
+import type { Dog } from "../api/dogsApi.js";
+import { DogInfoPage } from "../ui/dogInfoPage.js";
+import { TaskListPage } from "../ui/taskListPage.js";
 import { ReservationsCard } from "../ui/reservationsCard.js";
 import { ReservationCodesPage } from "../ui/reservationCodesPage.js";
 import type { CompletedSessionRef } from "../ui/completedPage.js";
@@ -359,6 +361,8 @@ type AppModule =
   | "multi"
   | "storage"
   | "rescodes"
+  | "tasks"
+  | "doginfo"
   | "mypage";
 
 const APP_MODULES: readonly AppModule[] = [
@@ -375,6 +379,8 @@ const APP_MODULES: readonly AppModule[] = [
   "multi",
   "storage",
   "rescodes",
+  "tasks",
+  "doginfo",
   "mypage",
 ];
 
@@ -616,58 +622,73 @@ async function boot(): Promise<void> {
   const verifyPage = verifyPageEl ? new VerifyPage(verifyPageEl) : null;
   verifyPage?.setApiBase(apiBase);
   /**
-   * 빠른 입력 — 등록해 둔 반려견을 눌러 아래 입력란을 채운다.
-   * 채운 뒤 게이트를 다시 평가해야 시작 버튼이 그 자리에서 풀린다.
+   * **측정 대상 개체** — 촬영의 주인이다 (§3-3).
+   *
+   * 예전에는 이름·몸무게·견종을 손으로 치는 입력란이 있었고 그 값이 그대로 파일명이 됐다.
+   * 오타가 파일명이 되고, 이름·몸무게가 같은 다른 개가 구분되지 않았다(§1-2, §1-3).
+   * 지금은 **등록된 개체를 고르는 것**이 유일한 경로이고, 나르는 값은 `dogs.id` 하나다.
    */
-  /** 카드 하나가 반려견 입력란 한 벌을 채운다. 빠른 입력과 예약 현황이 공유한다. */
-  const fillDogInputs = (dog: {
-    name: string;
-    weightKg: number;
-    heightCm?: number | null;
-    breed?: string | null;
-    birthMonth?: string | null;
-    sex?: "male" | "female" | null;
-    neutered?: boolean | null;
-  }): void => {
-    const set = (id: string, value: string): void => {
-      const el = $opt(id) as HTMLInputElement | HTMLSelectElement | null;
-      if (el) el.value = value;
-    };
-    set("dogName", dog.name);
-    set("dogWeightInfo", String(dog.weightKg));
-    set("dogHeight", dog.heightCm == null ? "" : String(dog.heightCm));
-    set("dogBreed", dog.breed ?? "");
-    set("dogBirthMonth", dog.birthMonth ?? "");
-    set("dogSex", dog.sex ?? "");
-    // 미입력과 "안 했음" 은 다르다 — 빈 문자열이 미입력이다.
-    set("dogNeutered", dog.neutered == null ? "" : dog.neutered ? "1" : "0");
+  let selectedDog: Dog | null = null;
+
+  /** 고른 개체를 화면 위에 적는다. 입력란이 아니라 표시다 — 여기서 고칠 수 없다. */
+  const renderSelectedDog = (): void => {
+    const el = $opt("selectedDogLabel");
+    if (el) {
+      el.textContent = selectedDog
+        ? `#${selectedDog.id} ${selectedDog.name} · ${selectedDog.weightKg}kg` +
+          (selectedDog.breed ? ` · ${selectedDog.breed}` : "")
+        : t("session_need_dog");
+      el.classList.toggle("is-empty", selectedDog === null);
+    }
     applyDogIdentityGate();
   };
 
-  const dogPresets = new DogPresetsCard({ onPick: (preset) => fillDogInputs(preset) });
+  const selectDog = (dog: Dog): void => {
+    selectedDog = dog;
+    renderSelectedDog();
+  };
+
+  const dogPresets = new DogPresetsCard({ onPick: (dog) => selectDog(dog) });
   dogPresets.setApiBase(apiBase);
   void dogPresets.refresh();
   onLangChange(() => dogPresets.renderLabels());
 
   /**
-   * 예약 현황 — 현장 QR 로 들어온 신청자를 눌러 같은 입력란을 채운다.
-   * 테스터·마스터가 아니면 섹션 자체를 켜지 않는다. 서버도 403 을 준다.
+   * 예약 현황 — 현장 QR 로 들어온 신청자.
+   *
+   * 예약 자체는 개체가 아니다(방문하지 않을 수 있다). 카드의 **[추가]** 가 `dogs` 행을
+   * 만들고 그때 발급된 개체로 측정한다(§3-3-A). 테스터·마스터가 아니면 섹션을 켜지 않는다.
    */
   const reservations = new ReservationsCard({
-    onPick: (row) =>
-      fillDogInputs({
-        name: row.dogName,
-        weightKg: row.dogWeightKg,
-        // 신장은 신청 폼에서 받지 않는다 — 현장에서 재서 입력한다.
-        heightCm: null,
-        breed: row.dogBreed,
-        birthMonth: row.dogBirthMonth,
-        sex: row.dogSex,
-        neutered: row.dogNeutered,
-      }),
+    onPick: (dog) => {
+      selectDog(dog);
+      void dogPresets.refresh();
+    },
   });
   reservations.setApiBase(apiBase);
   if (currentUser.isMaster || currentUser.isTester) reservations.enable();
+
+  /** 개 정보 변경 — 삼선 메뉴의 "정보 변경"(§3-18). */
+  const dogInfoPageEl = $opt("dogInfoPage");
+  const dogInfoPage = dogInfoPageEl
+    ? new DogInfoPage(dogInfoPageEl, {
+        onChanged: () => {
+          void dogPresets.refresh();
+          // 고른 개체의 이름이 바뀌었을 수 있다 — 표시를 즉시 맞춘다.
+          renderSelectedDog();
+        },
+        onGotoTasks: (dogId) => {
+          setModule("tasks");
+          void taskListPage?.showForDog(dogId);
+        },
+      })
+    : null;
+  dogInfoPage?.setApiBase(apiBase);
+
+  /** 태스크 목록 — 삼선 메뉴의 "태스크 목록"(§3-7). 회차 통삭제가 여기 있다. */
+  const taskListEl = $opt("taskListPage");
+  const taskListPage = taskListEl ? new TaskListPage(taskListEl) : null;
+  taskListPage?.setApiBase(apiBase);
 
   const resCodesEl = $opt("resCodesPage");
   const resCodesPage = resCodesEl ? new ReservationCodesPage(resCodesEl) : null;
@@ -693,23 +714,17 @@ async function boot(): Promise<void> {
   const confirmCancelBtn = $("confirmCancelBtn") as HTMLButtonElement;
   const confirmDiscardBtn = $("confirmDiscardBtn") as HTMLButtonElement;
 
-  /** 우측 레일 "반려견" 입력값 — 촬영 세션의 결과에 붙일 정보. */
-  const readSideDogInfo = (): ManualDogInfo => {
-    const text = (id: string): string | null =>
-      ($opt(id) as HTMLInputElement | null)?.value.trim() || null;
-    const num = (id: string): number | null => {
-      const raw = text(id);
-      if (!raw) return null;
-      const n = Number(raw);
-      return Number.isFinite(n) ? n : null;
-    };
-    return {
-      name: text("dogName"),
-      breed: text("dogBreed"),
-      weightKg: num("dogWeightInfo"),
-      heightCm: num("dogHeight"),
-    };
-  };
+  /**
+   * 고른 개체의 표시용 정보 — **로컬 내보내기 파일명에만** 쓴다.
+   *
+   * 서버로 가는 값은 `dogId` 하나다. 이 이름이 서버 저장 파일명이 되는 일은 없다.
+   */
+  const readSideDogInfo = (): ManualDogInfo => ({
+    name: selectedDog?.name ?? null,
+    breed: selectedDog?.breed ?? null,
+    weightKg: selectedDog?.weightKg ?? null,
+    heightCm: selectedDog?.heightCm ?? null,
+  });
 
   const hideConfirmModal = (): void => {
     confirmModal.classList.remove("open");
@@ -727,6 +742,27 @@ async function boot(): Promise<void> {
       : t("confirm_analyze_waiting_upload");
     confirmAnalyzeBtn.disabled = confirmBusy || !uploaded;
     confirmCancelBtn.disabled = confirmBusy;
+    // 압력 CSV 는 영상과 **같은 수준으로** 보여 준다(§3-10). 예전에는 CSV 가 서버에
+    // 도착했는지 모른 채 "분석하기" 를 누를 수 있었고, 없으면 그대로 영상만 나갔다.
+    const csvStateEl = $opt("confirmCsvState");
+    const csvRetryBtn = $opt("confirmCsvRetry") as HTMLButtonElement | null;
+    if (csvStateEl) {
+      const state = pressureCsv.state();
+      csvStateEl.textContent =
+        state === "uploading"
+          ? "업로드 중…"
+          : state === "done"
+            ? "업로드 완료"
+            : state === "failed"
+              ? "업로드 실패"
+              : "대기 중";
+      csvStateEl.classList.toggle("is-bad", state === "failed");
+    }
+    if (csvRetryBtn) {
+      // 자동 재시도는 하지 않는다(§3-13). 사람이 문제를 인지한 그 자리에 버튼을 둔다.
+      csvRetryBtn.hidden = !pressureCsv.canRetry();
+      csvRetryBtn.disabled = pressureCsv.state() === "uploading";
+    }
     // 버리기는 업로드가 끝나기를 기다리지 않는다 — 도장에 표시해 두면 늦게 도착한
     // 파일도 같은 취급을 받는다. 기다리게 하는 순간 7번을 만든 이유가 사라진다.
     confirmDiscardBtn.disabled = confirmBusy;
@@ -785,11 +821,21 @@ async function boot(): Promise<void> {
   };
 
 
-  /** 판정은 직접 분석과 공유한다 — 규칙이 갈라지지 않게. [core/dogIdentity.ts] */
+  /**
+   * 시작 게이트 — **개체를 골랐나**, 그리고 **이 계정이 이미 측정 중은 아닌가**.
+   *
+   * 개체 판정이 한 줄로 줄었다. 예전에는 이름·몸무게·견종 세 값을 각각 확인했는데
+   * (`core/dogIdentity.ts`), 그 셋이 파일명의 재료였기 때문이다. 지금 재료는 dogId 뿐이라
+   * 고른 것 자체가 곧 통과다.
+   */
   const dogIdentityGate = (): { ok: boolean; reason: string } => {
-    const gate = checkDogIdentity(readSideDogInfo());
-    return { ok: gate.ok, reason: gate.reasonKey ? t(gate.reasonKey) : "" };
+    if (!selectedDog) return { ok: false, reason: t("session_need_dog") };
+    if (measuringElsewhere) return { ok: false, reason: t("session_measuring_elsewhere") };
+    return { ok: true, reason: "" };
   };
+
+  /** 다른 브라우저가 이 계정으로 측정 중인가 — 서버가 판정해 내려준다(§3-11). */
+  let measuringElsewhere = false;
 
   const applyDogIdentityGate = (): void => {
     const gate = dogIdentityGate();
@@ -797,6 +843,7 @@ async function boot(): Promise<void> {
     const idle = sessionPhase === "idle";
     if (idle) {
       sessionBtn.disabled = !gate.ok;
+      sessionBtn.title = gate.reason;
     }
     // 상단 토스트는 띄우지 않는다 — 시작 버튼 비활성화로 충분하다.
     dismissTopToast("dog-identity");
@@ -1223,6 +1270,10 @@ async function boot(): Promise<void> {
       else accountsPage?.hide();
       if (mod === "rescodes") resCodesPage?.show();
       else resCodesPage?.hide();
+      if (mod === "tasks") taskListPage?.show();
+      else taskListPage?.hide();
+      if (mod === "doginfo") dogInfoPage?.show();
+      else dogInfoPage?.hide();
       if (mod === "review") enterViewerMode();
       else leaveViewerMode();
       // 측정 화면의 1·압력패드는 라이브 히트맵이다 — 열람이 덮어 둔 결과 미디어를 걷어낸다.
@@ -1756,11 +1807,20 @@ async function boot(): Promise<void> {
     buildCsv: () => framesToCanineGaitCsv(recorder.getFrames(), GRID_ROWS, GRID_COLS),
     // 동기 촬영 세션과 같은 sessionId 로 묶어 back 이 영상+CSV 를 한 세션으로 연결하게 한다.
     sessionId: () => syncSessionId,
+    // 세션이 없을 때(웹만 켜고 압력만 잰 경우)의 저장 위치. 세션이 있으면 서버가 무시한다.
+    dogId: () => selectedDog?.id ?? null,
     startedAt: () => recordingStartedAt,
     // CSV 첫 행(time=0)의 절대 시각 — 영상 프레임과 매칭하는 기준점.
     startAtServerNs: () => recordingStartServerNs,
     clockOffsetNs: () => clockSync.offset,
     clockRttP50Ns: () => clockSync.result?.rttP50Ns ?? null,
+  });
+
+  // 업로드 상태가 바뀌면 확인 모달의 표시를 즉시 갱신한다(§3-10) — 모달이 열려 있는
+  // 동안 CSV 가 도착하는 것이 정상 경로다.
+  pressureCsv.onStateChange(() => syncConfirmModal());
+  $opt("confirmCsvRetry")?.addEventListener("click", () => {
+    void pressureCsv.retry();
   });
 
   /** 매트 녹화의 하드 상한 타이머. 폰의 자체 상한과 같은 값을 쓴다. */
@@ -1857,6 +1917,14 @@ async function boot(): Promise<void> {
   gaitSync.onMessage((msg) => {
     if (msg.type === "joined" || msg.type === "peer_update") {
       updateSyncUi(msg.peers, true);
+      // 다른 브라우저가 이미 측정 중이면 시작 버튼을 잠근다(§3-11).
+      measuringElsewhere = Boolean(msg.peers.measuring) && msg.peers.activeSessionId !== syncSessionId;
+      applyDogIdentityGate();
+    }
+    if (msg.type === "measure_state") {
+      // 내가 시작한 세션이면 잠금이 아니다 — 내 화면은 촬영 중 규칙을 따른다.
+      measuringElsewhere = msg.measuring && msg.sessionId !== syncSessionId;
+      applyDogIdentityGate();
     }
     if (msg.type === "preview_frame") {
       if (!syncPlaybackActive && !syncDock.isVisible) {
@@ -2022,7 +2090,7 @@ async function boot(): Promise<void> {
       setSessionPhase("recording", "시작버튼(시뮬)");
       if (gaitSync.connected && gaitSync.peers.mobile) {
         syncRecordPending = true;
-        gaitSync.requestRecord(readSideDogInfo(), captureSettingsPayload(selectedCapturePreset), maxRecordSec * 1000);
+        gaitSync.requestRecord(selectedDog?.id ?? null, captureSettingsPayload(selectedCapturePreset), maxRecordSec * 1000);
       }
       return;
     }
@@ -2043,7 +2111,7 @@ async function boot(): Promise<void> {
     setSyncStatus(t("sync_pending"), "wait");
     setSessionPhase("recording", "시작버튼");
     gaitSync.log("record_request", { maxRecordSec, preset: selectedCapturePreset?.id ?? null });
-    gaitSync.requestRecord(readSideDogInfo(), captureSettingsPayload(selectedCapturePreset), maxRecordSec * 1000);
+    gaitSync.requestRecord(selectedDog?.id ?? null, captureSettingsPayload(selectedCapturePreset), maxRecordSec * 1000);
   };
 
   const stopClinicSession = (): void => {
@@ -2168,7 +2236,7 @@ async function boot(): Promise<void> {
       syncRecordPending = true;
       setSyncStatus(t("sync_pending"));
       setSessionPhase("recording", "btnRecord(구)");
-      gaitSync.requestRecord(readSideDogInfo(), captureSettingsPayload(selectedCapturePreset), maxRecordSec * 1000);
+      gaitSync.requestRecord(selectedDog?.id ?? null, captureSettingsPayload(selectedCapturePreset), maxRecordSec * 1000);
       return;
     }
 
@@ -2183,7 +2251,8 @@ async function boot(): Promise<void> {
   onClick("btnCsv", () => {
     const csv = framesToCanineGaitCsv(recorder.getFrames(), GRID_ROWS, GRID_COLS);
     const dog = readSideDogInfo();
-    downloadText(pressureCsvName({ dog: { name: dog.name, weightKg: dog.weightKg } }), csv);
+    // 로컬로 받는 파일이라 **사람이 읽는 이름**으로 짓는다. 서버 저장 이름과는 별개다.
+    downloadText(displayCsvName({ name: dog.name, weightKg: dog.weightKg }), csv);
   });
 
   // Paw-tracking CSV: per-frame, per-paw label + position + pressure.

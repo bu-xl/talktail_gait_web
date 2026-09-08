@@ -791,6 +791,36 @@
         background: var(--bg); overflow: hidden;
       }
       body[data-module="csv"] #csvPage { display: flex; }
+      body[data-module="tasks"] #taskListPage { display: flex; }
+      body[data-module="doginfo"] #dogInfoPage { display: flex; }
+      /* 태스크 목록·정보 변경은 CSV 다운과 같은 판을 쓴다 — 목록 한 줄 + 툴바. */
+      #taskListPage, #dogInfoPage {
+        display: none; flex-direction: column; gap: 12px;
+        padding: 20px 24px 28px; overflow: auto;
+      }
+      .tl-row, .di-row {
+        display: grid; align-items: center; gap: 10px;
+        padding: 8px 10px; border-bottom: 1px solid var(--divider);
+      }
+      .tl-row { grid-template-columns: 24px 150px 1fr 260px 190px; }
+      .tl-row.is-discarded { opacity: 0.55; }
+      .tl-task { color: var(--muted); font-family: ui-monospace, monospace; font-size: 12px; }
+      .di-row { grid-template-columns: 1fr auto; }
+      .di-head { font-weight: 650; }
+      .di-meta { color: var(--muted); font-size: 13px; }
+      .di-warn { grid-column: 1 / -1; color: var(--danger, #eb463c); font-size: 12px; }
+      .di-actions { display: flex; gap: 8px; }
+      .di-form {
+        display: grid; grid-template-columns: repeat(2, minmax(180px, 1fr)); gap: 10px;
+        padding: 12px 10px; border-bottom: 1px solid var(--divider);
+      }
+      .di-field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+      .di-field input.is-readonly { background: var(--divider); color: var(--muted); }
+      .di-hint { grid-column: 1 / -1; color: var(--muted); font-size: 12px; }
+      .di-form .di-actions { grid-column: 1 / -1; justify-content: flex-end; }
+      /* 고른 개체는 읽기 전용 표시다 — 여기서 고칠 수 없다. */
+      .dog-picked { font-size: 15px; font-weight: 600; padding: 6px 2px; }
+      .dog-picked.is-empty { color: var(--muted); font-weight: 400; }
       #multiPage {
         flex: 1; min-height: 0; display: none; flex-direction: column;
         background: var(--bg); overflow: hidden;
@@ -1518,6 +1548,10 @@
         padding: 12px 18px; border-bottom: 1px solid var(--divider);
       }
       #confirmAnalyzeModal .dialog-body .cam-list { margin-top: 6px; }
+      #confirmAnalyzeModal .confirm-csv {
+        display: flex; align-items: center; gap: 10px; margin-top: 6px; font-size: 13px;
+      }
+      #confirmAnalyzeModal .confirm-csv .is-bad { color: var(--danger, #eb463c); }
       /* 모달 안에서는 이게 판단 근거다 — 사이드바 카드보다 크게 읽히게 한다. */
       #confirmAnalyzeModal .cam-row { min-width: 104px; font-size: 13px; padding: 8px 12px; }
       #confirmAnalyzeModal .cam-state { font-size: 12px; }
@@ -1975,6 +2009,8 @@
             <details class="ah-menu">
               <summary data-i18n-title="nav_more" title="더보기" aria-label="더보기">≡</summary>
               <div class="ah-menu-list">
+                <button type="button" data-module="tasks" data-i18n="nav_tasks">태스크 목록</button>
+                <button type="button" data-module="doginfo" data-i18n="nav_doginfo">정보 변경</button>
                 <button type="button" data-module="files" data-i18n="nav_files">파일 다운</button>
                 <button type="button" class="master-only" data-module="purge" data-i18n="nav_purge">파일 삭제</button>
               <button type="button" data-module="csv" data-i18n="nav_csv">CSV 다운</button>
@@ -2174,48 +2210,17 @@
           <div class="rv-list" id="rvList"></div>
         </section>
 
-        <!-- 반려견 — 가로 4칸. 이름·몸무게는 파일명에 들어가는 필수값이다. -->
+        <!--
+          측정 대상 반려견 — **입력이 아니라 표시다** (§3-3).
+
+          예전에는 여기에 이름·몸무게·견종 입력란이 있었고 그 값이 그대로 파일명이 됐다.
+          오타가 파일명이 되고, 이름·몸무게가 같은 다른 개가 구분되지 않았다(§1-2, §1-3).
+          지금은 위의 "빠른 입력 등록" 또는 "예약 현황" 에서 **등록된 개체를 고른다.**
+          정보를 고치는 곳은 삼선 메뉴의 "정보 변경" 이다.
+        -->
         <section class="mc-card mc-dog">
           <div class="section" data-i18n="section_dog_info">반려견</div>
-          <div class="dog-info" id="dogInfoForm">
-            <div class="field-col">
-              <label for="dogName" data-i18n="dog_name">이름</label>
-              <input id="dogName" type="text" placeholder="예: 바둑이" autocomplete="off" />
-            </div>
-            <div class="field-col">
-              <label for="dogWeightInfo" data-i18n="dog_weight">몸무게</label>
-              <input id="dogWeightInfo" type="number" placeholder="kg" min="0" step="0.1" />
-            </div>
-            <div class="field-col">
-              <label for="dogHeight" data-i18n="dog_height">신장</label>
-              <input id="dogHeight" type="number" placeholder="cm" min="0" step="0.1" />
-            </div>
-            <div class="field-col">
-              <label for="dogBreed" data-i18n="dog_breed">견종</label>
-              <input id="dogBreed" type="text" placeholder="예: 진돗개" autocomplete="off" />
-            </div>
-            <!-- 나이가 아니라 생년월이다 — 나이를 저장하면 1년 뒤 그 기록은 틀린 값이 된다. -->
-            <div class="field-col">
-              <label for="dogBirthMonth" data-i18n="dog_birth_month">생년월</label>
-              <input id="dogBirthMonth" type="month" />
-            </div>
-            <div class="field-col">
-              <label for="dogSex" data-i18n="dog_sex">성별</label>
-              <select id="dogSex">
-                <option value="" data-i18n="dog_unset">미입력</option>
-                <option value="male" data-i18n="dog_male">수컷</option>
-                <option value="female" data-i18n="dog_female">암컷</option>
-              </select>
-            </div>
-            <div class="field-col">
-              <label for="dogNeutered" data-i18n="dog_neutered">중성화</label>
-              <select id="dogNeutered">
-                <option value="" data-i18n="dog_unset">미입력</option>
-                <option value="1" data-i18n="dog_neutered_yes">했음</option>
-                <option value="0" data-i18n="dog_neutered_no">안 했음</option>
-              </select>
-            </div>
-          </div>
+          <div class="dog-picked" id="selectedDogLabel">–</div>
         </section>
 
         <!--
@@ -2543,6 +2548,41 @@
       </div>
     </section>
 
+    <!--
+      태스크 목록 — 촬영이 제대로 쌓이는지 **통계로 확인**하는 화면 (§3-7).
+      목록 출처는 DB 다(디스크 스캔이 아니다). 회차 통삭제도 여기서만 한다.
+    -->
+    <section id="taskListPage" hidden aria-label="Task list">
+      <div class="rp-toolbar">
+        <div class="rp-toolbar-text">
+          <h1 data-i18n="nav_tasks">태스크 목록</h1>
+          <p>계정의 촬영 회차를 날짜순으로 봅니다. 선택해서 통삭제할 수 있습니다.</p>
+        </div>
+        <div class="fd-toolbar-extra">
+          <input id="taskListFrom" type="date" title="시작 날짜" />
+          <span class="fd-date-sep">~</span>
+          <input id="taskListTo" type="date" title="끝 날짜" />
+          <button type="button" id="taskListClearFilter">필터 해제</button>
+          <button type="button" id="taskListReload" data-i18n="btn_results_refresh">새로고침</button>
+          <button type="button" id="taskListDelete" class="danger" disabled>통삭제</button>
+        </div>
+      </div>
+      <p id="taskListStatus" class="fd-status"></p>
+      <div id="taskListRows"></div>
+    </section>
+
+    <!-- 개 정보 변경 — 이름·견종·성별·중성화만 바뀐다. 몸무게는 읽기 전용(§3-18). -->
+    <section id="dogInfoPage" hidden aria-label="Dog info">
+      <div class="rp-toolbar">
+        <div class="rp-toolbar-text">
+          <h1 data-i18n="nav_doginfo">정보 변경</h1>
+          <p>등록된 반려견의 정보를 고칩니다. 몸무게는 바꿀 수 없습니다 — 몸무게가 다르면 다른 개체입니다.</p>
+        </div>
+      </div>
+      <p id="dogInfoStatus" class="fd-status"></p>
+      <div id="dogInfoList"></div>
+    </section>
+
     <section id="csvPage" hidden aria-label="CSV download">
       <div class="rp-toolbar">
         <div class="rp-toolbar-text">
@@ -2697,20 +2737,12 @@
             </div>
             <div class="up-dog-grid">
               <div class="field-col">
-                <label for="upDogName" data-i18n="dog_name">이름</label>
-                <input id="upDogName" type="text" placeholder="예: 바둑이" autocomplete="off" />
-              </div>
-              <div class="field-col">
-                <label for="upDogBreed" data-i18n="dog_breed">견종</label>
-                <input id="upDogBreed" type="text" placeholder="예: 진돗개" autocomplete="off" />
-              </div>
-              <div class="field-col">
-                <label for="upDogWeight" data-i18n="dog_weight">몸무게</label>
-                <input id="upDogWeight" type="number" placeholder="kg" min="0" step="0.1" />
-              </div>
-              <div class="field-col">
-                <label for="upDogHeight" data-i18n="dog_height">신장</label>
-                <input id="upDogHeight" type="number" placeholder="cm" min="0" step="0.1" />
+                <label for="upDogSelect" data-i18n="section_dog_info">반려견</label>
+                <!--
+                  등록된 개체를 고른다(§3-3). 저장 경로가 `uploads/<userId>/<dogId>/<도장>/`
+                  이라 개체 없이는 파일을 둘 자리가 없다.
+                -->
+                <select id="upDogSelect"></select>
               </div>
             </div>
           </div>
@@ -2950,6 +2982,16 @@
         <div class="dialog-body">
           <div class="section" id="confirmCamHeading" data-i18n="confirm_cams_heading">카메라 상태</div>
           <ul id="confirmCamList" class="cam-list"></ul>
+          <!--
+            압력 CSV 업로드 상태 — 영상과 **같은 수준으로** 보여 준다 (§3-10).
+            퍼센트는 없다: 현장에서 필요한 답은 "올라갔나 / 아직인가" 둘뿐이다.
+            실패하면 [다시 올리기] 가 여기 뜬다(§3-13) — 자동 재시도는 하지 않는다.
+          -->
+          <div class="section" id="confirmCsvHeading">압력 데이터</div>
+          <div class="confirm-csv">
+            <span id="confirmCsvState">–</span>
+            <button type="button" id="confirmCsvRetry" hidden>다시 올리기</button>
+          </div>
         </div>
         <div class="dialog-foot">
           <button type="button" id="confirmDiscardBtn" class="danger" data-i18n="confirm_discard">버리기</button>

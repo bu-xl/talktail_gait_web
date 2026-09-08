@@ -1,9 +1,11 @@
 /**
  * 직접 분석 API — 이미 가지고 있는 압력 CSV + 촬영 영상을 back 으로 올린다.
  *
- * back `POST /api/analyze/manual` 이 CSV 를 `pressure_data/` 에, 영상을 `uploads/main/`
- * 에 저장한 뒤 둘을 함께 ai-server `/analyze` 로 보낸다. 촬영 세션과 산출물·DB 행이
- * 같으므로, 결과는 리포트에서 평소처럼 조회된다.
+ * back `POST /api/analyze/manual` 이 **촬영 폴더**(`uploads/<userId>/<dogId>/<도장>/`)에
+ * 둘을 나란히 저장한 뒤 함께 ai-server `/analyze` 로 보낸다. 촬영 세션과 산출물·DB 행이
+ * 같으므로 결과는 리포트에서 평소처럼 조회된다.
+ *
+ * ★ **`dogId` 가 필수다.** 개체 없이는 파일을 둘 자리가 없다(§3-3).
  */
 
 import { joinApiUrl } from "../config/apiUrl.js";
@@ -19,7 +21,8 @@ export type ManualDogInfo = {
 export type ManualAnalyzeInput = {
   csv: File;
   video: File;
-  dog?: ManualDogInfo;
+  /** 촬영 대상 개체(`dogs.id`) — **필수**. 저장 폴더의 한 조각이다. */
+  dogId: number;
 };
 
 export type ManualAnalyzeJob = {
@@ -51,15 +54,9 @@ export async function uploadManualAnalysis(
   form.append("video", input.video, input.video.name || "gait.mp4");
   form.append("csv", input.csv, input.csv.name || "pressure.csv");
 
-  const dog = input.dog || {};
-  if (dog.name && dog.name.trim()) form.append("dogName", dog.name.trim());
-  if (dog.breed && dog.breed.trim()) form.append("dogBreed", dog.breed.trim());
-  if (dog.weightKg != null && Number.isFinite(dog.weightKg)) {
-    form.append("dogWeightKg", String(dog.weightKg));
-  }
-  if (dog.heightCm != null && Number.isFinite(dog.heightCm)) {
-    form.append("dogHeightCm", String(dog.heightCm));
-  }
+  // 개 정보는 **id 하나**다. 이름·몸무게는 서버가 `dogs` 에서 읽는다 — 두 곳이 같은 값을
+  // 들고 있으면 언젠가 갈리고, 그 갈림이 파일명에 박히던 것이 §1-3 의 문제였다.
+  form.append("dogId", String(input.dogId));
 
   const res = await apiFetch(joinApiUrl(apiBaseUrl, "/api/analyze/manual"), {
     method: "POST",
@@ -87,12 +84,15 @@ export async function uploadManualAnalysis(
  */
 export async function analyzeStoredCapture(
   apiBaseUrl: string,
+  dogId: number,
   stamp: string,
 ): Promise<ManualAnalyzeJob & { taskName: string; hasCsv: boolean }> {
+  // 개체 + 도장이 곧 촬영 폴더다(§3-22). 예전에는 도장만 보내고 서버가 계정 폴더 전체를
+  // 훑어 파일명으로 짝을 맞췄다 — 이제 `readdir` 한 번이면 끝난다.
   const res = await apiFetch(joinApiUrl(apiBaseUrl, "/api/analyze/stored"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ stamp }),
+    body: JSON.stringify({ dogId, stamp }),
   });
   if (!res.ok) {
     let detail = `HTTP ${res.status}`;

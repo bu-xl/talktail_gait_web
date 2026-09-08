@@ -2,13 +2,14 @@
  * 데이터 검증 — 촬영 한 번(=테스트 한 번)에 뭐가 저장됐는지 현장에서 바로 확인하는 화면.
  *
  * "파일 다운" 은 디스크에 있는 파일을 통째로 늘어놓는다. 그런데 실제 단위는 파일이
- * 아니라 **촬영 한 번**이고, 한 번에 CSV 1개 + 영상 N개가 나온다. 업로드는 카메라마다
- * 제각각 도착하므로 목록 순서도 촬영 순서와 어긋난다. 그래서 여기서는 파일을
- * **도장(stamp)** 으로 되묶어 테스트 단위로 보여준다.
+ * 아니라 **촬영 한 번**이고, 한 번에 CSV 1개 + 영상 N개가 나온다.
  *
- * 도장은 back 의 `captureSessions.js` 가 sync_start 때 한 번만 찍고 그 세션의 모든
- * 파일명 꼬리에 들어간다(`…-main-260820-150920.mp4`, `…-260820-150920.csv`).
- * 즉 **파일명이 이미 세션 키**라서 서버에 세션 표를 따로 두지 않아도 묶인다.
+ * 묶는 일은 **서버가 한다** — 촬영 하나가 폴더 하나(`uploads/<userId>/<dogId>/<도장>/`)라
+ * `readdir` 이 곧 답이다. 예전에는 화면이 파일명 꼬리의 도장을 파싱해 되묶었고, 이름이
+ * 규칙에서 벗어난 파일은 조용히 빠졌다.
+ *
+ * 버림 표시(`discardedAt`)와 세션 id 는 DB 목록(`/api/tasks`)에서 온다. 파일 목록과 폴더
+ * 키(`<dogId>/<도장>`)로 맞춘다 — 두 출처가 같은 키를 쓰므로 어긋날 자리가 없다.
  *
  * CSV 는 로우데이터라 열어봐야 알 수 없으므로 몇 초치가 쌓였는지만 보여주고
  * (`fetchCsvSpan` — 앞뒤 조각만 Range 로 읽는다), 영상은 그 자리에서 재생한다.
@@ -19,22 +20,36 @@ import { analyzeStoredCapture } from "../api/analyzeApi.js";
 import { onLangChange, t } from "../i18n/index.js";
 import {
   deleteStoredFiles,
+  discardSession,
   fetchCsvSpan,
   listStoredFiles,
-  setStampDiscarded,
+  restoreSession,
   storedFileUrl,
   type CsvSpan,
   type StoredCsvFile,
   type StoredVideoFile,
 } from "../api/storedFilesApi.js";
-import {
-  groupSessions,
-  parseCaptureName,
-  type CaptureSession,
-} from "../core/sessionNaming.js";
+import { listTasks } from "../api/tasksApi.js";
+import { parseStamp, roleOrder } from "../core/sessionNaming.js";
 
-/** 촬영 한 번 = 도장 하나. 묶는 규칙은 `sessionNaming` 에 있다. */
-type Session = CaptureSession;
+/**
+ * 촬영 한 번 = 폴더 하나.
+ *
+ * `key`(`<dogId>/<도장>`)가 화면 전체의 식별자다. 도장만으로는 개체가 다른 두 촬영이
+ * 같은 초에 찍혔을 때 합쳐진다 — 그게 §1-2 의 원래 문제였다.
+ */
+type Session = {
+  key: string;
+  /** `gait_sessions.id`. 버리기·되살리기가 이 값으로 간다. */
+  id: string | null;
+  dogId: number;
+  stamp: string;
+  when: Date | null;
+  dogLabel: string;
+  csv: StoredCsvFile | null;
+  videos: StoredVideoFile[];
+  discardedAt: string | null;
+};
 
 /**
  * 확인 모달이 묻는 것. 셋 다 되묻는 이유가 다르다 —
@@ -52,10 +67,9 @@ type ConfirmMode = "delete" | "discard" | "restore";
 const GAP_WARN_SEC = 2;
 
 function roleLabel(name: string): string {
-  const parsed = parseCaptureName(name);
-  if (!parsed) return name;
-  if (parsed.role === "main") return t("files_role_main");
-  return `${t("files_role_sub")}${parsed.subIndex ?? 1}`;
+  const order = roleOrder(name);
+  if (order === 999) return name;
+  return order === 0 ? t("files_role_main") : `${t("files_role_sub")}${order}`;
 }
 
 export class VerifyPage {
@@ -90,7 +104,7 @@ export class VerifyPage {
   private apiBase = "";
   /** 서버가 준 전체 목록. 화면에는 탭으로 걸러 낸 것만 보인다. */
   private allSessions: Session[] = [];
-  /** 버려진 촬영의 도장. 소프트 삭제라 파일은 그대로 있고 표시만 다르다. */
+  /** 버려진 촬영의 키. 소프트 삭제라 파일은 그대로 있고 표시만 다르다. */
   private discarded = new Set<string>();
   private tab: "live" | "discarded" = "live";
   /** 날짜 필터(YYYY-MM-DD). 빈 문자열이면 전체를 보여준다. */
@@ -195,13 +209,57 @@ export class VerifyPage {
     this.setStatus(t("files_loading"));
     try {
       this.picked.clear();
-      const list = await listStoredFiles(this.apiBase);
-      this.allSessions = groupSessions(list.csv, list.videos);
-      this.discarded = new Set(list.discarded);
+      // 파일은 디스크에서, 세션 id·버림 표시는 DB 에서. 폴더 키로 맞춘다.
+      const [list, tasks] = await Promise.all([
+        listStoredFiles(this.apiBase),
+        listTasks(this.apiBase).catch(() => []),
+      ]);
+      const byKey = new Map<string, Session>();
+      const ensure = (dogId: number, stamp: string): Session => {
+        const key = `${dogId}/${stamp}`;
+        let hit = byKey.get(key);
+        if (!hit) {
+          hit = {
+            key,
+            id: null,
+            dogId,
+            stamp,
+            when: parseStamp(stamp),
+            dogLabel: `#${dogId}`,
+            csv: null,
+            videos: [],
+            discardedAt: null,
+          };
+          byKey.set(key, hit);
+        }
+        return hit;
+      };
+      for (const task of list.tasks) {
+        const hit = ensure(task.dogId, task.stamp);
+        hit.dogLabel = task.dog?.name
+          ? `${task.dog.name}${task.dog.weightKg != null ? ` · ${task.dog.weightKg}kg` : ""}`
+          : `#${task.dogId}`;
+      }
+      for (const row of list.csv) ensure(row.dogId, row.stamp).csv = row;
+      for (const row of list.videos) ensure(row.dogId, row.stamp).videos.push(row);
+      for (const row of tasks) {
+        if (row.dog.id == null) continue;
+        const hit = ensure(row.dog.id, row.stamp);
+        hit.id = row.id;
+        hit.discardedAt = row.discardedAt;
+      }
+      for (const s of byKey.values()) {
+        s.videos.sort((a, b) => roleOrder(a.name) - roleOrder(b.name));
+      }
+      // 도장 내림차순 = 최신순.
+      this.allSessions = [...byKey.values()].sort((a, b) => b.stamp.localeCompare(a.stamp));
+      this.discarded = new Set(
+        this.allSessions.filter((s) => s.discardedAt).map((s) => s.key),
+      );
       this.applyTab();
       this.spans.clear();
-      if (this.selected && !this.sessions.some((s) => s.stamp === this.selected)) this.selected = null;
-      if (!this.selected && this.sessions.length > 0) this.selected = this.sessions[0].stamp;
+      if (this.selected && !this.sessions.some((s) => s.key === this.selected)) this.selected = null;
+      if (!this.selected && this.sessions.length > 0) this.selected = this.sessions[0].key;
       this.setStatus("");
       this.render();
     } catch (err) {
@@ -226,10 +284,10 @@ export class VerifyPage {
   private applyTab(): void {
     const wantDiscarded = this.tab === "discarded";
     this.sessions = this.allSessions.filter(
-      (s) => this.discarded.has(s.stamp) === wantDiscarded && (!this.day || sessionDay(s) === this.day),
+      (s) => this.discarded.has(s.key) === wantDiscarded && (!this.day || sessionDay(s) === this.day),
     );
-    if (this.selected && !this.sessions.some((s) => s.stamp === this.selected)) this.selected = null;
-    if (!this.selected && this.sessions.length > 0) this.selected = this.sessions[0].stamp;
+    if (this.selected && !this.sessions.some((s) => s.key === this.selected)) this.selected = null;
+    if (!this.selected && this.sessions.length > 0) this.selected = this.sessions[0].key;
   }
 
   /**
@@ -243,20 +301,22 @@ export class VerifyPage {
    * 중간에 멈춰 있으면 그 뒤가 통째로 안 돈다.
    */
   private async runAnalyze(): Promise<void> {
-    const stamps = this.sessions
-      .filter((s) => this.picked.has(s.stamp) && this.canAnalyze(s))
-      .map((s) => s.stamp);
-    if (stamps.length === 0 || this.analyzing) return;
+    const targetsToAnalyze = this.sessions.filter(
+      (s) => this.picked.has(s.key) && this.canAnalyze(s),
+    );
+    const stamps = targetsToAnalyze.map((s) => s.stamp);
+    if (targetsToAnalyze.length === 0 || this.analyzing) return;
     this.analyzing = true;
     this.syncAnalyzeBtn();
     let ok = 0;
     const failed: string[] = [];
-    for (const [i, stamp] of stamps.entries()) {
+    for (const [i, session] of targetsToAnalyze.entries()) {
+      const stamp = session.stamp;
       this.setStatus(t("verify_analyze_sending", { i: String(i + 1), n: String(stamps.length) }));
       try {
-        await analyzeStoredCapture(this.apiBase, stamp);
+        await analyzeStoredCapture(this.apiBase, session.dogId, stamp);
         ok += 1;
-        this.picked.delete(stamp);
+        this.picked.delete(session.key);
       } catch (err) {
         failed.push(`${stamp}: ${err instanceof Error ? err.message : String(err)}`);
       }
@@ -329,11 +389,11 @@ export class VerifyPage {
 
   /** 지금 보이는 목록 중 체크된 것. 안 보이는 선택은 없는 셈 친다. */
   private pickedSessions(): Session[] {
-    return this.sessions.filter((s) => this.picked.has(s.stamp));
+    return this.sessions.filter((s) => this.picked.has(s.key));
   }
 
   private allPicked(targets: Session[]): boolean {
-    return targets.length > 0 && targets.every((s) => this.picked.has(s.stamp));
+    return targets.length > 0 && targets.every((s) => this.picked.has(s.key));
   }
 
   /** 보이는 목록을 통째로 켜고 끈다. 이미 다 켜져 있으면 끈다. */
@@ -342,8 +402,8 @@ export class VerifyPage {
     if (targets.length === 0) return;
     const off = this.allPicked(targets);
     for (const s of targets) {
-      if (off) this.picked.delete(s.stamp);
-      else this.picked.add(s.stamp);
+      if (off) this.picked.delete(s.key);
+      else this.picked.add(s.key);
     }
     this.render();
   }
@@ -354,12 +414,12 @@ export class VerifyPage {
     const pick = document.createElement("input");
     pick.type = "checkbox";
     pick.className = "dv-pick";
-    pick.checked = this.picked.has(s.stamp);
+    pick.checked = this.picked.has(s.key);
     // 잠그지 않는다 — 분석 못 하는 촬영도 버리거나 지울 수는 있어야 한다.
     // 분석 대상 여부는 `runAnalyze()` 가 `canAnalyze()` 로 따로 거른다.
     pick.addEventListener("change", () => {
-      if (pick.checked) this.picked.add(s.stamp);
-      else this.picked.delete(s.stamp);
+      if (pick.checked) this.picked.add(s.key);
+      else this.picked.delete(s.key);
       this.syncAnalyzeBtn();
     });
     const btn = document.createElement("button");
@@ -374,7 +434,7 @@ export class VerifyPage {
 
     const dog = document.createElement("span");
     dog.className = "dv-item-dog";
-    dog.textContent = s.dog || "—";
+    dog.textContent = s.dogLabel || "—";
 
     const tags = document.createElement("span");
     tags.className = "dv-item-tags";
@@ -413,7 +473,7 @@ export class VerifyPage {
     title.textContent = s.when ? `${formatDay(s.when)} ${formatClock(s.when)}` : s.stamp;
     const who = document.createElement("div");
     who.className = "dv-detail-sub";
-    who.textContent = s.dog ? `${s.dog} · ${s.stamp}` : s.stamp;
+    who.textContent = s.dogLabel ? `${s.dogLabel} · ${s.stamp}` : s.stamp;
     head.append(title, who);
 
     const delBtn = document.createElement("button");
@@ -545,7 +605,7 @@ export class VerifyPage {
     // 한 건이면 언제·누구를 그대로 보여주고, 여러 건이면 건수로 말한다.
     const one = list.length === 1 ? list[0] : null;
     const when = one ? (one.when ? `${formatDay(one.when)} ${formatClock(one.when)}` : one.stamp) : "";
-    const dog = one?.dog || "—";
+    const dog = one?.dogLabel || "—";
     const files = list.flatMap((s) => [...(s.csv ? [s.csv] : []), ...s.videos]);
 
     if (mode === "delete") {
@@ -610,14 +670,18 @@ export class VerifyPage {
     let failed = 0;
     for (const s of list) {
       try {
-        await setStampDiscarded(this.apiBase, s.stamp, next);
-        if (next) this.discarded.add(s.stamp);
-        else this.discarded.delete(s.stamp);
-        this.picked.delete(s.stamp);
+        // 표시는 **회차 행**에 붙는다(§3-17-1). 도장 문자열 목록이 아니라 DB 컬럼이라
+        // 계정이 섞이지 않고, 회차를 통삭제하면 표시도 함께 사라진다.
+        if (!s.id) throw new Error("세션 기록이 없습니다");
+        if (next) await discardSession(this.apiBase, s.id);
+        else await restoreSession(this.apiBase, s.id);
+        if (next) this.discarded.add(s.key);
+        else this.discarded.delete(s.key);
+        this.picked.delete(s.key);
         ok += 1;
       } catch (err) {
         failed += 1;
-        console.warn("[verify] discard failed", s.stamp, err);
+        console.warn("[verify] discard failed", s.key, err);
       }
     }
     this.deleting = false;
@@ -646,20 +710,18 @@ export class VerifyPage {
     let failed = 0;
     for (const s of list) {
       try {
-        const result = await deleteStoredFiles(this.apiBase, {
-          csv: s.csv ? [s.csv.name] : [],
-          videos: s.videos.map((v) => `${"role" in v ? v.role : "main"}/${v.name}`),
-        });
+        // 폴더 키 하나면 그 회차의 파일이 전부 지워진다 — 파일을 하나씩 셀 필요가 없다.
+        const result = await deleteStoredFiles(this.apiBase, [s.key]);
         deleted += result.deleted.length;
         failed += result.failed.length;
         // 파일이 사라졌으면 버림 표시도 같이 걷는다 — 안 걷으면 목록에 유령이 남는다.
-        if (result.failed.length === 0 && this.discarded.has(s.stamp)) {
-          await setStampDiscarded(this.apiBase, s.stamp, false).catch(() => undefined);
+        if (result.failed.length === 0 && s.id && this.discarded.has(s.key)) {
+          await restoreSession(this.apiBase, s.id).catch(() => undefined);
         }
-        this.picked.delete(s.stamp);
+        this.picked.delete(s.key);
       } catch (err) {
         failed += 1;
-        console.warn("[verify] delete failed", s.stamp, err);
+        console.warn("[verify] delete failed", s.key, err);
       }
     }
     this.deleting = false;
