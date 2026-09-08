@@ -74,8 +74,8 @@ export class VerifyPage {
   private readonly modalListEl: HTMLElement;
   private readonly modalCancelBtn: HTMLButtonElement;
   private readonly modalConfirmBtn: HTMLButtonElement;
-  /** 확인 모달이 겨냥하고 있는 촬영. 닫히면 null. */
-  private pendingDelete: Session | null = null;
+  /** 확인 모달이 겨냥하고 있는 촬영들. 한 건일 수도, 선택한 여러 건일 수도 있다. */
+  private pending: Session[] = [];
   /** 확인 모달이 무엇을 묻고 있는지. 문구와 확인 동작이 여기서 갈린다. */
   private pendingMode: ConfirmMode = "delete";
   private deleting = false;
@@ -85,6 +85,8 @@ export class VerifyPage {
   private readonly purgeBtn: HTMLButtonElement;
   private readonly dayEl: HTMLInputElement;
   private readonly selectAllBtn: HTMLButtonElement;
+  private readonly bulkDiscardBtn: HTMLButtonElement;
+  private readonly bulkDeleteBtn: HTMLButtonElement;
 
   private apiBase = "";
   /** 서버가 준 전체 목록. 화면에는 탭으로 걸러 낸 것만 보인다. */
@@ -138,6 +140,13 @@ export class VerifyPage {
       this.render();
     });
     this.selectAllBtn.addEventListener("click", () => this.toggleSelectAll());
+
+    this.bulkDiscardBtn = root.querySelector("#dvBulkDiscard") as HTMLButtonElement;
+    this.bulkDeleteBtn = root.querySelector("#dvBulkDelete") as HTMLButtonElement;
+    this.bulkDiscardBtn.addEventListener("click", () =>
+      this.openConfirm(this.pickedSessions(), this.tab === "discarded" ? "restore" : "discard"),
+    );
+    this.bulkDeleteBtn.addEventListener("click", () => this.openConfirm(this.pickedSessions(), "delete"));
 
     this.refreshBtn.addEventListener("click", () => void this.reload());
     this.analyzeBtn.addEventListener("click", () => void this.runAnalyze());
@@ -305,20 +314,6 @@ export class VerifyPage {
     }
   }
 
-  /** 촬영 한 건의 버림 표시를 켜고 끈다. */
-  private async toggleDiscard(s: Session): Promise<void> {
-    const next = !this.discarded.has(s.stamp);
-    try {
-      await setStampDiscarded(this.apiBase, s.stamp, next);
-      if (next) this.discarded.add(s.stamp);
-      else this.discarded.delete(s.stamp);
-      this.applyTab();
-      this.render();
-    } catch (err) {
-      this.setStatus(err instanceof Error ? err.message : String(err), true);
-    }
-  }
-
   private render(): void {
     this.tabLiveBtn.classList.toggle("is-active", this.tab === "live");
     this.tabDiscardedBtn.classList.toggle("is-active", this.tab === "discarded");
@@ -345,15 +340,15 @@ export class VerifyPage {
   }
 
   /**
-   * Main 영상이 있어야 분석할 수 있다. CSV 는 없어도 된다 — 영상만으로도 분석은 돈다
-   * (압력 산출물만 빠진다). 버린 촬영은 대상이 아니다.
+   * 영상만 있어도(압력 산출물만 빠짐), CSV 만 있어도 분석은 돈다. 둘 다 없는 껍데기와
+   * 버린 촬영만 대상이 아니다.
    */
   private canAnalyze(s: Session): boolean {
-    return this.tab === "live" && s.videos.some((v) => v.role === "main");
+    return this.tab === "live" && (Boolean(s.csv) || s.videos.some((v) => v.role === "main"));
   }
 
   private syncAnalyzeBtn(): void {
-    const n = this.picked.size;
+    const n = this.pickedSessions().filter((s) => this.canAnalyze(s)).length;
     this.analyzeBtn.hidden = this.tab !== "live";
     this.analyzeBtn.disabled = n === 0 || this.analyzing;
     this.analyzeBtn.textContent = n === 0
@@ -361,14 +356,24 @@ export class VerifyPage {
       : t("verify_analyze_n", { n: String(n) });
 
     // 전체선택은 지금 보이는 목록만 겨냥한다 — 날짜 필터가 걸려 있으면 그 날짜만 잡힌다.
-    const targets = this.selectableSessions();
-    this.selectAllBtn.hidden = this.tab !== "live" || targets.length === 0;
-    this.selectAllBtn.disabled = this.analyzing;
+    const targets = this.sessions;
+    this.selectAllBtn.hidden = targets.length === 0;
+    this.selectAllBtn.disabled = this.analyzing || this.deleting;
     this.selectAllBtn.textContent = this.allPicked(targets) ? t("verify_select_none") : t("verify_select_all");
+
+    // 선택 일괄 처리 — 버리기/되살리기는 탭에 따라 방향이 뒤집힌다.
+    const picked = this.pickedSessions();
+    this.bulkDiscardBtn.hidden = targets.length === 0;
+    this.bulkDiscardBtn.disabled = picked.length === 0 || this.deleting;
+    this.bulkDiscardBtn.textContent = t(this.tab === "discarded" ? "verify_bulk_restore" : "verify_bulk_discard");
+    this.bulkDeleteBtn.hidden = targets.length === 0;
+    this.bulkDeleteBtn.disabled = picked.length === 0 || this.deleting;
+    this.bulkDeleteBtn.textContent = t("verify_bulk_delete");
   }
 
-  private selectableSessions(): Session[] {
-    return this.sessions.filter((s) => this.canAnalyze(s));
+  /** 지금 보이는 목록 중 체크된 것. 안 보이는 선택은 없는 셈 친다. */
+  private pickedSessions(): Session[] {
+    return this.sessions.filter((s) => this.picked.has(s.stamp));
   }
 
   private allPicked(targets: Session[]): boolean {
@@ -377,7 +382,7 @@ export class VerifyPage {
 
   /** 보이는 목록을 통째로 켜고 끈다. 이미 다 켜져 있으면 끈다. */
   private toggleSelectAll(): void {
-    const targets = this.selectableSessions();
+    const targets = this.sessions;
     if (targets.length === 0) return;
     const off = this.allPicked(targets);
     for (const s of targets) {
@@ -394,8 +399,8 @@ export class VerifyPage {
     pick.type = "checkbox";
     pick.className = "dv-pick";
     pick.checked = this.picked.has(s.stamp);
-    pick.disabled = !this.canAnalyze(s);
-    if (pick.disabled) pick.title = t("verify_analyze_no_video");
+    // 잠그지 않는다 — 분석 못 하는 촬영도 버리거나 지울 수는 있어야 한다.
+    // 분석 대상 여부는 `runAnalyze()` 가 `canAnalyze()` 로 따로 거른다.
     pick.addEventListener("change", () => {
       if (pick.checked) this.picked.add(s.stamp);
       else this.picked.delete(s.stamp);
@@ -459,14 +464,14 @@ export class VerifyPage {
     delBtn.type = "button";
     delBtn.className = "dv-del-btn";
     delBtn.textContent = t("verify_del_button");
-    delBtn.addEventListener("click", () => this.openConfirm(s, "delete"));
+    delBtn.addEventListener("click", () => this.openConfirm([s], "delete"));
     // 소프트 삭제 토글 — 현장에서 버린 것을 여기서 되살릴 수 있다.
     const discardBtn = document.createElement("button");
     discardBtn.type = "button";
     discardBtn.className = "dv-del-btn";
     discardBtn.textContent = this.discarded.has(s.stamp) ? t("verify_restore_btn") : t("verify_discard_btn");
     discardBtn.addEventListener("click", () =>
-      this.openConfirm(s, this.discarded.has(s.stamp) ? "restore" : "discard"),
+      this.openConfirm([s], this.discarded.has(s.stamp) ? "restore" : "discard"),
     );
     const headRow = document.createElement("div");
     headRow.className = "dv-detail-head";
@@ -572,27 +577,27 @@ export class VerifyPage {
   /* ─────────────── 삭제 ─────────────── */
 
   /**
-   * 되묻는 창 하나로 삭제·버리기·되살리기를 다 받는다.
+   * 되묻는 창 하나로 삭제·버리기·되살리기를 다 받는다. 한 건이든 선택한 여러 건이든 같은 창이다.
    *
    * 삭제일 때만 파일 목록을 편다 — 무엇이 사라지는지 눈으로 봐야 하기 때문이다.
    * 버리기/되살리기는 파일이 그대로 있으므로 목록이 오히려 겁을 준다.
    */
-  private openConfirm(s: Session, mode: ConfirmMode): void {
-    this.pendingDelete = s;
+  private openConfirm(list: Session[], mode: ConfirmMode): void {
+    if (list.length === 0) return;
+    this.pending = list;
     this.pendingMode = mode;
-    const when = s.when ? `${formatDay(s.when)} ${formatClock(s.when)}` : s.stamp;
-    const dog = s.dog || "—";
-    const files = [...(s.csv ? [s.csv] : []), ...s.videos];
+    // 한 건이면 언제·누구를 그대로 보여주고, 여러 건이면 건수로 말한다.
+    const one = list.length === 1 ? list[0] : null;
+    const when = one ? (one.when ? `${formatDay(one.when)} ${formatClock(one.when)}` : one.stamp) : "";
+    const dog = one?.dog || "—";
+    const files = list.flatMap((s) => [...(s.csv ? [s.csv] : []), ...s.videos]);
 
     if (mode === "delete") {
-      const total = files.reduce((sum, f) => sum + (Number(f.size) || 0), 0);
+      const size = formatSize(files.reduce((sum, f) => sum + (Number(f.size) || 0), 0));
       this.modalTitleEl.textContent = t("verify_del_title");
-      this.modalHintEl.textContent = t("verify_del_hint", {
-        when,
-        dog,
-        n: String(files.length),
-        size: formatSize(total),
-      });
+      this.modalHintEl.textContent = one
+        ? t("verify_del_hint", { when, dog, n: String(files.length), size })
+        : t("verify_del_hint_n", { c: String(list.length), n: String(files.length), size });
       this.modalListEl.replaceChildren();
       for (const f of files) {
         const li = document.createElement("li");
@@ -603,8 +608,11 @@ export class VerifyPage {
       this.modalListEl.hidden = false;
       this.modalConfirmBtn.disabled = files.length === 0;
     } else {
-      this.modalTitleEl.textContent = t(mode === "discard" ? "verify_discard_title" : "verify_restore_title");
-      this.modalHintEl.textContent = t(mode === "discard" ? "verify_discard_hint" : "verify_restore_hint", { when, dog });
+      const discard = mode === "discard";
+      this.modalTitleEl.textContent = t(discard ? "verify_discard_title" : "verify_restore_title");
+      this.modalHintEl.textContent = one
+        ? t(discard ? "verify_discard_hint" : "verify_restore_hint", { when, dog })
+        : t(discard ? "verify_discard_hint_n" : "verify_restore_hint_n", { c: String(list.length) });
       this.modalListEl.replaceChildren();
       this.modalListEl.hidden = true;
       this.modalConfirmBtn.disabled = false;
@@ -624,65 +632,93 @@ export class VerifyPage {
 
   /** 모달의 확인 버튼 — 모드별로 갈라진다. */
   private async runConfirm(): Promise<void> {
-    if (this.pendingMode === "delete") {
-      await this.runDelete();
-      return;
-    }
-    const s = this.pendingDelete;
-    if (!s || this.deleting) return;
-    this.deleting = true;
-    this.modalConfirmBtn.disabled = true;
-    this.modalCancelBtn.disabled = true;
-    try {
-      await this.toggleDiscard(s);
-    } finally {
-      this.deleting = false;
-      this.modalCancelBtn.disabled = false;
-      this.modalConfirmBtn.disabled = false;
-      this.closeDeleteModal();
-    }
+    if (this.pendingMode === "delete") await this.runDelete();
+    else await this.runDiscard();
   }
 
   private closeDeleteModal(): void {
     if (this.deleting) return;
-    this.pendingDelete = null;
+    this.pending = [];
     this.modalEl.hidden = true;
   }
 
+  /** 버림 표시를 켜거나 끈다. 하나가 실패해도 나머지는 계속 간다. */
+  private async runDiscard(): Promise<void> {
+    const list = this.pending;
+    const next = this.pendingMode === "discard";
+    if (list.length === 0 || this.deleting) return;
+    this.deleting = true;
+    this.modalConfirmBtn.disabled = true;
+    this.modalCancelBtn.disabled = true;
+    let ok = 0;
+    let failed = 0;
+    for (const s of list) {
+      try {
+        await setStampDiscarded(this.apiBase, s.stamp, next);
+        if (next) this.discarded.add(s.stamp);
+        else this.discarded.delete(s.stamp);
+        this.picked.delete(s.stamp);
+        ok += 1;
+      } catch (err) {
+        failed += 1;
+        console.warn("[verify] discard failed", s.stamp, err);
+      }
+    }
+    this.deleting = false;
+    this.closeDeleteModal();
+    this.modalCancelBtn.disabled = false;
+    this.modalConfirmBtn.disabled = false;
+    this.selected = null;
+    this.applyTab();
+    this.render();
+    this.setStatus(
+      t(next ? "verify_discard_done" : "verify_restore_done", { n: String(ok) }) +
+        (failed ? ` ${t("verify_bulk_failed_n", { n: String(failed) })}` : ""),
+      failed > 0,
+    );
+  }
+
+  /** 파일을 영구 삭제한다. 촬영 단위로 끊어 보내고 하나가 실패해도 나머지는 계속 간다. */
   private async runDelete(): Promise<void> {
-    const s = this.pendingDelete;
-    if (!s || this.deleting) return;
+    const list = this.pending;
+    if (list.length === 0 || this.deleting) return;
     this.deleting = true;
     this.modalConfirmBtn.disabled = true;
     this.modalCancelBtn.disabled = true;
     this.modalConfirmBtn.textContent = t("verify_del_running");
-    try {
-      const result = await deleteStoredFiles(this.apiBase, {
-        csv: s.csv ? [s.csv.name] : [],
-        videos: s.videos.map((v) => `${"role" in v ? v.role : "main"}/${v.name}`),
-      });
-      this.deleting = false;
-      this.closeDeleteModal();
-      // 지운 촬영은 목록에서 사라지므로 선택을 비우고 새로 읽는다.
-      this.selected = null;
-      await this.reload();
-      const failed = result.failed.length;
-      this.setStatus(
-        t("verify_del_done", { n: String(result.deleted.length) }) +
-          (failed ? ` ${t("verify_del_failed_n", { n: String(failed) })}` : ""),
-        failed > 0,
-      );
-    } catch (err) {
-      this.deleting = false;
-      const detail = err instanceof Error ? err.message : String(err);
-      this.closeDeleteModal();
-      this.setStatus(`${t("verify_del_failed")}: ${detail}`, true);
-    } finally {
-      this.deleting = false;
-      this.modalCancelBtn.disabled = false;
-      this.modalConfirmBtn.disabled = false;
-      this.modalConfirmBtn.textContent = this.confirmLabel();
+    let deleted = 0;
+    let failed = 0;
+    for (const s of list) {
+      try {
+        const result = await deleteStoredFiles(this.apiBase, {
+          csv: s.csv ? [s.csv.name] : [],
+          videos: s.videos.map((v) => `${"role" in v ? v.role : "main"}/${v.name}`),
+        });
+        deleted += result.deleted.length;
+        failed += result.failed.length;
+        // 파일이 사라졌으면 버림 표시도 같이 걷는다 — 안 걷으면 목록에 유령이 남는다.
+        if (result.failed.length === 0 && this.discarded.has(s.stamp)) {
+          await setStampDiscarded(this.apiBase, s.stamp, false).catch(() => undefined);
+        }
+        this.picked.delete(s.stamp);
+      } catch (err) {
+        failed += 1;
+        console.warn("[verify] delete failed", s.stamp, err);
+      }
     }
+    this.deleting = false;
+    this.closeDeleteModal();
+    this.modalCancelBtn.disabled = false;
+    this.modalConfirmBtn.disabled = false;
+    this.modalConfirmBtn.textContent = this.confirmLabel();
+    // 지운 촬영은 목록에서 사라지므로 선택을 비우고 새로 읽는다.
+    this.selected = null;
+    await this.reload();
+    this.setStatus(
+      t("verify_del_done", { n: String(deleted) }) +
+        (failed ? ` ${t("verify_del_failed_n", { n: String(failed) })}` : ""),
+      failed > 0,
+    );
   }
 
   private videoBlock(s: Session): HTMLElement {
