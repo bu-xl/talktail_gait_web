@@ -630,16 +630,32 @@ async function boot(): Promise<void> {
    */
   let selectedDog: Dog | null = null;
 
-  /** 고른 개체를 화면 위에 적는다. 입력란이 아니라 표시다 — 여기서 고칠 수 없다. */
+  /**
+   * 고른 개체를 화면 위에 적는다. **입력란이 아니라 표시다** — 여기서 고칠 수 없다.
+   *
+   * 아무것도 안 골랐을 때도 이 줄이 무엇을 해야 하는지 말한다. 비워 두면 옛 입력란의
+   * 잔해처럼 보인다.
+   */
   const renderSelectedDog = (): void => {
     const el = $opt("selectedDogLabel");
     if (el) {
-      el.textContent = selectedDog
-        ? `#${selectedDog.id} ${selectedDog.name} · ${selectedDog.weightKg}kg` +
-          (selectedDog.breed ? ` · ${selectedDog.breed}` : "")
-        : t("session_need_dog");
+      el.textContent = "";
+      if (selectedDog) {
+        const id = document.createElement("span");
+        id.className = "dp-id";
+        id.textContent = `#${selectedDog.id}`;
+        const label = document.createElement("span");
+        label.textContent =
+          `${selectedDog.name} · ${selectedDog.weightKg}kg` +
+          (selectedDog.breed ? ` · ${selectedDog.breed}` : "");
+        el.append(id, label);
+      } else {
+        el.textContent = t("session_need_dog");
+      }
       el.classList.toggle("is-empty", selectedDog === null);
     }
+    // 카드 쪽에도 눌린 표시를 남긴다 — 목록이 길면 위의 한 줄만으로는 못 찾는다.
+    dogPresets?.setSelected(selectedDog?.id ?? null);
     applyDogIdentityGate();
   };
 
@@ -652,6 +668,8 @@ async function boot(): Promise<void> {
   dogPresets.setApiBase(apiBase);
   void dogPresets.refresh();
   onLangChange(() => dogPresets.renderLabels());
+  // 처음 그릴 때부터 "반려견을 고르세요" 가 보여야 한다.
+  renderSelectedDog();
 
   /**
    * 예약 현황 — 현장 QR 로 들어온 신청자.

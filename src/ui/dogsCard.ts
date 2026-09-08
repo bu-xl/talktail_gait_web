@@ -25,9 +25,65 @@ export interface DogPresetsCardOptions {
   onPick(dog: Dog): void;
 }
 
+/**
+ * 같은 정보의 개체가 이미 있을 때 되묻는다 (§3-2-A).
+ *
+ * **막지 않는다.** 같은 날 이름도 몸무게도 같은 *다른 개*가 오는 것이 이 재설계의
+ * 출발점이라, 유니크를 걸면 그 개를 등록조차 못 한다. 사람에게 후보를 보여 주고
+ * 그대로 등록할지만 묻는다.
+ */
+function askDuplicate(matches: Dog[]): Promise<boolean> {
+  const modal = document.getElementById("dogDupModal");
+  const list = document.getElementById("dogDupList");
+  const ok = document.getElementById("dogDupConfirm") as HTMLButtonElement | null;
+  const cancel = document.getElementById("dogDupCancel") as HTMLButtonElement | null;
+  // 모달이 없는 화면에서는 그냥 등록한다 — 등록을 막는 것보다 낫다.
+  if (!modal || !list || !ok || !cancel) return Promise.resolve(true);
+
+  list.textContent = "";
+  for (const dog of matches) {
+    const li = document.createElement("li");
+    const id = document.createElement("span");
+    id.className = "dup-id";
+    id.textContent = `#${dog.id}`;
+    const label = document.createElement("span");
+    label.textContent =
+      `${dog.name} · ${dog.weightKg}kg` +
+      (dog.breed ? ` · ${dog.breed}` : "") +
+      (dog.createdAt ? ` · ${dog.createdAt.slice(0, 10)} 등록` : "") +
+      (dog.sessionCount ? ` · 촬영 ${dog.sessionCount}건` : "");
+    li.append(id, label);
+    list.appendChild(li);
+  }
+
+  modal.classList.add("open");
+  document.body.classList.add("modal-open");
+
+  return new Promise<boolean>((resolve) => {
+    const close = (answer: boolean): void => {
+      modal.classList.remove("open");
+      document.body.classList.remove("modal-open");
+      ok.removeEventListener("click", onOk);
+      cancel.removeEventListener("click", onCancel);
+      window.removeEventListener("keydown", onKey);
+      resolve(answer);
+    };
+    const onOk = (): void => close(true);
+    const onCancel = (): void => close(false);
+    const onKey = (ev: KeyboardEvent): void => {
+      if (ev.key === "Escape") close(false);
+    };
+    ok.addEventListener("click", onOk);
+    cancel.addEventListener("click", onCancel);
+    window.addEventListener("keydown", onKey);
+  });
+}
+
 export class DogPresetsCard {
   private apiBase = "";
   private presets: Dog[] = [];
+  /** 지금 측정 대상으로 고른 개체. 목록이 길면 위의 한 줄만으로는 어느 개인지 못 찾는다. */
+  private selectedId: number | null = null;
 
   private readonly listEl: HTMLElement;
   private readonly emptyEl: HTMLElement;
@@ -48,6 +104,12 @@ export class DogPresetsCard {
 
   setApiBase(url: string): void {
     this.apiBase = url.replace(/\/$/, "");
+  }
+
+  /** 측정 화면이 고른 개체를 알려 준다 — 그 카드를 눌린 상태로 그린다. */
+  setSelected(id: number | null): void {
+    this.selectedId = id;
+    this.render();
   }
 
   async refresh(): Promise<void> {
@@ -159,10 +221,17 @@ export class DogPresetsCard {
       return;
     }
 
+    // ★ 등록 **전에** 묻는다. 만들고 나서 알리면 취소할 방법이 없다 —
+    //   목록을 이미 들고 있으므로 서버에 한 번 더 물어볼 이유도 없다.
+    const matches = this.presets.filter(
+      (d) => d.name === name && Number(d.weightKg) === weightKg,
+    );
+    if (matches.length && !(await askDuplicate(matches))) return;
+
     const saveBtn = document.getElementById("dogPresetSave") as HTMLButtonElement | null;
     if (saveBtn) saveBtn.disabled = true;
     try {
-      const { duplicates } = await createDog(this.apiBase, {
+      await createDog(this.apiBase, {
         name,
         weightKg,
         heightCm: num("dpHeight"),
@@ -174,15 +243,6 @@ export class DogPresetsCard {
       });
       this.closeModal();
       await this.refresh();
-      // ★ 중복은 **막지 않고 알린다.** 같은 날 이름도 몸무게도 같은 *다른 개*가 오는 것이
-      //   이 재설계의 출발점이라(§1-2), 유니크를 걸면 그 개를 등록조차 못 한다.
-      if (duplicates.length) {
-        const when = duplicates
-          .map((d) => `#${d.id}${d.createdAt ? ` (${d.createdAt.slice(0, 10)})` : ""}`)
-          .join(", ");
-        window.alert(`같은 정보의 개체가 이미 있습니다 — ${when}
-다른 개라면 그대로 두세요.`);
-      }
     } catch (err) {
       this.errorEl.textContent = err instanceof Error ? err.message : String(err);
     } finally {
@@ -210,6 +270,7 @@ export class DogPresetsCard {
     for (const preset of this.presets) {
       const card = document.createElement("div");
       card.className = "dp-card";
+      if (preset.id === this.selectedId) card.classList.add("is-selected");
 
       const pick = document.createElement("button");
       pick.type = "button";
