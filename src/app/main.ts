@@ -352,6 +352,7 @@ type AppModule =
   | "report"
   | "upload"
   | "files"
+  | "purge"
   | "csv"
   | "verify"
   | "review"
@@ -367,6 +368,7 @@ const APP_MODULES: readonly AppModule[] = [
   "report",
   "upload",
   "files",
+  "purge",
   "csv",
   "verify",
   "review",
@@ -385,10 +387,18 @@ const MODULE_STORAGE_KEY = "gait.activeModule";
  * 노트북 두 대를 역할별로 고정해 쓰기 때문이다. 열람용 노트북이 새로고침마다
  * 측정 화면으로 돌아가면 매번 탭을 다시 눌러야 하고, 그 사이 측정용 제어가 붙는다.
  */
-function loadActiveModule(): AppModule | null {
+/**
+ * 마스터만 열 수 있는 화면. 메뉴는 CSS 로 감추지만 **저장된 화면 복원은 CSS 를 지나지 않는다** —
+ * 마스터가 쓰던 브라우저에 일반 계정이 로그인하면 그대로 열려 버린다(서버는 막지만 화면은 뜬다).
+ */
+const MASTER_ONLY_MODULES: readonly AppModule[] = ["accounts", "rescodes", "purge"];
+
+function loadActiveModule(isMaster: boolean): AppModule | null {
   try {
     const saved = localStorage.getItem(MODULE_STORAGE_KEY) as AppModule | null;
-    return saved && APP_MODULES.includes(saved) ? saved : null;
+    if (!saved || !APP_MODULES.includes(saved)) return null;
+    if (!isMaster && MASTER_ONLY_MODULES.includes(saved)) return null;
+    return saved;
   } catch {
     return null;
   }
@@ -592,6 +602,10 @@ async function boot(): Promise<void> {
   const filesPageEl = $opt("filesPage");
   const filesPage = filesPageEl ? new FilesPage(filesPageEl) : null;
   filesPage?.setApiBase(apiBase);
+  // 같은 클래스, 지우기 모드. 마스터가 아니면 메뉴가 안 보이고 서버가 한 번 더 막는다.
+  const purgePageEl = $opt("purgePage");
+  const purgePage = purgePageEl ? new FilesPage(purgePageEl, "delete") : null;
+  purgePage?.setApiBase(apiBase);
   const csvPageEl = $opt("csvPage");
   const csvPage = csvPageEl ? new CsvPage(csvPageEl) : null;
   csvPage?.setApiBase(apiBase);
@@ -1195,6 +1209,8 @@ async function boot(): Promise<void> {
       else uploadPage?.hide();
       if (mod === "files") filesPage?.show();
       else filesPage?.hide();
+      if (mod === "purge") purgePage?.show();
+      else purgePage?.hide();
       if (mod === "csv") csvPage?.show();
       else csvPage?.hide();
       if (mod === "multi") multiPage?.show();
@@ -1982,7 +1998,7 @@ async function boot(): Promise<void> {
   //
   // gaitSync 가 만들어진 뒤에 불러야 한다 — 뷰어 전환이 이 소켓을 끊고 갈아타므로,
   // 선언 전에 부르면 TDZ 에 걸려 부팅이 통째로 멈춘다.
-  setModule(loadActiveModule() ?? "measure");
+  setModule(loadActiveModule(currentUser.isMaster) ?? "measure");
   syncDock.setOnBack(() => {
     syncPlaybackActive = false;
     syncDock.stop();

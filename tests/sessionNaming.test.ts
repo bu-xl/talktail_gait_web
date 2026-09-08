@@ -4,9 +4,11 @@ import { test } from "node:test";
 import {
   dogPrefix,
   formatWeightTag,
+  groupSessions,
   parseCaptureName,
   pressureCsvName,
   sanitizeDogName,
+  sessionKey,
   stampFrom,
   videoBaseName,
 } from "../src/core/sessionNaming.js";
@@ -139,4 +141,27 @@ test("a dog literally named main or sub does not confuse the parser", () => {
   assert.equal(parsed.role, "sub", "the role right after the stamp wins, not the name");
   assert.equal(parsed.subIndex, 1);
   assert.equal(parsed.dog, "main-4kg");
+});
+
+test("전 계정 목록에서 같은 도장은 계정별로 갈린다", () => {
+  const csv = [
+    { name: `${STAMP}-대박이-5.2kg.csv`, size: 1, mtime: "", url: "", userId: "clinicA" },
+    { name: `${STAMP}-제니-9.8kg.csv`, size: 1, mtime: "", url: "", userId: "clinicB" },
+  ];
+  const videos = [
+    { name: `${STAMP}-main-대박이-5.2kg.mp4`, size: 1, mtime: "", url: "", role: "main", userId: "clinicA" },
+  ];
+  const tasks = groupSessions(csv, videos);
+  assert.equal(tasks.length, 2, "같은 초에 찍혔어도 계정이 다르면 다른 촬영이다");
+  const a = tasks.find((s) => s.userId === "clinicA");
+  const b = tasks.find((s) => s.userId === "clinicB");
+  assert.equal(a?.videos.length, 1, "영상은 주인 쪽에만 붙는다");
+  assert.equal(b?.videos.length, 0);
+  assert.notEqual(sessionKey(a!), sessionKey(b!));
+});
+
+test("한 계정만 볼 때 키는 도장 그대로다", () => {
+  const [task] = groupSessions([{ name: `${STAMP}-제니-9.8kg.csv`, size: 1, mtime: "", url: "" }], []);
+  assert.equal(task.userId, "");
+  assert.equal(sessionKey(task), STAMP);
 });

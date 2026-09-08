@@ -158,9 +158,16 @@ export function parseCaptureName(filename: string): ParsedCaptureName | null {
  * 한쪽 화면에서만 촬영이 사라지는 식으로 어긋나므로 여기 한 곳에 둔다.
  */
 
-/** 촬영 한 번 = 도장 하나. */
+/** 촬영 한 번 = 계정 하나의 도장 하나. */
 export interface CaptureSession {
   stamp: string;
+  /**
+   * 이 촬영이 있는 계정. 전 계정 목록에서만 채워진다(한 계정만 볼 때는 빈 문자열).
+   *
+   * ★ 묶음 키가 도장 하나뿐이면 **같은 초에 찍은 남의 촬영이 한 줄로 합쳐진다.**
+   *   개 이름이 같을 필요도 없다. 그래서 계정도 키에 넣는다.
+   */
+  userId: string;
   /** 도장을 로컬 시각으로 되읽은 값. 형식이 깨지면 null. */
   when: Date | null;
   /** `제니-9.8kg` 같은 파일명 앞머리. 없으면 빈 문자열. */
@@ -214,11 +221,12 @@ export function groupSessions(
   videos: StoredVideoFile[],
 ): CaptureSession[] {
   const byStamp = new Map<string, CaptureSession>();
-  const ensure = (stamp: string): CaptureSession => {
-    let s = byStamp.get(stamp);
+  const ensure = (stamp: string, userId: string): CaptureSession => {
+    const key = `${userId}::${stamp}`;
+    let s = byStamp.get(key);
     if (!s) {
-      s = { stamp, when: parseStamp(stamp), dog: "", csv: null, videos: [] };
-      byStamp.set(stamp, s);
+      s = { stamp, userId, when: parseStamp(stamp), dog: "", csv: null, videos: [] };
+      byStamp.set(key, s);
     }
     return s;
   };
@@ -226,14 +234,14 @@ export function groupSessions(
   for (const row of csv) {
     const stamp = csvStamp(row.name);
     if (!stamp) continue;
-    const s = ensure(stamp);
+    const s = ensure(stamp, row.userId || "");
     s.csv = row;
     if (!s.dog) s.dog = csvDog(row.name, stamp);
   }
   for (const row of videos) {
     const parsed = parseCaptureName(row.name);
     if (!parsed) continue;
-    const s = ensure(parsed.stamp);
+    const s = ensure(parsed.stamp, row.userId || "");
     s.videos.push(row);
     if (!s.dog && parsed.dog) s.dog = parsed.dog;
   }
@@ -242,7 +250,17 @@ export function groupSessions(
     s.videos.sort((a, b) => roleOrder(a.name) - roleOrder(b.name) || a.name.localeCompare(b.name));
   }
   // 도장은 `YYMMDD-HHMMSS` 라 문자열 내림차순이 곧 최신순이다.
-  return [...byStamp.values()].sort((a, b) => b.stamp.localeCompare(a.stamp));
+  return [...byStamp.values()].sort(
+    (a, b) => b.stamp.localeCompare(a.stamp) || a.userId.localeCompare(b.userId),
+  );
+}
+
+/**
+ * 화면이 촬영 한 건을 가리킬 때 쓰는 키. 전 계정 목록에서 도장만으로는 안 갈린다.
+ * 한 계정만 볼 때는 `userId` 가 비어 있어 사실상 도장 그대로다.
+ */
+export function sessionKey(session: CaptureSession): string {
+  return session.userId ? `${session.userId}::${session.stamp}` : session.stamp;
 }
 
 /**

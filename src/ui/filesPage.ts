@@ -9,11 +9,18 @@
  *
  * 체크박스는 태스크에만 있다. "여러 개 골라 묶기"는 체크박스, "이거 하나만"은 ⬇ 로
  * 역할이 갈린다 — 파일 단위 체크박스까지 두면 부분 선택된 태스크의 폴더 구조가 애매해진다.
+ *
+ * ★ 이 클래스가 화면 **둘**을 굴린다 — `mode: "download"` 는 "파일 다운",
+ *   `mode: "delete"` 는 마스터 전용 "파일 삭제". 목록·검색·묶기가 완전히 같아서
+ *   복제하면 한쪽만 고치는 사고가 난다. 갈리는 것은 행의 동작뿐이다:
+ *   받기 화면에는 ⬇ 와 ZIP 만, 지우기 화면에는 🗑 만 둔다.
  */
 
 import { onLangChange, t } from "../i18n/index.js";
+import { listUsers } from "../api/authApi.js";
 import {
   createZipTicket,
+  deleteStoredFiles,
   listStoredFiles,
   storedFileUrl,
   zipDownloadUrl,
@@ -23,10 +30,17 @@ import {
 import {
   groupSessions,
   parseCaptureName,
+  sessionKey,
   taskName,
   ungroupedFiles,
   type CaptureSession,
 } from "../core/sessionNaming.js";
+
+/** 받는 화면이냐 지우는 화면이냐. 목록은 같고 행의 동작만 갈린다. */
+export type FilesMode = "download" | "delete";
+
+/** 전 계정 보기. 서버는 이 값을 조회에서만 받는다(지우기는 계정 하나씩). */
+const ALL_ACCOUNTS = "*";
 
 type StoredFile = StoredCsvFile | StoredVideoFile;
 
@@ -55,7 +69,13 @@ function roleLabel(name: string): string {
 
 const VIDEO_EXT_RE = /\.(mp4|mov|m4v|avi|webm)$/i;
 
+/** 영상이면 `role` 이 있다. 확장자는 목록이 role 을 안 준 옛 파일용 보루. */
+function isVideoRow(row: StoredFile): row is StoredVideoFile {
+  return "role" in row || VIDEO_EXT_RE.test(row.name);
+}
+
 export class FilesPage {
+  private readonly mode: FilesMode;
   private readonly root: HTMLElement;
   private readonly subEl: HTMLElement;
   private readonly statusEl: HTMLElement;
@@ -74,8 +94,13 @@ export class FilesPage {
   private readonly looseHeadEl: HTMLElement;
   private readonly looseHintEl: HTMLElement;
   private readonly looseListEl: HTMLElement;
+  /** 마스터 전용 계정 필터. 일반 계정 화면에는 아예 없다. */
+  private readonly acctEl: HTMLSelectElement | null;
 
   private apiBase = "";
+  /** 지금 보고 있는 계정. `"*"` 는 전 계정, `""` 는 내 계정(헤더 스코프를 따름). */
+  private acct = "";
+  private acctLoaded = false;
   private tasks: CaptureSession[] = [];
   /** 도장이 없어 묶이지 않은 파일 — 개별 다운로드만 된다. */
   private loose: StoredFile[] = [];
@@ -89,25 +114,36 @@ export class FilesPage {
   private loading = false;
   private busy = false;
 
-  constructor(root: HTMLElement) {
+  constructor(root: HTMLElement, mode: FilesMode = "download") {
     this.root = root;
-    this.subEl = root.querySelector("#fdSub") as HTMLElement;
-    this.statusEl = root.querySelector("#fdStatus") as HTMLElement;
-    this.searchEl = root.querySelector("#fdSearch") as HTMLInputElement;
-    this.fromEl = root.querySelector("#fdFrom") as HTMLInputElement;
-    this.toEl = root.querySelector("#fdTo") as HTMLInputElement;
-    this.refreshBtn = root.querySelector("#fdRefresh") as HTMLButtonElement;
-    this.allEl = root.querySelector("#fdAll") as HTMLInputElement;
-    this.allLabelEl = root.querySelector("#fdAllLabel") as HTMLElement;
-    this.selEl = root.querySelector("#fdSel") as HTMLElement;
-    this.zipBtn = root.querySelector("#fdZip") as HTMLButtonElement;
-    this.countEl = root.querySelector("#fdCount") as HTMLElement;
-    this.listEl = root.querySelector("#fdList") as HTMLElement;
-    this.emptyEl = root.querySelector("#fdEmpty") as HTMLElement;
-    this.looseEl = root.querySelector("#fdLoose") as HTMLElement;
-    this.looseHeadEl = root.querySelector("#fdLooseHeading") as HTMLElement;
-    this.looseHintEl = root.querySelector("#fdLooseHint") as HTMLElement;
-    this.looseListEl = root.querySelector("#fdLooseList") as HTMLElement;
+    this.mode = mode;
+    // 화면이 둘이라 id 로는 못 고른다. 같은 마크업을 두 벌 두고 `data-fd` 로 찾는다.
+    const pick = <T extends HTMLElement>(key: string): T =>
+      root.querySelector(`[data-fd="${key}"]`) as T;
+    this.subEl = pick("sub");
+    this.statusEl = pick("status");
+    this.searchEl = pick<HTMLInputElement>("search");
+    this.fromEl = pick<HTMLInputElement>("from");
+    this.toEl = pick<HTMLInputElement>("to");
+    this.refreshBtn = pick<HTMLButtonElement>("refresh");
+    this.allEl = pick<HTMLInputElement>("all");
+    this.allLabelEl = pick("allLabel");
+    this.selEl = pick("sel");
+    this.zipBtn = pick<HTMLButtonElement>("zip");
+    this.countEl = pick("count");
+    this.listEl = pick("list");
+    this.emptyEl = pick("empty");
+    this.looseEl = pick("loose");
+    this.looseHeadEl = pick("looseHeading");
+    this.looseHintEl = pick("looseHint");
+    this.looseListEl = pick("looseList");
+    this.acctEl = root.querySelector('[data-fd="acct"]');
+    this.acctEl?.addEventListener("change", () => {
+      this.acct = this.acctEl?.value || "";
+      // 계정이 바뀌면 목록이 통째로 갈린다 — 남은 선택은 유령이 된다.
+      this.selected.clear();
+      void this.reload();
+    });
 
     this.refreshBtn.addEventListener("click", () => void this.reload());
     this.searchEl.addEventListener("input", () => {
@@ -122,7 +158,10 @@ export class FilesPage {
       });
     }
     this.allEl.addEventListener("change", () => this.toggleAll(this.allEl.checked));
-    this.zipBtn.addEventListener("click", () => void this.downloadZip(this.selectedTasks()));
+    this.zipBtn.addEventListener("click", () => {
+      if (this.mode === "delete") void this.deleteTasks(this.selectedTasks());
+      else void this.downloadZip(this.selectedTasks());
+    });
     onLangChange(() => this.syncCopy());
   }
 
@@ -133,7 +172,38 @@ export class FilesPage {
   show(): void {
     this.root.hidden = false;
     this.syncCopy();
+    void this.loadAccounts();
     void this.reload();
+  }
+
+  /**
+   * 계정 목록을 한 번만 채운다. 마스터가 아니면 셀렉트가 화면에 없고(`master-only`),
+   * 그때는 계정을 안 붙여 헤더의 조회 스코프를 그대로 따른다.
+   */
+  private async loadAccounts(): Promise<void> {
+    if (!this.acctEl || this.acctLoaded || !this.apiBase) return;
+    if (document.body.dataset.role !== "master") return;
+    this.acctLoaded = true;
+    try {
+      const users = await listUsers(this.apiBase);
+      this.acctEl.replaceChildren();
+      const all = document.createElement("option");
+      all.value = ALL_ACCOUNTS;
+      all.textContent = t("files_acct_all");
+      this.acctEl.append(all);
+      for (const u of users) {
+        const opt = document.createElement("option");
+        opt.value = u.id;
+        opt.textContent = u.id;
+        this.acctEl.append(opt);
+      }
+      this.acctEl.value = this.acct || ALL_ACCOUNTS;
+      this.acct = this.acctEl.value;
+      void this.reload();
+    } catch {
+      // 계정 목록을 못 받아도 화면은 산다 — 내 계정 것만 보인다.
+      this.acctLoaded = false;
+    }
   }
 
   hide(): void {
@@ -141,14 +211,17 @@ export class FilesPage {
   }
 
   private syncCopy(): void {
-    this.subEl.textContent = t("files_page_sub");
+    const del = this.mode === "delete";
+    this.subEl.textContent = t(del ? "purge_page_sub" : "files_page_sub");
     this.searchEl.placeholder = t("files_search_placeholder");
     this.refreshBtn.textContent = t("btn_results_refresh");
     this.allLabelEl.textContent = t("files_select_all");
-    this.zipBtn.textContent = t("files_zip_button");
+    this.zipBtn.textContent = t(del ? "purge_button" : "files_zip_button");
     this.emptyEl.textContent = t("files_empty_tasks");
     this.looseHeadEl.textContent = t("files_ungrouped_heading");
-    this.looseHintEl.textContent = t("files_ungrouped_hint");
+    this.looseHintEl.textContent = t(
+      this.mode === "delete" ? "purge_ungrouped_hint" : "files_ungrouped_hint",
+    );
     this.render();
   }
 
@@ -164,13 +237,13 @@ export class FilesPage {
     this.emptyEl.hidden = true;
     this.setStatus(t("files_loading"));
     try {
-      const list = await listStoredFiles(this.apiBase);
+      const list = await listStoredFiles(this.apiBase, this.acct || undefined);
       this.tasks = groupSessions(list.csv, list.videos);
       this.loose = ungroupedFiles(list.csv, list.videos);
-      // 목록에서 사라진 촬영은 선택도 풀어야 ZIP 요청에 유령 이름이 남지 않는다.
-      const alive = new Set(this.tasks.map((task) => task.stamp));
-      for (const stamp of [...this.selected]) {
-        if (!alive.has(stamp)) this.selected.delete(stamp);
+      // 목록에서 사라진 촬영은 선택도 풀어야 ZIP·삭제 요청에 유령 이름이 남지 않는다.
+      const alive = new Set(this.tasks.map(sessionKey));
+      for (const key of [...this.selected]) {
+        if (!alive.has(key)) this.selected.delete(key);
       }
       this.setStatus("");
       this.render();
@@ -186,7 +259,7 @@ export class FilesPage {
   /** 검색은 태스크 이름과 그 안의 파일명 모두에 걸린다. */
   private matches(task: CaptureSession): boolean {
     if (this.query) {
-      const hay = [taskName(task), ...taskFiles(task).map((row) => row.name)]
+      const hay = [task.userId, taskName(task), ...taskFiles(task).map((row) => row.name)]
         .join("\n")
         .toLowerCase();
       if (!hay.includes(this.query)) return false;
@@ -219,7 +292,7 @@ export class FilesPage {
   }
 
   private selectedTasks(): CaptureSession[] {
-    return this.tasks.filter((task) => this.selected.has(task.stamp));
+    return this.tasks.filter((task) => this.selected.has(sessionKey(task)));
   }
 
   private render(): void {
@@ -234,16 +307,17 @@ export class FilesPage {
     this.looseEl.hidden = this.loose.length === 0;
     this.looseListEl.replaceChildren();
     for (const row of this.loose) {
-      this.looseListEl.appendChild(this.fileRow(row));
+      this.looseListEl.appendChild(this.fileRow(row, true));
     }
 
     this.syncSelectionUi();
   }
 
   private taskRow(task: CaptureSession): HTMLElement {
+    const key = sessionKey(task);
     const li = document.createElement("li");
     li.className = "fd-task";
-    const open = this.expanded.has(task.stamp);
+    const open = this.expanded.has(key);
 
     const head = document.createElement("div");
     head.className = "fd-task-head";
@@ -251,12 +325,12 @@ export class FilesPage {
     const check = document.createElement("input");
     check.type = "checkbox";
     check.className = "fd-check";
-    check.checked = this.selected.has(task.stamp);
+    check.checked = this.selected.has(key);
     check.disabled = this.busy;
     check.setAttribute("aria-label", taskName(task));
     check.addEventListener("change", () => {
-      if (check.checked) this.selected.add(task.stamp);
-      else this.selected.delete(task.stamp);
+      if (check.checked) this.selected.add(key);
+      else this.selected.delete(key);
       this.syncSelectionUi();
     });
 
@@ -267,8 +341,8 @@ export class FilesPage {
     caret.setAttribute("aria-expanded", open ? "true" : "false");
     caret.setAttribute("aria-label", t(open ? "files_collapse" : "files_expand"));
     caret.addEventListener("click", () => {
-      if (this.expanded.has(task.stamp)) this.expanded.delete(task.stamp);
-      else this.expanded.add(task.stamp);
+      if (this.expanded.has(key)) this.expanded.delete(key);
+      else this.expanded.add(key);
       this.render();
     });
 
@@ -283,10 +357,14 @@ export class FilesPage {
     const sub = document.createElement("div");
     sub.className = "fd-task-sub";
     sub.textContent = [
+      // 어느 계정에서 찍은 촬영인지. 전 계정 목록에서만 값이 있다.
+      task.userId ? t("files_tag_account", { id: task.userId }) : "",
       task.when ? formatWhen(task.when.toISOString()) : task.stamp,
       task.csv ? t("files_tag_csv") : t("files_tag_no_csv"),
       t("files_tag_videos", { n: task.videos.length }),
-    ].join(" · ");
+    ]
+      .filter(Boolean)
+      .join(" · ");
     meta.append(name, sub);
 
     const warn = taskWarning(task);
@@ -303,14 +381,18 @@ export class FilesPage {
     size.className = "fd-task-size";
     size.textContent = formatSize(taskSize(task));
 
+    const del = this.mode === "delete";
     const zip = document.createElement("button");
     zip.type = "button";
-    zip.className = "fd-icon-btn";
-    zip.textContent = "⬇";
-    zip.title = t("files_task_zip");
-    zip.setAttribute("aria-label", `${t("files_task_zip")} ${taskName(task)}`);
+    zip.className = del ? "fd-icon-btn is-danger" : "fd-icon-btn";
+    zip.textContent = del ? "🗑" : "⬇";
+    zip.title = t(del ? "purge_task" : "files_task_zip");
+    zip.setAttribute("aria-label", `${zip.title} ${taskName(task)}`);
     zip.disabled = this.busy;
-    zip.addEventListener("click", () => void this.downloadZip([task]));
+    zip.addEventListener("click", () => {
+      if (del) void this.deleteTasks([task]);
+      else void this.downloadZip([task]);
+    });
 
     // 행 아무 데나 눌러도 펼쳐진다. 체크박스·버튼은 각자 처리한다.
     head.addEventListener("click", (ev) => {
@@ -329,10 +411,10 @@ export class FilesPage {
     return li;
   }
 
-  private fileRow(row: StoredFile): HTMLElement {
+  private fileRow(row: StoredFile, loose = false): HTMLElement {
     const li = document.createElement("li");
     li.className = "fd-file";
-    const isVideo = "role" in row || VIDEO_EXT_RE.test(row.name);
+    const isVideo = isVideoRow(row);
 
     const tag = document.createElement("span");
     tag.className = "fd-tag";
@@ -348,15 +430,6 @@ export class FilesPage {
     sub.className = "fd-row-sub";
     sub.textContent = [formatWhen(row.mtime), formatSize(row.size)].join(" · ");
     meta.append(name, sub);
-
-    const link = document.createElement("a");
-    link.className = "fd-icon-btn";
-    link.textContent = "⬇";
-    link.title = t("files_download");
-    link.setAttribute("aria-label", `${t("files_download")} ${row.name}`);
-    link.href = storedFileUrl(this.apiBase, row.url, true);
-    link.setAttribute("download", row.name);
-    link.rel = "noopener";
 
     li.append(tag, meta);
 
@@ -384,15 +457,39 @@ export class FilesPage {
       });
       li.appendChild(play);
     }
-    li.appendChild(link);
+    // 촬영으로 묶이지 않은 파일은 태스크 체크박스가 못 잡는다. 용량을 비우려면
+    // 이것들이야말로 지워야 하므로 여기서만 파일 단위 🗑 을 둔다.
+    if (loose && this.mode === "delete") {
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "fd-icon-btn is-danger";
+      del.textContent = "🗑";
+      del.title = t("purge_task");
+      del.setAttribute("aria-label", `${t("purge_task")} ${row.name}`);
+      del.disabled = this.busy;
+      del.addEventListener("click", () => void this.deleteLoose(row));
+      li.appendChild(del);
+    }
+    // 지우기 화면에는 받기가 없다. 지우기 전에 확인할 수 있게 ▶ 재생만 남긴다.
+    if (this.mode !== "delete") {
+      const link = document.createElement("a");
+      link.className = "fd-icon-btn";
+      link.textContent = "⬇";
+      link.title = t("files_download");
+      link.setAttribute("aria-label", `${t("files_download")} ${row.name}`);
+      link.href = storedFileUrl(this.apiBase, row.url, true);
+      link.setAttribute("download", row.name);
+      link.rel = "noopener";
+      li.appendChild(link);
+    }
     return li;
   }
 
   /** "모두 선택" — 지금 검색 결과로 보이는 촬영만 대상으로 한다. */
   private toggleAll(checked: boolean): void {
     for (const task of this.visibleTasks()) {
-      if (checked) this.selected.add(task.stamp);
-      else this.selected.delete(task.stamp);
+      if (checked) this.selected.add(sessionKey(task));
+      else this.selected.delete(sessionKey(task));
     }
     // 다시 그리지 않고 체크 상태만 맞춘다(펼침·스크롤 유지).
     this.listEl.querySelectorAll<HTMLInputElement>("input.fd-check").forEach((el) => {
@@ -404,7 +501,7 @@ export class FilesPage {
   /** 선택 개수·용량 표시와 버튼/전체선택 체크박스 상태를 현재 선택에 맞춘다. */
   private syncSelectionUi(): void {
     const visible = this.visibleTasks();
-    const visibleSelected = visible.filter((task) => this.selected.has(task.stamp)).length;
+    const visibleSelected = visible.filter((task) => this.selected.has(sessionKey(task))).length;
     this.allEl.disabled = visible.length === 0 || this.busy;
     this.allEl.checked = visible.length > 0 && visibleSelected === visible.length;
     this.allEl.indeterminate = visibleSelected > 0 && visibleSelected < visible.length;
@@ -415,6 +512,7 @@ export class FilesPage {
     this.selEl.textContent = picked.length
       ? t("files_selected_tasks", { n: picked.length, size: formatSize(total) })
       : t("files_selected_none");
+    this.zipBtn.classList.toggle("is-danger", this.mode === "delete");
     this.zipBtn.disabled = picked.length === 0 || this.busy;
   }
 
@@ -434,6 +532,79 @@ export class FilesPage {
     this.root.appendChild(frame);
     // 다운로드는 시작되고 나면 프레임과 무관하게 진행된다. 넉넉히 두고 치운다.
     window.setTimeout(() => frame.remove(), 120000);
+  }
+
+  /**
+   * 고른 촬영의 원본을 서버에서 지운다. **되돌릴 수 없다.**
+   *
+   * 계정별로 갈라서 보낸다 — 서버의 삭제 경로는 한 번에 계정 하나만 받는다
+   * (`targetAccount`). 같은 도장을 가진 남의 파일이 딸려가는 사고를 그 구조가 막는다.
+   * 분석 산출물과 DB 행은 남는다. 여기서 지우는 것은 back 디스크의 원본뿐이다.
+   */
+  private async deleteTasks(tasks: CaptureSession[]): Promise<void> {
+    if (this.busy) return;
+    if (tasks.length === 0) {
+      this.setStatus(t("purge_empty"), true);
+      return;
+    }
+    const total = tasks.reduce((sum, task) => sum + taskSize(task), 0);
+    if (!window.confirm(t("purge_confirm", { n: tasks.length, size: formatSize(total) }))) return;
+    await this.sendDelete(tasks.flatMap(taskFiles), total);
+  }
+
+  /** 도장이 없어 촬영으로 묶이지 않은 파일 하나. 여기서만 파일 단위로 지운다. */
+  private async deleteLoose(row: StoredFile): Promise<void> {
+    if (this.busy) return;
+    if (!window.confirm(t("purge_confirm_files", { n: 1, size: formatSize(row.size) }))) return;
+    await this.sendDelete([row], row.size);
+  }
+
+  /**
+   * 실제 삭제 요청. **계정별로 갈라서 보낸다** — 서버의 삭제 경로는 한 번에 계정
+   * 하나만 받는다(`targetAccount`). 같은 도장을 가진 남의 파일이 딸려가는 사고를
+   * 그 구조가 막는다.
+   */
+  private async sendDelete(rows: StoredFile[], totalSize: number): Promise<void> {
+    if (this.busy || rows.length === 0) return;
+    this.busy = true;
+    this.zipBtn.disabled = true;
+    this.allEl.disabled = true;
+    this.setStatus(t("purge_running"));
+    try {
+      const byAccount = new Map<string, StoredFile[]>();
+      for (const row of rows) {
+        const key = row.userId || "";
+        const list = byAccount.get(key) ?? [];
+        list.push(row);
+        byAccount.set(key, list);
+      }
+      let deleted = 0;
+      let failed = 0;
+      for (const [userId, group] of byAccount) {
+        const csv = group.filter((row) => !isVideoRow(row)).map((row) => row.name);
+        const videos = group
+          .filter(isVideoRow)
+          .map((row) => `${row.role === "sub" ? "sub" : "main"}/${row.name}`);
+        if (csv.length === 0 && videos.length === 0) continue;
+        const result = await deleteStoredFiles(
+          this.apiBase,
+          { csv, videos },
+          userId || undefined,
+        );
+        deleted += result.deleted.length;
+        failed += result.failed.length;
+      }
+      this.selected.clear();
+      const done = t("purge_done", { n: deleted, size: formatSize(totalSize) });
+      this.setStatus(failed > 0 ? `${done} ${t("purge_failed_n", { n: failed })}` : done, failed > 0);
+      await this.reload();
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      this.setStatus(`${t("purge_failed")}: ${detail}`, true);
+    } finally {
+      this.busy = false;
+      this.render();
+    }
   }
 
   /** 태스크 이름만 보낸다 — 어느 파일이 그 촬영의 것인지는 서버가 도장으로 찾는다. */

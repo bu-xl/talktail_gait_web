@@ -10,6 +10,8 @@ export type StoredCsvFile = {
   size: number;
   mtime: string;
   url: string;
+  /** 이 파일이 있는 계정 폴더. 전 계정 목록(`userId="*"`)에서 주인을 가른다. */
+  userId?: string;
 };
 
 export type StoredVideoFile = StoredCsvFile & {
@@ -24,8 +26,16 @@ export type StoredFilesList = {
   discarded: string[];
 };
 
-export async function listStoredFiles(apiBaseUrl: string): Promise<StoredFilesList> {
-  const res = await apiFetch(joinApiUrl(apiBaseUrl, "/api/files"));
+/**
+ * @param userId 마스터만 의미가 있다. `"*"` 면 전 계정을 한 목록으로 받는다.
+ *               생략하면 조회 스코프(헤더의 계정 선택)를 따른다.
+ */
+export async function listStoredFiles(
+  apiBaseUrl: string,
+  userId?: string,
+): Promise<StoredFilesList> {
+  const path = userId ? `/api/files?userId=${encodeURIComponent(userId)}` : "/api/files";
+  const res = await apiFetch(joinApiUrl(apiBaseUrl, path));
   if (!res.ok) throw new Error(`files HTTP ${res.status}`);
   const json = (await res.json()) as StoredFilesList;
   return {
@@ -234,8 +244,11 @@ export type DeleteResult = {
 export async function deleteStoredFiles(
   apiBaseUrl: string,
   files: { csv: string[]; videos: string[] },
+  userId?: string,
 ): Promise<DeleteResult> {
-  const res = await apiFetch(joinApiUrl(apiBaseUrl, "/api/files/delete"), {
+  // 쓰기 요청에는 조회 스코프가 붙지 않는다(`http.ts`). 남의 계정을 지우려면 여기서 명시한다.
+  const path = userId ? `/api/files/delete?userId=${encodeURIComponent(userId)}` : "/api/files/delete";
+  const res = await apiFetch(joinApiUrl(apiBaseUrl, path), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(files),

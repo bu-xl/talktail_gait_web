@@ -771,6 +771,15 @@
         background: var(--bg); overflow: hidden;
       }
       body[data-module="files"] #filesPage { display: flex; }
+      #purgePage {
+        flex: 1; min-height: 0; display: none; flex-direction: column;
+        background: var(--bg); overflow: hidden;
+      }
+      body[data-module="purge"] #purgePage { display: flex; }
+      /* 지우는 버튼은 받는 버튼과 색이 같으면 안 된다. */
+      .fd-zip.is-danger { background: var(--danger, #e5484d); border-color: var(--danger, #e5484d); }
+      .fd-icon-btn.is-danger { color: var(--danger, #e5484d); }
+      .fd-icon-btn.is-danger:hover:not(:disabled) { background: var(--danger, #e5484d); border-color: var(--danger, #e5484d); color: #fff; }
       #reportPage {
         flex: 1; min-height: 0; display: none; flex-direction: column;
         background: var(--bg); overflow: hidden;
@@ -809,13 +818,15 @@
       .fd-toolbar-extra {
         display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end;
       }
-      #fdSearch, #fdFrom, #fdTo {
+      #filesPage .fd-toolbar-extra input, #purgePage .fd-toolbar-extra input, .fd-acct {
         background: var(--bg); color: var(--fg);
         border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px;
         font: inherit; font-size: 13px;
       }
-      #fdSearch { width: min(280px, 42vw); }
-      #fdSearch:focus, #fdFrom:focus, #fdTo:focus {
+      #filesPage .fd-toolbar-extra input[type="search"],
+      #purgePage .fd-toolbar-extra input[type="search"] { width: min(280px, 42vw); }
+      #filesPage .fd-toolbar-extra input:focus,
+      #purgePage .fd-toolbar-extra input:focus, .fd-acct:focus {
         outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light);
       }
       .fd-date-sep { color: var(--muted); font-size: 13px; }
@@ -1964,6 +1975,7 @@
               <summary data-i18n-title="nav_more" title="더보기" aria-label="더보기">≡</summary>
               <div class="ah-menu-list">
                 <button type="button" data-module="files" data-i18n="nav_files">파일 다운</button>
+                <button type="button" class="master-only" data-module="purge" data-i18n="nav_purge">파일 삭제</button>
               <button type="button" data-module="csv" data-i18n="nav_csv">CSV 다운</button>
                 <button type="button" data-module="upload" data-i18n="nav_upload">직접 분석</button>
                 <button type="button" data-module="report" data-i18n="nav_report">리포트</button>
@@ -2458,36 +2470,75 @@
     <section id="filesPage" hidden aria-label="Stored files">
       <div class="rp-toolbar">
         <div class="rp-toolbar-text">
-          <h1 id="fdTitle" data-i18n="files_page_title">파일 다운</h1>
-          <p id="fdSub" data-i18n="files_page_sub">서버에 저장된 촬영을 한 건씩 내려받습니다.</p>
+          <h1 data-i18n="files_page_title">파일 다운</h1>
+          <p data-fd="sub" data-i18n="files_page_sub">서버에 저장된 촬영을 한 건씩 내려받습니다.</p>
         </div>
         <div class="fd-toolbar-extra">
-          <input id="fdSearch" type="search" autocomplete="off" data-i18n-title="files_search_placeholder" placeholder="반려견 이름·파일명 검색" />
-          <input id="fdFrom" type="date" data-i18n-title="files_date_from" title="시작 날짜" />
+          <select data-fd="acct" class="fd-acct master-only" data-i18n-title="files_acct_label" title="계정"></select>
+          <input data-fd="search" type="search" autocomplete="off" data-i18n-title="files_search_placeholder" placeholder="반려견 이름·파일명 검색" />
+          <input data-fd="from" type="date" data-i18n-title="files_date_from" title="시작 날짜" />
           <span class="fd-date-sep">~</span>
-          <input id="fdTo" type="date" data-i18n-title="files_date_to" title="끝 날짜" />
-          <button type="button" id="fdRefresh" data-i18n="btn_results_refresh">새로고침</button>
+          <input data-fd="to" type="date" data-i18n-title="files_date_to" title="끝 날짜" />
+          <button type="button" data-fd="refresh" data-i18n="btn_results_refresh">새로고침</button>
         </div>
       </div>
-      <p id="fdStatus" class="fd-status"></p>
+      <p data-fd="status" class="fd-status"></p>
       <div class="fd-actions">
         <label class="fd-selectall">
-          <input type="checkbox" id="fdAll" />
-          <span id="fdAllLabel" data-i18n="files_select_all">모두 선택</span>
+          <input type="checkbox" data-fd="all" />
+          <span data-fd="allLabel" data-i18n="files_select_all">모두 선택</span>
         </label>
-        <span id="fdCount" class="fd-col-count"></span>
-        <span id="fdSel" class="fd-sel"></span>
-        <button type="button" id="fdZip" class="fd-zip" disabled data-i18n="files_zip_button">선택 촬영 ZIP 받기</button>
+        <span data-fd="count" class="fd-col-count"></span>
+        <span data-fd="sel" class="fd-sel"></span>
+        <button type="button" data-fd="zip" class="fd-zip" disabled data-i18n="files_zip_button">선택 촬영 ZIP 받기</button>
       </div>
       <div class="fd-scroll">
-        <p id="fdEmpty" class="fd-empty" data-i18n="files_empty_tasks">저장된 촬영이 없습니다.</p>
-        <ul id="fdList" class="fd-list"></ul>
-        <section id="fdLoose" class="fd-loose" hidden aria-labelledby="fdLooseHeading">
-          <div class="section" id="fdLooseHeading" data-i18n="files_ungrouped_heading">분류 안 됨</div>
-          <p id="fdLooseHint" class="fd-loose-hint" data-i18n="files_ungrouped_hint">
+        <p data-fd="empty" class="fd-empty" data-i18n="files_empty_tasks">저장된 촬영이 없습니다.</p>
+        <ul data-fd="list" class="fd-list"></ul>
+        <section data-fd="loose" class="fd-loose" hidden aria-labelledby="fdLooseHeading">
+          <div class="section" id="fdLooseHeading" data-fd="looseHeading" data-i18n="files_ungrouped_heading">분류 안 됨</div>
+          <p data-fd="looseHint" class="fd-loose-hint" data-i18n="files_ungrouped_hint">
             파일명에 도장이 없어 촬영으로 묶이지 않습니다. 개별로만 받을 수 있습니다.
           </p>
-          <ul id="fdLooseList" class="fd-list"></ul>
+          <ul data-fd="looseList" class="fd-list"></ul>
+        </section>
+      </div>
+    </section>
+
+    <section id="purgePage" hidden aria-label="Delete stored files">
+      <div class="rp-toolbar">
+        <div class="rp-toolbar-text">
+          <h1 data-i18n="purge_page_title">파일 삭제</h1>
+          <p data-fd="sub" data-i18n="purge_page_sub">서버 용량을 비웁니다. 지운 원본은 되돌릴 수 없습니다.</p>
+        </div>
+        <div class="fd-toolbar-extra">
+          <select data-fd="acct" class="fd-acct master-only" data-i18n-title="files_acct_label" title="계정"></select>
+          <input data-fd="search" type="search" autocomplete="off" data-i18n-title="files_search_placeholder" placeholder="반려견 이름·파일명 검색" />
+          <input data-fd="from" type="date" data-i18n-title="files_date_from" title="시작 날짜" />
+          <span class="fd-date-sep">~</span>
+          <input data-fd="to" type="date" data-i18n-title="files_date_to" title="끝 날짜" />
+          <button type="button" data-fd="refresh" data-i18n="btn_results_refresh">새로고침</button>
+        </div>
+      </div>
+      <p data-fd="status" class="fd-status"></p>
+      <div class="fd-actions">
+        <label class="fd-selectall">
+          <input type="checkbox" data-fd="all" />
+          <span data-fd="allLabel" data-i18n="files_select_all">모두 선택</span>
+        </label>
+        <span data-fd="count" class="fd-col-count"></span>
+        <span data-fd="sel" class="fd-sel"></span>
+        <button type="button" data-fd="zip" class="fd-zip" disabled data-i18n="purge_button">선택 촬영 삭제</button>
+      </div>
+      <div class="fd-scroll">
+        <p data-fd="empty" class="fd-empty" data-i18n="files_empty_tasks">저장된 촬영이 없습니다.</p>
+        <ul data-fd="list" class="fd-list"></ul>
+        <section data-fd="loose" class="fd-loose" hidden aria-labelledby="pgLooseHeading">
+          <div class="section" id="pgLooseHeading" data-fd="looseHeading" data-i18n="files_ungrouped_heading">분류 안 됨</div>
+          <p data-fd="looseHint" class="fd-loose-hint" data-i18n="files_ungrouped_hint">
+            파일명에 도장이 없어 촬영으로 묶이지 않습니다. 개별로만 받을 수 있습니다.
+          </p>
+          <ul data-fd="looseList" class="fd-list"></ul>
         </section>
       </div>
     </section>
