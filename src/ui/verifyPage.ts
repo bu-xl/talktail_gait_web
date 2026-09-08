@@ -37,6 +37,12 @@ import {
 type Session = CaptureSession;
 
 /**
+ * 확인 모달이 묻는 것. 셋 다 되묻는 이유가 다르다 —
+ * 삭제는 되돌릴 수 없어서, 버리기/되살리기는 목록이 통째로 옮겨 다녀서.
+ */
+type ConfirmMode = "delete" | "discard" | "restore";
+
+/**
  * CSV 와 영상 길이가 이만큼 넘게 어긋나면 눈에 띄게 표시한다.
  *
  * 매트가 카메라보다 조금 먼저 켜지고 늦게 꺼지므로 영상이 CSV 보다 1 초쯤 짧은 것은
@@ -63,17 +69,22 @@ export class VerifyPage {
   private readonly refreshBtn: HTMLButtonElement;
   private readonly analyzeBtn: HTMLButtonElement;
   private readonly modalEl: HTMLElement;
+  private readonly modalTitleEl: HTMLElement;
   private readonly modalHintEl: HTMLElement;
   private readonly modalListEl: HTMLElement;
   private readonly modalCancelBtn: HTMLButtonElement;
   private readonly modalConfirmBtn: HTMLButtonElement;
   /** 확인 모달이 겨냥하고 있는 촬영. 닫히면 null. */
   private pendingDelete: Session | null = null;
+  /** 확인 모달이 무엇을 묻고 있는지. 문구와 확인 동작이 여기서 갈린다. */
+  private pendingMode: ConfirmMode = "delete";
   private deleting = false;
 
   private readonly tabLiveBtn: HTMLButtonElement;
   private readonly tabDiscardedBtn: HTMLButtonElement;
   private readonly purgeBtn: HTMLButtonElement;
+  private readonly dayEl: HTMLInputElement;
+  private readonly selectAllBtn: HTMLButtonElement;
 
   private apiBase = "";
   /** 서버가 준 전체 목록. 화면에는 탭으로 걸러 낸 것만 보인다. */
@@ -81,6 +92,8 @@ export class VerifyPage {
   /** 버려진 촬영의 도장. 소프트 삭제라 파일은 그대로 있고 표시만 다르다. */
   private discarded = new Set<string>();
   private tab: "live" | "discarded" = "live";
+  /** 날짜 필터(YYYY-MM-DD). 빈 문자열이면 전체를 보여준다. */
+  private day = "";
   private sessions: Session[] = [];
   private selected: string | null = null;
   private loading = false;
@@ -102,6 +115,7 @@ export class VerifyPage {
     this.analyzeBtn = root.querySelector("#dvAnalyze") as HTMLButtonElement;
 
     this.modalEl = root.querySelector("#dvDelModal") as HTMLElement;
+    this.modalTitleEl = root.querySelector("#dvDelTitle") as HTMLElement;
     this.modalHintEl = root.querySelector("#dvDelHint") as HTMLElement;
     this.modalListEl = root.querySelector("#dvDelList") as HTMLElement;
     this.modalCancelBtn = root.querySelector("#dvDelCancel") as HTMLButtonElement;
@@ -114,10 +128,21 @@ export class VerifyPage {
     this.tabDiscardedBtn.addEventListener("click", () => this.setTab("discarded"));
     this.purgeBtn.addEventListener("click", () => void this.purgeDiscarded());
 
+    this.dayEl = root.querySelector("#dvDay") as HTMLInputElement;
+    this.selectAllBtn = root.querySelector("#dvSelectAll") as HTMLButtonElement;
+    this.dayEl.addEventListener("change", () => {
+      this.day = this.dayEl.value;
+      // 안 보이는 촬영이 선택된 채로 남으면 "선택 n건" 이 거짓말이 된다.
+      this.picked.clear();
+      this.applyTab();
+      this.render();
+    });
+    this.selectAllBtn.addEventListener("click", () => this.toggleSelectAll());
+
     this.refreshBtn.addEventListener("click", () => void this.reload());
     this.analyzeBtn.addEventListener("click", () => void this.runAnalyze());
     this.modalCancelBtn.addEventListener("click", () => this.closeDeleteModal());
-    this.modalConfirmBtn.addEventListener("click", () => void this.runDelete());
+    this.modalConfirmBtn.addEventListener("click", () => void this.runConfirm());
     // 바깥을 눌러도 닫힌다. 지우는 중에는 닫지 않는다.
     this.modalEl.addEventListener("click", (ev) => {
       if (ev.target === this.modalEl) this.closeDeleteModal();
@@ -194,7 +219,9 @@ export class VerifyPage {
 
   private applyTab(): void {
     const wantDiscarded = this.tab === "discarded";
-    this.sessions = this.allSessions.filter((s) => this.discarded.has(s.stamp) === wantDiscarded);
+    this.sessions = this.allSessions.filter(
+      (s) => this.discarded.has(s.stamp) === wantDiscarded && (!this.day || sessionDay(s) === this.day),
+    );
     if (this.selected && !this.sessions.some((s) => s.stamp === this.selected)) this.selected = null;
     if (!this.selected && this.sessions.length > 0) this.selected = this.sessions[0].stamp;
   }
@@ -332,6 +359,32 @@ export class VerifyPage {
     this.analyzeBtn.textContent = n === 0
       ? t("verify_analyze_btn")
       : t("verify_analyze_n", { n: String(n) });
+
+    // 전체선택은 지금 보이는 목록만 겨냥한다 — 날짜 필터가 걸려 있으면 그 날짜만 잡힌다.
+    const targets = this.selectableSessions();
+    this.selectAllBtn.hidden = this.tab !== "live" || targets.length === 0;
+    this.selectAllBtn.disabled = this.analyzing;
+    this.selectAllBtn.textContent = this.allPicked(targets) ? t("verify_select_none") : t("verify_select_all");
+  }
+
+  private selectableSessions(): Session[] {
+    return this.sessions.filter((s) => this.canAnalyze(s));
+  }
+
+  private allPicked(targets: Session[]): boolean {
+    return targets.length > 0 && targets.every((s) => this.picked.has(s.stamp));
+  }
+
+  /** 보이는 목록을 통째로 켜고 끈다. 이미 다 켜져 있으면 끈다. */
+  private toggleSelectAll(): void {
+    const targets = this.selectableSessions();
+    if (targets.length === 0) return;
+    const off = this.allPicked(targets);
+    for (const s of targets) {
+      if (off) this.picked.delete(s.stamp);
+      else this.picked.add(s.stamp);
+    }
+    this.render();
   }
 
   private sessionRow(s: Session): HTMLElement {
@@ -406,13 +459,15 @@ export class VerifyPage {
     delBtn.type = "button";
     delBtn.className = "dv-del-btn";
     delBtn.textContent = t("verify_del_button");
-    delBtn.addEventListener("click", () => this.openDeleteModal(s));
+    delBtn.addEventListener("click", () => this.openConfirm(s, "delete"));
     // 소프트 삭제 토글 — 현장에서 버린 것을 여기서 되살릴 수 있다.
     const discardBtn = document.createElement("button");
     discardBtn.type = "button";
     discardBtn.className = "dv-del-btn";
     discardBtn.textContent = this.discarded.has(s.stamp) ? t("verify_restore_btn") : t("verify_discard_btn");
-    discardBtn.addEventListener("click", () => void this.toggleDiscard(s));
+    discardBtn.addEventListener("click", () =>
+      this.openConfirm(s, this.discarded.has(s.stamp) ? "restore" : "discard"),
+    );
     const headRow = document.createElement("div");
     headRow.className = "dv-detail-head";
     headRow.append(head, discardBtn, delBtn);
@@ -516,29 +571,76 @@ export class VerifyPage {
 
   /* ─────────────── 삭제 ─────────────── */
 
-  /** 무엇이 지워지는지 전부 보여주고 확인을 받는다. 되돌릴 수 없기 때문이다. */
-  private openDeleteModal(s: Session): void {
+  /**
+   * 되묻는 창 하나로 삭제·버리기·되살리기를 다 받는다.
+   *
+   * 삭제일 때만 파일 목록을 편다 — 무엇이 사라지는지 눈으로 봐야 하기 때문이다.
+   * 버리기/되살리기는 파일이 그대로 있으므로 목록이 오히려 겁을 준다.
+   */
+  private openConfirm(s: Session, mode: ConfirmMode): void {
     this.pendingDelete = s;
+    this.pendingMode = mode;
+    const when = s.when ? `${formatDay(s.when)} ${formatClock(s.when)}` : s.stamp;
+    const dog = s.dog || "—";
     const files = [...(s.csv ? [s.csv] : []), ...s.videos];
-    const total = files.reduce((sum, f) => sum + (Number(f.size) || 0), 0);
-    this.modalHintEl.textContent = t("verify_del_hint", {
-      when: s.when ? `${formatDay(s.when)} ${formatClock(s.when)}` : s.stamp,
-      dog: s.dog || "—",
-      n: String(files.length),
-      size: formatSize(total),
-    });
-    this.modalListEl.replaceChildren();
-    for (const f of files) {
-      const li = document.createElement("li");
-      li.textContent = f.name;
-      li.title = f.name;
-      this.modalListEl.appendChild(li);
+
+    if (mode === "delete") {
+      const total = files.reduce((sum, f) => sum + (Number(f.size) || 0), 0);
+      this.modalTitleEl.textContent = t("verify_del_title");
+      this.modalHintEl.textContent = t("verify_del_hint", {
+        when,
+        dog,
+        n: String(files.length),
+        size: formatSize(total),
+      });
+      this.modalListEl.replaceChildren();
+      for (const f of files) {
+        const li = document.createElement("li");
+        li.textContent = f.name;
+        li.title = f.name;
+        this.modalListEl.appendChild(li);
+      }
+      this.modalListEl.hidden = false;
+      this.modalConfirmBtn.disabled = files.length === 0;
+    } else {
+      this.modalTitleEl.textContent = t(mode === "discard" ? "verify_discard_title" : "verify_restore_title");
+      this.modalHintEl.textContent = t(mode === "discard" ? "verify_discard_hint" : "verify_restore_hint", { when, dog });
+      this.modalListEl.replaceChildren();
+      this.modalListEl.hidden = true;
+      this.modalConfirmBtn.disabled = false;
     }
-    this.modalConfirmBtn.disabled = files.length === 0;
-    this.modalConfirmBtn.textContent = t("verify_del_confirm");
+    this.modalConfirmBtn.classList.toggle("danger", mode === "delete");
+    this.modalConfirmBtn.textContent = this.confirmLabel();
     this.modalEl.hidden = false;
     // 위험한 버튼에 처음부터 포커스가 가지 않게 취소에 둔다.
     this.modalCancelBtn.focus();
+  }
+
+  private confirmLabel(): string {
+    if (this.pendingMode === "discard") return t("verify_discard_confirm");
+    if (this.pendingMode === "restore") return t("verify_restore_confirm");
+    return t("verify_del_confirm");
+  }
+
+  /** 모달의 확인 버튼 — 모드별로 갈라진다. */
+  private async runConfirm(): Promise<void> {
+    if (this.pendingMode === "delete") {
+      await this.runDelete();
+      return;
+    }
+    const s = this.pendingDelete;
+    if (!s || this.deleting) return;
+    this.deleting = true;
+    this.modalConfirmBtn.disabled = true;
+    this.modalCancelBtn.disabled = true;
+    try {
+      await this.toggleDiscard(s);
+    } finally {
+      this.deleting = false;
+      this.modalCancelBtn.disabled = false;
+      this.modalConfirmBtn.disabled = false;
+      this.closeDeleteModal();
+    }
   }
 
   private closeDeleteModal(): void {
@@ -579,7 +681,7 @@ export class VerifyPage {
       this.deleting = false;
       this.modalCancelBtn.disabled = false;
       this.modalConfirmBtn.disabled = false;
-      this.modalConfirmBtn.textContent = t("verify_del_confirm");
+      this.modalConfirmBtn.textContent = this.confirmLabel();
     }
   }
 
@@ -656,6 +758,13 @@ export class VerifyPage {
     card.append(label, video, meta, name, link);
     return card;
   }
+}
+
+/** 목록의 날짜 기준. 날짜 input 이 주는 YYYY-MM-DD 와 같은 모양이다. */
+function sessionDay(s: Session): string {
+  if (s.when) return formatDay(s.when);
+  const p = s.stamp.slice(0, 6);
+  return p.length === 6 ? `20${p.slice(0, 2)}-${p.slice(2, 4)}-${p.slice(4, 6)}` : "";
 }
 
 function formatDay(d: Date): string {

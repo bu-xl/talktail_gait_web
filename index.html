@@ -468,6 +468,7 @@
         font-size: 12px; color: var(--muted);
       }
       .dv-del-list li { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .dv-del-list[hidden] { display: none; }
       #dvDelModal .dialog-foot {
         display: flex; gap: 8px; justify-content: flex-end; padding: 12px 18px;
       }
@@ -479,6 +480,11 @@
       }
       .dv-tab.is-active { color: var(--fg); border-color: var(--primary); font-weight: 700; }
       .dv-purge { color: var(--danger, #eb463c); border-color: var(--danger, #eb463c); }
+      .dv-day-input {
+        padding: 5px 8px; margin-right: 8px; border-radius: 8px;
+        border: 1px solid var(--border); background: var(--surface);
+        color: var(--fg); font-size: 13px;
+      }
       .dv-item.is-discarded .dv-item-dog { text-decoration: line-through; opacity: .7; }
       #dvDelModal .dialog-foot button { min-width: 104px; }
       #dvDelModal .dialog-foot button.danger {
@@ -2311,6 +2317,9 @@
             <button type="button" id="dvTabLive" class="dv-tab is-active" data-i18n="verify_tab_live">살아있는 촬영</button>
             <button type="button" id="dvTabDiscarded" class="dv-tab" data-i18n="verify_tab_discarded">버린 촬영</button>
           </div>
+          <!-- 날짜 하나로 목록을 좁힌다. 비워 두면 전체. -->
+          <input type="date" id="dvDay" class="dv-day-input" />
+          <button type="button" id="dvSelectAll" data-i18n="verify_select_all">전체선택</button>
           <span id="dvCount" class="fd-col-count"></span>
           <button type="button" id="dvAnalyze" data-i18n="verify_analyze_btn" disabled>선택 분석하기</button>
           <button type="button" id="dvPurge" class="dv-purge" data-i18n="verify_purge_btn" hidden>버린 촬영 전체 삭제</button>
