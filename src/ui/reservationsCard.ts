@@ -76,7 +76,8 @@ function todayKst(): string {
 export class ReservationsCard {
   private apiBase = "";
   private rows: Reservation[] = [];
-  private filter: Filter = "all";
+  /** 현장에서 먼저 보는 것은 아직 안 찍은 사람이다 — "전체" 로 열면 끝난 예약이 섞인다. */
+  private filter: Filter = "waiting";
   private date: string = todayKst();
   private loading = false;
 

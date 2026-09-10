@@ -109,6 +109,7 @@ import { StoragePage } from "../ui/storagePage.js";
 import { AccountsPage } from "../ui/accountsPage.js";
 import { wireMyPage } from "../ui/myPage.js";
 import { fetchMe, listUsers, logout, type AuthUser } from "../api/authApi.js";
+import { ageLabel, sexLabel } from "../api/reservationsApi.js";
 import { getViewScope, setViewScope } from "../api/http.js";
 import { requireLogin, watchSessionExpiry } from "../auth/loginGate.js";
 import { APP_VERSION } from "../version.js";
@@ -645,9 +646,19 @@ async function boot(): Promise<void> {
         id.className = "dp-id";
         id.textContent = `#${selectedDog.id}`;
         const label = document.createElement("span");
-        label.textContent =
-          `${selectedDog.name} · ${selectedDog.weightKg}kg` +
-          (selectedDog.breed ? ` · ${selectedDog.breed}` : "");
+        // 카드는 `#id 이름` 만 낸다. 개체 정보를 읽는 곳은 여기 한 줄뿐이라
+        // 등록일까지 전부 적는다 — 같은 이름이 여럿일 때 등록일이 마지막 단서다.
+        label.textContent = [
+          selectedDog.name,
+          `${selectedDog.weightKg}kg`,
+          selectedDog.heightCm != null ? `${selectedDog.heightCm}cm` : null,
+          selectedDog.breed,
+          ageLabel(selectedDog.birthMonth),
+          sexLabel(selectedDog.sex, selectedDog.neutered),
+          selectedDog.createdAt ? `${selectedDog.createdAt.slice(0, 10)} 등록` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ");
         el.append(id, label);
       } else {
         el.textContent = t("session_need_dog");
@@ -668,8 +679,7 @@ async function boot(): Promise<void> {
   dogPresets.setApiBase(apiBase);
   void dogPresets.refresh();
   onLangChange(() => dogPresets.renderLabels());
-  // 처음 그릴 때부터 "반려견을 고르세요" 가 보여야 한다.
-  renderSelectedDog();
+  // 처음 그리는 것은 applyDogIdentityGate 정의 뒤에서 한다 — 아래 참조.
 
   /**
    * 예약 현황 — 현장 QR 로 들어온 신청자.
@@ -866,6 +876,10 @@ async function boot(): Promise<void> {
     // 상단 토스트는 띄우지 않는다 — 시작 버튼 비활성화로 충분하다.
     dismissTopToast("dog-identity");
   };
+
+  // 처음 그릴 때부터 "반려견을 고르세요" 가 보여야 한다. 여기서 부른다 —
+  // renderSelectedDog 가 applyDogIdentityGate 를 쓰므로 그 정의보다 앞이면 TDZ 로 죽는다.
+  renderSelectedDog();
 
   /** 완료를 기다리는 분석 잡들 — WS `analyze_done` 을 놓쳤을 때의 백그라운드 폴링 폴백. */
   const watchedJobs = new Set<string>();

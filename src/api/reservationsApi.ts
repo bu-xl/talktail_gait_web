@@ -22,6 +22,8 @@ export interface Reservation {
   dogName: string;
   dogWeightKg: number;
   dogBreed: string | null;
+  /** 선택 입력. 비면 개체도 `heightCm = null` 로 발급되고 현장에서 채운다. */
+  dogHeightCm: number | null;
   /** `YYYY-MM`. 나이는 화면에서 계산한다 — 저장해 두면 1년 뒤 틀린 값이 된다. */
   dogBirthMonth: string | null;
   dogSex: "male" | "female" | null;

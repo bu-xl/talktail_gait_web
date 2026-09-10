@@ -33,6 +33,8 @@ interface Payload {
   dogName: string;
   dogWeightKg: number;
   dogBreed: string;
+  /** 선택. 모르는 사람이 많아 필수로 받지 않는다 — 비면 null 이고 현장에서 채운다. */
+  dogHeightCm: number | null;
   dogBirthMonth: string;
   dogSex: string;
   dogNeutered: boolean;
@@ -116,6 +118,13 @@ function collect(): Payload | { field: string; message: string } {
   const dogBreed = value("rBreed");
   if (!dogBreed) return { field: "rBreed", message: "견종을 입력해 주세요. 모르시면 '믹스'로 적어 주세요." };
 
+  // 키는 선택이다. 적었으면 숫자여야 한다 — 오타를 조용히 버리지 않는다.
+  const rawHeight = value("rHeight");
+  const dogHeightCm = rawHeight ? Number(rawHeight) : null;
+  if (dogHeightCm != null && (!Number.isFinite(dogHeightCm) || dogHeightCm <= 0)) {
+    return { field: "rHeight", message: "키를 숫자로 입력해 주세요. 모르면 비워 두세요." };
+  }
+
   const dogBirthMonth = value("rBirth");
   if (!dogBirthMonth) return { field: "rBirth", message: "생년월을 골라 주세요." };
   // 미래 생년월은 오타다. 서버도 같은 규칙으로 다시 본다.
@@ -146,6 +155,7 @@ function collect(): Payload | { field: string; message: string } {
     dogName,
     dogWeightKg: weight,
     dogBreed,
+    dogHeightCm,
     dogBirthMonth,
     dogSex,
     dogNeutered: neutered === "1",

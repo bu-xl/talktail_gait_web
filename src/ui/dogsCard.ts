@@ -15,7 +15,6 @@ import {
   listDogs,
   type Dog,
 } from "../api/dogsApi.js";
-import { ageLabel, sexLabel } from "../api/reservationsApi.js";
 import { t } from "../i18n/index.js";
 
 const COLLAPSE_KEY = "gait.quickCollapsed";
@@ -223,8 +222,9 @@ export class DogPresetsCard {
 
     // ★ 등록 **전에** 묻는다. 만들고 나서 알리면 취소할 방법이 없다 —
     //   목록을 이미 들고 있으므로 서버에 한 번 더 물어볼 이유도 없다.
+    // 견종까지 같아야 중복 후보다 — 이름·몸무게가 같아도 견종이 다르면 다른 개다.
     const matches = this.presets.filter(
-      (d) => d.name === name && Number(d.weightKg) === weightKg,
+      (d) => d.name === name && Number(d.weightKg) === weightKg && d.breed === breed,
     );
     if (matches.length && !(await askDuplicate(matches))) return;
 
@@ -283,18 +283,9 @@ export class DogPresetsCard {
 
       const meta = document.createElement("span");
       meta.className = "dp-meta";
-      // 같은 이름이 여럿일 수 있으므로 몸무게까지 보여 줘야 고를 수 있다.
-      // 그래도 안 갈리면 `#id` 가 최종 근거다 — 개체를 가르는 것은 결국 id 다.
-      meta.textContent = [
-        `#${preset.id}`,
-        `${preset.weightKg}kg`,
-        preset.heightCm != null ? `${preset.heightCm}cm` : null,
-        preset.breed,
-        ageLabel(preset.birthMonth),
-        sexLabel(preset.sex, preset.neutered),
-      ]
-        .filter(Boolean)
-        .join(" · ");
+      // 카드에는 **id 와 이름만**. 몸무게·견종·나이까지 한 줄에 이어 붙이면 읽을 수가
+      // 없고, 카드의 일은 고르는 것뿐이다. 고른 뒤 상세는 아래 "선택한 반려견" 줄이 낸다.
+      meta.textContent = `#${preset.id}`;
 
       pick.append(name, meta);
 
