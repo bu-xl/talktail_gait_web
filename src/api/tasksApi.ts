@@ -64,6 +64,28 @@ export type DeleteTasksResult = {
 };
 
 /**
+ * 회차를 다른 개체로 옮긴다 (§3-1 정정) — 개를 잘못 골라 찍었을 때.
+ *
+ * 서버가 폴더와 파일명 안의 dogId 까지 함께 바꾼다. **분석이 끝난 회차는 409 로 막힌다** —
+ * 산출물은 ai-server 디스크에 있어 back 이 못 옮긴다.
+ */
+export async function moveTaskDog(
+  apiBaseUrl: string,
+  id: string,
+  dogId: number,
+): Promise<void> {
+  const res = await apiFetch(joinApiUrl(apiBaseUrl, `/api/tasks/${encodeURIComponent(id)}/dog`), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ dogId }),
+  });
+  if (!res.ok) {
+    const json = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(json?.error || `HTTP ${res.status}`);
+  }
+}
+
+/**
  * 회차 통삭제 — 원본 폴더 + ai-server 산출물 + DB 행을 한 번에 지운다.
  *
  * **되돌릴 수 없다.** "파일 다운" 화면의 삭제와 달리 분석 결과까지 사라진다.

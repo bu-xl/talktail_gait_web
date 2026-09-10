@@ -791,8 +791,9 @@ async function boot(): Promise<void> {
       csvRetryBtn.hidden = !pressureCsv.canRetry();
       csvRetryBtn.disabled = pressureCsv.state() === "uploading";
     }
-    // 버리기는 업로드가 끝나기를 기다리지 않는다 — 도장에 표시해 두면 늦게 도착한
-    // 파일도 같은 취급을 받는다. 기다리게 하는 순간 7번을 만든 이유가 사라진다.
+    // 버리기는 업로드가 끝나기를 기다리지 않는다 — 표시는 회차 행
+    // (`gait_sessions.discarded_at`)에 남으므로 늦게 도착한 파일도 같은 취급을 받는다.
+    // 기다리게 하는 순간 7번을 만든 이유가 사라진다.
     confirmDiscardBtn.disabled = confirmBusy;
   };
 
@@ -1042,11 +1043,11 @@ async function boot(): Promise<void> {
    * "버리기" — 이번 촬영을 통째로 버린다(소프트 삭제).
    *
    * 개가 안 뛰거나 딴 데로 새면 그 회차는 쓸모가 없다. 나중에 파일 목록에서 찾아
-   * 지우려면 반복 시행이 끊기므로 그 자리에서 버린다. 파일은 지우지 않고 도장에
-   * 표시만 하며, 되살리기·영구 삭제는 데이터 검증 화면에서 한다.
+   * 지우려면 반복 시행이 끊기므로 그 자리에서 버린다. 파일은 지우지 않고 회차 행에
+   * `discarded_at` 만 찍으며(§3-17-1), 되살리기·영구 삭제는 데이터 검증 화면에서 한다.
    *
    * ★ 업로드가 진행 중이어도 막지 않는다. 폰에는 `retake` 로 업로드를 끊으라고 알리고,
-   *   그래도 늦게 도착하는 파일은 서버가 도장을 보고 같은 취급을 한다.
+   *   그래도 늦게 도착하는 파일은 `sessionId` 로 자기 행을 찾아가 같은 취급을 받는다.
    */
   const onDiscardTake = (): void => {
     if (confirmBusy) return;
@@ -1069,7 +1070,7 @@ async function boot(): Promise<void> {
       try {
         if (jobId) await skipAiForJob(jobId);
       } catch {
-        /* 잡 취소 실패는 버리기를 막지 않는다 — 도장 표시가 본체다 */
+        /* 잡 취소 실패는 버리기를 막지 않는다 — `discarded_at` 표시가 본체다 */
       }
       try {
         if (sessionId) await discardSession(apiBase, sessionId);
@@ -1201,9 +1202,7 @@ async function boot(): Promise<void> {
     onPick: async (ref) => {
       const detail = await getResultDetail(apiBase, ref.date, ref.session.stem);
       clearReviewPanes();
-      if (detail.original?.url || detail.backOriginal?.url) {
-        setOriginVideo(detail.original?.url || detail.backOriginal?.url || null);
-      }
+      if (detail.backOriginal?.url) setOriginVideo(detail.backOriginal.url);
       setAnalysisVideo(detail.video?.url ?? null);
       setMaxMinVideo(detail.report?.angle_pawy?.url ?? null);
       setPressureMedia(detail.report?.pressure?.url ?? null);

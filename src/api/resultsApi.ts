@@ -82,8 +82,10 @@ export type ResultDetail = {
   displayDate: string;
   session: ResultSession;
   video: MediaArtifact & { filename: string };
-  original?: MediaArtifact;
-  /** back/uploads 원본 (DB back_original_path). */
+  /**
+   * back/uploads 원본 (DB back_original_path). **원본은 back 에만 있다** —
+   * ai-server 는 원본을 보관하지 않는다(§3-19).
+   */
   backOriginal?: MediaArtifact;
   /** 연결된 압력 CSV (DB gait_sessions). */
   csv?: MediaArtifact & { path?: string | null };
@@ -142,12 +144,6 @@ export async function getResultDetail(
     ...detail.video,
     url: absolutize(apiBaseUrl, detail.video?.url),
   };
-  if (detail.original) {
-    detail.original = {
-      ...detail.original,
-      url: absolutize(apiBaseUrl, detail.original.url),
-    };
-  }
   if (detail.backOriginal) {
     detail.backOriginal = {
       ...detail.backOriginal,

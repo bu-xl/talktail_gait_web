@@ -29,7 +29,8 @@ import {
   type StoredCsvFile,
   type StoredVideoFile,
 } from "../api/storedFilesApi.js";
-import { listTasks } from "../api/tasksApi.js";
+import { listDogs, type Dog } from "../api/dogsApi.js";
+import { listTasks, moveTaskDog } from "../api/tasksApi.js";
 import { parseStamp, roleOrder } from "../core/sessionNaming.js";
 
 /**
@@ -117,6 +118,9 @@ export class VerifyPage {
   /** 분석하기로 보낼 도장들. 탭을 바꾸거나 새로고침하면 비운다. */
   private readonly picked = new Set<string>();
   private analyzing = false;
+
+  /** 개체 목록 — "개체 변경" 셀렉트의 재료. 목록을 새로 읽을 때 같이 받는다. */
+  private dogs: Dog[] = [];
 
   constructor(root: HTMLElement) {
     this.root = root;
@@ -210,6 +214,12 @@ export class VerifyPage {
     try {
       this.picked.clear();
       // 파일은 디스크에서, 세션 id·버림 표시는 DB 에서. 폴더 키로 맞춘다.
+      // 개체 목록은 "개체 변경" 셀렉트가 쓴다. 실패해도 화면은 떠야 한다.
+      void listDogs(this.apiBase)
+        .then((dogs) => {
+          this.dogs = dogs;
+        })
+        .catch(() => undefined);
       const [list, tasks] = await Promise.all([
         listStoredFiles(this.apiBase),
         listTasks(this.apiBase).catch(() => []),
@@ -491,11 +501,61 @@ export class VerifyPage {
     );
     const headRow = document.createElement("div");
     headRow.className = "dv-detail-head";
-    headRow.append(head, discardBtn, delBtn);
+    headRow.append(head, this.moveDogSelect(s), discardBtn, delBtn);
     this.detailEl.appendChild(headRow);
 
     this.detailEl.appendChild(this.csvBlock(s));
     this.detailEl.appendChild(this.videoBlock(s));
+  }
+
+  /**
+   * 개체 변경 — 개를 잘못 고르고 찍었을 때 그 자리에서 옮긴다(§3-1 정정).
+   *
+   * 버튼 + 모달이 아니라 **셀렉트 하나**다. 고를 대상이 목록이라 셀렉트가 곧 목록이고,
+   * 되묻기는 `confirm` 이 한다 — 이 화면의 삭제 모달과 달리 되돌릴 수 있는 동작이다.
+   */
+  private moveDogSelect(s: Session): HTMLSelectElement {
+    const sel = document.createElement("select");
+    sel.className = "dv-del-btn";
+    const head = document.createElement("option");
+    head.textContent = t("verify_move_dog");
+    head.value = "";
+    sel.appendChild(head);
+    for (const dog of this.dogs) {
+      if (dog.id === s.dogId) continue;
+      const opt = document.createElement("option");
+      opt.value = String(dog.id);
+      opt.textContent = `#${dog.id} ${dog.name ?? ""}`.trim();
+      sel.appendChild(opt);
+    }
+    sel.disabled = this.deleting || this.analyzing || this.dogs.length < 2;
+    sel.addEventListener("change", () => {
+      const dogId = Number(sel.value);
+      sel.value = "";
+      if (!dogId) return;
+      void this.moveToDog(s, dogId);
+    });
+    return sel;
+  }
+
+  private async moveToDog(s: Session, dogId: number): Promise<void> {
+    if (!this.apiBase) return;
+    // 폴더는 있는데 회차 행이 없는 촬영(옛 이관분 등)은 옮길 수 없다 — 고칠 행이 없다.
+    if (!s.id) {
+      this.setStatus(t("verify_move_no_row"), true);
+      return;
+    }
+    const dog = this.dogs.find((d) => d.id === dogId);
+    const label = dog ? `#${dog.id} ${dog.name ?? ""}`.trim() : `#${dogId}`;
+    if (!window.confirm(t("verify_move_ask", { dog: label }))) return;
+    try {
+      await moveTaskDog(this.apiBase, s.id, dogId);
+      await this.reload();
+      this.setStatus(t("verify_move_done", { dog: label }));
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      this.setStatus(`${t("verify_move_failed")}: ${detail}`, true);
+    }
   }
 
   private csvBlock(s: Session): HTMLElement {

@@ -310,11 +310,7 @@ export class ResultsPage {
     setReviewMedia(
       "rpBody21",
       document.getElementById("rpOriginVideo") as HTMLVideoElement,
-      detail.original?.available && detail.original.url
-        ? detail.original.url
-        : detail.backOriginal?.available
-          ? detail.backOriginal.url
-          : null,
+      detail.backOriginal?.available ? detail.backOriginal.url : null,
     );
     setReviewMedia(
       "rpBody22",
